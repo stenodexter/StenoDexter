@@ -11,13 +11,19 @@ import { toast } from "sonner";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
-  return <p className="text-destructive text-xs mt-1">{message}</p>;
+  return <p className="text-destructive mt-1 text-xs">{message}</p>;
 }
 
 export function LoginForm() {
   const router = useRouter();
   const loginMutation = trpc.admin.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async ({ admin: { token } }) => {
+      await fetch("/api/set-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, name: "admin_token" }),
+      });
+
       toast.success("Welcome back!");
       router.push("/admin");
     },
@@ -128,7 +134,7 @@ export function LoginForm() {
           Don't have an account?{" "}
           <a
             href="/admin/register"
-            className="text-foreground font-medium underline underline-offset-4 hover:text-primary"
+            className="text-foreground hover:text-primary font-medium underline underline-offset-4"
           >
             Create one
           </a>

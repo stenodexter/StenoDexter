@@ -17,7 +17,7 @@ import { auth, type UserSession } from "~/server/better-auth";
 import { db } from "~/server/db";
 import { subscription } from "~/server/db/schema";
 import type { AdminSession } from "../better-auth/config";
-import type { NextApiRequest, NextApiResponse } from "next";
+import { cookies } from "next/headers";
 
 /**
  * 1. CONTEXT
@@ -28,6 +28,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
  * - admin: custom admin session + admin user (may be null)
  * - headers: forwarded headers
  */
+
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   // 1) user session (better-auth)
   const userSession = (await auth.api.getSession({
@@ -36,9 +37,9 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
   // 2) admin session: read cookie and load admin session row
   const cookieHeader = opts.headers.get("cookie") ?? "";
-  const cookies = parseCookie(cookieHeader || "");
+  const parsedCookies = parseCookie(cookieHeader || "");
 
-  const adminTokenParse = z.string().safeParse(cookies.admin_token);
+  const adminTokenParse = z.string().safeParse(parsedCookies.admin_token);
 
   let admin: AdminSession | null = null;
 
@@ -48,9 +49,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
     const adminSession = await db.query.adminSession.findFirst({
       where: (s, { eq, gt }) => and(eq(s.token, token), gt(s.expiresAt, now)),
-      with: {
-        admin: true,
-      },
+      with: { admin: true },
     });
 
     if (adminSession?.admin) {
@@ -68,7 +67,6 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     admin: admin?.admin ?? null,
     adminSession: admin?.session ?? null,
     headers: opts.headers,
-    setCookie: null as null | string,
   };
 };
 

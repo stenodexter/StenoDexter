@@ -8,7 +8,7 @@ export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <Button variant="outline" onClick={toggleTheme} className="cursor-pointer">
+    <Button variant="outline" onClick={toggleTheme} className="cursor-pointer scale-115">
       <IconBrightness />
     </Button>
   );

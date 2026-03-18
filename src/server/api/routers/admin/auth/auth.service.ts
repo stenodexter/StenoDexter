@@ -99,8 +99,10 @@ export const authService = {
       await ctx.db.delete(adminSession).where(eq(adminSession.token, token));
     }
 
-    ctx.setCookie = serialize(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 });
-
+    ctx.resHeaders.append(
+      "Set-Cookie",
+      serialize(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 }),
+    );
     return { success: true };
   },
 
@@ -116,13 +118,12 @@ export const authService = {
       expiresAt: new Date(Date.now() + SEVEN_DAYS),
     });
 
-    ctx.setCookie = serialize(COOKIE_NAME, token, cookieOptions);
-
     return {
       admin: {
         id: adminUser.id,
         name: adminUser.name,
         isSuper: adminUser.isSuper,
+        token,
       },
     };
   },
