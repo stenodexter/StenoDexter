@@ -18,6 +18,7 @@ import { db } from "~/server/db";
 import { subscription } from "~/server/db/schema";
 import type { AdminSession } from "../better-auth/config";
 import { cookies } from "next/headers";
+import { R2Service } from "../services/r2.service";
 
 /**
  * 1. CONTEXT
@@ -62,6 +63,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
   return {
     db,
+
     user: userSession?.user ?? null,
     userSession: userSession?.session ?? null,
     admin: admin?.admin ?? null,

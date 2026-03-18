@@ -9,7 +9,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import { env } from "~/env";
 
-export class R2Service {
+export default class R2Service {
   private client: S3Client;
   private bucket: string;
   private publicUrl: string;
@@ -78,3 +78,5 @@ export class R2Service {
     });
   }
 }
+
+export const r2Service = new R2Service();

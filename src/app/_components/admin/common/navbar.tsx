@@ -27,10 +27,10 @@ export function AdminNavbar({ admin }: NavbarProps) {
       <Separator orientation="vertical" className="mr-2 h-4" />
       <span className="text-sm font-semibold">Hi , {admin.name}</span>
 
-      <div className="ml-auto flex gap-3 items-center">
+      <div className="ml-auto flex items-center gap-3">
         <Button size={"sm"} className="">
-            <Plus/>
-            <p>Create Assessment</p>
+          <Plus />
+          <p>Create Test</p>
         </Button>
         <ThemeToggle />
         <DropdownMenu>

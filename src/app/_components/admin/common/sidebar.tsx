@@ -27,13 +27,15 @@ import {
   Plus,
   Keyboard,
   Pen,
+  Frame,
 } from "lucide-react";
 
 const MAIN_NAV = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Tests", href: "/admin/tests", icon: ClipboardList, badge: "New" },
-  { label: "Leaderboard", href: "/leaderboard", icon: Trophy },
+  { label: "Leaderboard", href: "/admin/leaderboard", icon: Trophy },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart2 },
+  { label: "Hall of Fame", href: "/admin/hall-of-fame", icon: Frame },
 ];
 
 const MANAGE_NAV = [
@@ -68,11 +70,11 @@ export function AdminSidebar() {
 
       <SidebarContent className="px-2">
         {/* ── Create Assessment CTA ── */}
-        <div className="px-2 pt-1 pb-2 mb-3">
+        <div className="mb-1 px-2 pt-1">
           <Button asChild className="w-full justify-start gap-2" size="sm">
             <Link href="/admin/tests/new">
               <Plus className="h-4 w-4" />
-              Create Assessment
+              Create Test
             </Link>
           </Button>
         </div>
