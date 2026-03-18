@@ -68,6 +68,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     admin: admin?.admin ?? null,
     adminSession: admin?.session ?? null,
     headers: opts.headers,
+    setCookie: null as null | string,
   };
 };
 

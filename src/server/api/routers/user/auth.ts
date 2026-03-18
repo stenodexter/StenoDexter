@@ -1,22 +1,26 @@
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  paidUserProcedure,
+  protectedProcedure,
+} from "~/server/api/trpc";
 
 export const authRouter = createTRPCRouter({
   /**
    * Get current user profile
    */
   me: protectedProcedure.query(({ ctx }) => {
-    return ctx.session.user;
+    return ctx.user;
   }),
 
   /**
    * Check if user has active subscription
    */
-  hasSubscription: protectedProcedure.query(async ({ ctx }) => {
+  hasSubscription: paidUserProcedure.query(async ({ ctx }) => {
     // This would typically check the subscription table
     // For now, returning false as placeholder
-    return false;
+    return ctx.subscription;
   }),
 
   /**

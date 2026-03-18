@@ -2,8 +2,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 // User routers
 import { authRouter as userAuthRouter } from "./routers/user/auth";
-import { postsRouter } from "./routers/user/posts";
-import { adminAuthRouter } from "./routers/admin/auth/auth.router";
+import { adminRouter } from "./routers/admin";
 
 /**
  * This is the primary router for your server.
@@ -12,14 +11,11 @@ import { adminAuthRouter } from "./routers/admin/auth/auth.router";
  */
 export const appRouter = createTRPCRouter({
   // Admin routes
-  admin: createTRPCRouter({
-    auth: adminAuthRouter,
-  }),
+  admin: adminRouter,
 
   // User routes
   user: createTRPCRouter({
     auth: userAuthRouter,
-    posts: postsRouter,
   }),
 });
 

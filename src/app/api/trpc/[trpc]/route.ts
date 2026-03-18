@@ -15,20 +15,24 @@ const createContext = async (req: NextRequest) => {
   });
 };
 
-const handler = (req: NextRequest) =>
-  fetchRequestHandler({
+const handler = async (req: NextRequest) => {
+  let ctxRef: any;
+
+  const res = await fetchRequestHandler({
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: () => createContext(req),
-    onError:
-      env.NODE_ENV === "development"
-        ? ({ path, error }) => {
-            console.error(
-              `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
-            );
-          }
-        : undefined,
+    createContext: async () => {
+      const ctx = await createContext(req);
+      ctxRef = ctx; // capture reference
+      return ctx;
+    },
   });
 
+  if (ctxRef?.setCookie) {
+    res.headers.set("Set-Cookie", ctxRef.setCookie);
+  }
+
+  return res;
+};
 export { handler as GET, handler as POST };

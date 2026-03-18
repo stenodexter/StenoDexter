@@ -1,9 +1,16 @@
-import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import {
+  adminProcedure,
+  createTRPCRouter,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { authService } from "./auth.service";
 import { loginSchema, registerSchema } from "./auth.schema";
 
 export const adminAuthRouter = createTRPCRouter({
+  me: adminProcedure.query(({ ctx }) => {
+    return ctx.admin;
+  }),
+
   register: publicProcedure
     .input(registerSchema)
     .mutation(({ input, ctx }) => authService.register(input, ctx)),

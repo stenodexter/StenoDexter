@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773560041954,
-      "tag": "0000_sharp_chimera",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1773560396056,
-      "tag": "0001_funny_lily_hollister",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773566276054,
-      "tag": "0002_add_subscription",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773567191154,
-      "tag": "0003_add_user_role",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773567751291,
-      "tag": "0004_add_admin_auth",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1773567969404,
-      "tag": "0005_sync_user_without_role",
+      "when": 1773815979925,
+      "tag": "0000_shiny_famine",
       "breakpoints": true
     }
   ]
