@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { env } from "~/env";
 import { db } from "~/server/db";
+import type { admin, adminSession } from "../db/schema";
 
 export const auth = betterAuth({
   ...(env.BETTER_AUTH_SECRET && { secret: env.BETTER_AUTH_SECRET }),
@@ -29,4 +30,9 @@ export const auth = betterAuth({
   },
 });
 
-export type Session = typeof auth.$Infer.Session;
+export type UserSession = typeof auth.$Infer.Session;
+
+export type AdminSession = {
+  admin: typeof admin.$inferSelect;
+  session: typeof adminSession.$inferSelect;
+} | null;

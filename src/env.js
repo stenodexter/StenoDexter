@@ -13,10 +13,12 @@ export const env = createEnv({
         : z.string().optional(),
     BETTER_AUTH_GOOGLE_CLIENT_ID: z.string(),
     BETTER_AUTH_GOOGLE_CLIENT_SECRET: z.string(),
+    JWT_SECRET: z.string(),
     BETTER_AUTH_BASE_URL: z.string(),
     DATABASE_URL: z.string().url(),
     RAZORPAY_KEY_ID: z.string(),
     RAZORPAY_KEY_SECRET: z.string(),
+    ADMIN_INVITE_CODE: z.string(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -42,6 +44,8 @@ export const env = createEnv({
     BETTER_AUTH_GOOGLE_CLIENT_SECRET:
       process.env.BETTER_AUTH_GOOGLE_CLIENT_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
+    ADMIN_INVITE_CODE: process.env.ADMIN_INVITE_CODE,
+    JWT_SECRET: process.env.JWT_SECRET,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
     NODE_ENV: process.env.NODE_ENV,

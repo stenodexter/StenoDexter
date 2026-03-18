@@ -1,52 +1,80 @@
 /**
- * YOU PROBABLY DON'T NEED TO EDIT THIS FILE, UNLESS:
- * 1. You want to modify request context (see Part 1).
- * 2. You want to create a new middleware or type of procedure (see Part 3).
+ * tRPC bootstrap — cleaned and simplified
  *
- * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
- * need to use are documented accordingly near the end.
+ * Provides:
+ * - createTRPCContext: attaches `db`, `user` (better-auth session), and `admin` (custom admin session)
+ * - initTRPC with superjson transformer and Zod error parsing
+ * - public/protected/admin/superAdmin/paidUser procedures with clear error messages
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
-import { ZodError } from "zod";
-
+import { z, ZodError } from "zod";
 import { and, eq, gt } from "drizzle-orm";
+import { parse as parseCookie } from "cookie";
 
-import { auth, type Session as AuthSession } from "~/server/better-auth";
+import { auth, type UserSession } from "~/server/better-auth";
 import { db } from "~/server/db";
 import { subscription } from "~/server/db/schema";
-import { getCurrentAdmin } from "~/server/admin/auth";
+import type { AdminSession } from "../better-auth/config";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 /**
  * 1. CONTEXT
  *
- * This section defines the "contexts" that are available in the backend API.
- *
- * These allow you to access things when processing a request, like the database, the session, etc.
- *
- * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
- * wrap this and provides the required context.
- *
- * @see https://trpc.io/docs/server/context
+ * Attaches:
+ * - db
+ * - user: result from better-auth (may be null)
+ * - admin: custom admin session + admin user (may be null)
+ * - headers: forwarded headers
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth.api.getSession({
+  // 1) user session (better-auth)
+  const userSession = (await auth.api.getSession({
     headers: opts.headers,
-  });
+  })) as UserSession | null;
+
+  // 2) admin session: read cookie and load admin session row
+  const cookieHeader = opts.headers.get("cookie") ?? "";
+  const cookies = parseCookie(cookieHeader || "");
+
+  const adminTokenParse = z.string().safeParse(cookies.admin_token);
+
+  let admin: AdminSession | null = null;
+
+  if (adminTokenParse.success) {
+    const token = adminTokenParse.data;
+    const now = new Date();
+
+    const adminSession = await db.query.adminSession.findFirst({
+      where: (s, { eq, gt }) => and(eq(s.token, token), gt(s.expiresAt, now)),
+      with: {
+        admin: true,
+      },
+    });
+
+    if (adminSession?.admin) {
+      admin = {
+        session: adminSession,
+        admin: adminSession.admin,
+      } as unknown as AdminSession;
+    }
+  }
+
   return {
     db,
-    session,
-    ...opts,
+    user: userSession?.user ?? null,
+    userSession: userSession?.session ?? null,
+    admin: admin?.admin ?? null,
+    adminSession: admin?.session ?? null,
+    headers: opts.headers,
   };
 };
 
 /**
  * 2. INITIALIZATION
  *
- * This is where the tRPC API is initialized, connecting the context and transformer. We also parse
- * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
- * errors on the backend.
+ * Use superjson transformer and format Zod errors for frontend consumption.
  */
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
@@ -63,42 +91,28 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 });
 
 /**
- * Create a server-side caller.
- *
- * @see https://trpc.io/docs/server/server-side-calls
+ * Create a server-side caller factory (useful for server-side calls).
  */
 export const createCallerFactory = t.createCallerFactory;
 
 /**
- * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)
- *
- * These are the pieces you use to build your tRPC API. You should import these a lot in the
- * "/src/server/api/routers" directory.
- */
-
-/**
- * This is how you create new routers and sub-routers in your tRPC API.
- *
- * @see https://trpc.io/docs/router
+ * Router helper to create routers.
  */
 export const createTRPCRouter = t.router;
 
 /**
- * Middleware for timing procedure execution and adding an artificial delay in development.
- *
- * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
- * network latency that would occur in production but not in local development.
+ * Timing middleware (keeps a small artificial delay in dev to catch waterfalls).
  */
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
-  
+
   if (t._config.isDev) {
-    // artificial delay in dev
+    // small artificial delay — remove or adjust if you don't want it
     const waitMs = Math.floor(Math.random() * 400) + 100;
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
-  const result = await next();
 
+  const result = await next();
 
   const end = Date.now();
   console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
@@ -107,74 +121,104 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 });
 
 /**
- * Public (unauthenticated) procedure
+ * 3. Procedures
  *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
+ * - publicProcedure: no auth required
+ * - protectedProcedure: any logged-in user (better-auth)
+ * - adminProcedure: logged-in admin (custom admin_session)
+ * - superAdminProcedure: admin with isSuper flag
+ * - paidUserProcedure: user with active subscription
  */
+
+/** Public (no authentication required) */
 export const publicProcedure = t.procedure.use(timingMiddleware);
 
-/**
- * Protected (authenticated) procedure – any logged in user.
- */
+/** Protected user (better-auth) */
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
-  if (!ctx.session?.user) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-  const session = ctx.session as AuthSession;
-  return next({
-    ctx: {
-      session,
-    },
-  });
-});
-
-/**
- * Admin procedure – only for admins authenticated via the dedicated admin auth system.
- */
-export const adminProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  const admin = await getCurrentAdmin();
-  if (!admin) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Admins only" });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      admin,
-    },
-  });
-});
-
-/**
- * Paid procedure – requires authenticated user with an active monthly subscription.
- * Use for any mutation/query that should be gated behind subscription (e.g. post, access content).
- */
-export const paidProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const now = new Date();
-  const [activeSubscription] = await db
-    .select()
-    .from(subscription)
-    .where(
-      and(
-        eq(subscription.userId, ctx.session.user.id),
-        eq(subscription.status, "active"),
-        gt(subscription.currentPeriodEnd, now),
-      ),
-    )
-    .limit(1);
-
-  if (!activeSubscription) {
+  // ctx.user follows better-auth's getSession shape: ctx.user?.user is the actual user object
+  if (!ctx?.user) {
     throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "Active monthly subscription required. Subscribe to access this feature.",
+      code: "UNAUTHORIZED",
+      message: "You must be signed in to access this resource.",
     });
   }
+
   return next({
     ctx: {
       ...ctx,
-      subscription: activeSubscription,
+      user: ctx.user,
     },
   });
 });
+
+/** Admin (custom admin session) */
+export const adminProcedure = publicProcedure.use(({ ctx, next }) => {
+  if (!ctx?.admin?.id) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Admin access required. Please sign in as an admin.",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      admin: ctx.admin,
+    },
+  });
+});
+
+/** Super admin only */
+export const superAdminProcedure = adminProcedure.use(({ ctx, next }) => {
+  // ctx.admin here is the admin object (returned by adminProcedure)
+  if (!ctx.admin?.isSuper) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only super admins are allowed to perform this action.",
+    });
+  }
+
+  return next();
+});
+
+/**
+ * Paid user procedure — requires an active subscription
+ */
+export const paidUserProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    const now = new Date();
+
+    const [activeSubscription] = await db
+      .select()
+      .from(subscription)
+      .where(
+        and(
+          eq(subscription.userId, ctx.user.id),
+          eq(subscription.status, "active"),
+          gt(subscription.currentPeriodEnd, now),
+        ),
+      )
+      .limit(1);
+
+    if (!activeSubscription) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "An active subscription is required to access this feature. Please subscribe and try again.",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        subscription: activeSubscription,
+      },
+    });
+  },
+);
+
+export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
+
+export type PaidUserContext = TRPCContext & {
+  subscription: typeof subscription.$inferSelect;
+};
