@@ -78,6 +78,7 @@ export function RegisterForm() {
               <div className="space-y-1">
                 <Label htmlFor={field.name}>Full name</Label>
                 <Input
+                size={10}
                   id={field.name}
                   placeholder="John Doe"
                   value={field.state.value}
