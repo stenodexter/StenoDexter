@@ -5,12 +5,11 @@ import {
   Area,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 const dummyData = [
   { date: "Mar 1", score: 62 },
@@ -36,9 +35,9 @@ const CustomTooltip = ({
 }) => {
   if (active && payload?.length) {
     return (
-      <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
-        <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
-        <p className="text-foreground text-sm font-semibold">
+      <div className="bg-background border border-border rounded-md px-2 py-1 shadow-sm">
+        <p className="text-muted-foreground text-[10px]">{label}</p>
+        <p className="text-foreground text-sm font-medium">
           {payload[0]?.value}
           <span className="text-muted-foreground font-normal"> / 100</span>
         </p>
@@ -61,20 +60,30 @@ export function ScoreChart() {
             <p className="text-muted-foreground text-xs uppercase tracking-widest font-medium mb-1">
               Score Progress
             </p>
+
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-semibold tracking-tight">
                 {latest}
               </span>
+
               <span className="text-muted-foreground text-sm">/ 100</span>
+
               <span
-                className={`flex items-center gap-0.5 text-xs font-medium ${delta >= 0 ? "text-emerald-500" : "text-red-400"}`}
+                className={`flex items-center gap-1 text-xs font-medium ${
+                  delta >= 0 ? "text-emerald-500" : "text-red-400"
+                }`}
               >
-                <TrendingUp className="h-3 w-3" />
+                {delta >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )}
                 {delta >= 0 ? "+" : ""}
-                {delta} pts
+                {delta}
               </span>
             </div>
           </div>
+
           <span className="text-muted-foreground text-xs bg-muted px-2 py-1 rounded-md">
             Last 30 days
           </span>
@@ -87,38 +96,34 @@ export function ScoreChart() {
             data={dummyData}
             margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="hsl(var(--border))"
-              vertical={false}
-            />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
             />
+
             <YAxis
               domain={[40, 100]}
               tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+
+            <Tooltip
+              cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
+              content={<CustomTooltip />}
+            />
+
             <Area
-              type="monotone"
+              type="natural"
               dataKey="score"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              fill="url(#scoreGrad)"
-              dot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-              activeDot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+              stroke="hsl(var(--foreground))"
+              strokeWidth={1.8}
+              fill="hsl(var(--foreground))"
+              fillOpacity={0.05}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
           </AreaChart>
         </ResponsiveContainer>
