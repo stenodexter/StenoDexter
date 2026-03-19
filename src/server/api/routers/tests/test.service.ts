@@ -1,10 +1,12 @@
 import { db } from "~/server/db";
 import { testAttempts, tests } from "~/server/db/schema/tests";
-import { eq, desc, count, and, asc, inArray } from "drizzle-orm";
+import { eq, desc, count, and, asc, inArray, gte, lte } from "drizzle-orm";
 import type {
   CreateTestInput,
   GetTestInput,
+  GetTestsAdminInput,
   ListTestsInput,
+  ListUserTestsInput,
   listUserTestsSchema,
   UpdateTestInput,
 } from "./test.schema";
@@ -116,7 +118,7 @@ export const testService = {
     };
   },
 
-  async listForUserFeed(input: listUserTestsSchema, userId: string) {
+  async listForUserFeed(input: ListUserTestsInput, userId: string) {
     const { page } = input;
     const offset = (page - 1) * PAGE_SIZE;
 
@@ -193,5 +195,75 @@ export const testService = {
     if (!test) throw new Error("Test not found");
 
     return { ...test, audioUrl: R2Service.getPublicUrl(test.audioKey) };
+  },
+
+  async getLast24HourTests() {
+    const now = new Date();
+
+    const past24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const data = await db.query.tests.findMany({
+      where: gte(tests.createdAt, past24Hours),
+      orderBy: desc(tests.createdAt),
+    });
+
+    return data;
+  },
+
+  async getTestsAdmin(input: GetTestsAdminInput) {
+    const { page, pageSize, status, type, fromDate, toDate, adminId, sort } =
+      input;
+
+    const offset = (page - 1) * pageSize;
+
+    const conditions = [];
+
+    if (status) {
+      conditions.push(eq(tests.status, status));
+    }
+
+    if (type) {
+       conditions.push(eq(tests.type, type));
+     
+    }
+
+    if (adminId) {
+      conditions.push(eq(tests.adminId, adminId));
+    }
+
+    if (fromDate) {
+      conditions.push(gte(tests.createdAt, fromDate));
+    }
+
+    if (toDate) {
+      conditions.push(lte(tests.createdAt, toDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const orderBy =
+      sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
+
+    const data = await db.query.tests.findMany({
+      where: whereClause,
+      limit: pageSize,
+      offset,
+      orderBy,
+    });
+
+    const totalRows = await db
+      .select({ total: count() })
+      .from(tests)
+      .where(whereClause);
+
+    const total = totalRows[0]?.total ?? 0;
+
+    return {
+      data,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
   },
 };

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { trpc } from "~/trpc/react";
-import { TestRow } from "../common/test-row";
 import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, Mic } from "lucide-react";
+import { TestRow } from "../test-row";
 
 function TestRowSkeleton() {
   return (

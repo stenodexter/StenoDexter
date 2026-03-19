@@ -1,12 +1,13 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 // User routers
-import { authRouter as userAuthRouter } from "./routers/user/auth";
 import { adminRouter } from "./routers/admin";
 import { storeRouter } from "./routers/store/store.router";
 import { testRouter } from "./routers/tests/test.router";
 import { attemptRouter } from "./routers/attempt/attempt.router";
 import { resultRouter } from "./routers/results/results.router";
+import { userRouter } from "./routers/user/user.router";
+import { analyticsRouter } from "./routers/analytics/analytics.router";
 
 /**
  * This is the primary router for your server.
@@ -14,17 +15,13 @@ import { resultRouter } from "./routers/results/results.router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  // Admin routes
   admin: adminRouter,
   store: storeRouter,
   test: testRouter,
   attempt: attemptRouter,
-  result:resultRouter,
-
-  // User routes
-  user: createTRPCRouter({
-    auth: userAuthRouter,
-  }),
+  result: resultRouter,
+  user: userRouter,
+  analytics: analyticsRouter,
 });
 
 // export type definition of API

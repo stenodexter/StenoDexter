@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../../trpc";
-import { r2Service } from "~/server/services/r2.service";
+import R2Service, { r2Service } from "~/server/services/r2.service";
 
 export const storeRouter = createTRPCRouter({
   generatePresignedUrl: publicProcedure
@@ -21,5 +21,15 @@ export const storeRouter = createTRPCRouter({
       });
 
       return result;
+    }),
+
+  getPublicUrl: publicProcedure
+    .input(
+      z.object({
+        key: z.string(),
+      }),
+    )
+    .query(({ input }) => {
+      return R2Service.getPublicUrl(input.key);
     }),
 });

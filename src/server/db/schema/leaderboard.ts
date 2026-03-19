@@ -61,7 +61,7 @@ export const leaderboard = pgTable("leaderboard", {
   bestWpm: integer("best_wpm"),
   bestAccuracy: integer("best_accuracy"),
 
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date()),
 });

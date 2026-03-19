@@ -32,10 +32,15 @@ import {
 
 const MAIN_NAV = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Tests", href: "/admin/tests", icon: ClipboardList, badge: "New" },
+  { label: "Tests", href: "/admin/tests", icon: ClipboardList },
   { label: "Leaderboard", href: "/admin/leaderboard", icon: Trophy },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart2 },
-  { label: "Hall of Fame", href: "/admin/hall-of-fame", icon: Frame },
+  {
+    label: "Hall of Fame",
+    href: "/admin/hall-of-fame",
+    icon: Frame,
+    badge: "New",
+  },
 ];
 
 const MANAGE_NAV = [

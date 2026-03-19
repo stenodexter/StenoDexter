@@ -24,8 +24,11 @@ import {
   PlusCircle,
   Play,
   Pause,
+  ChevronLeft,
+  ArrowLeft,
 } from "lucide-react";
 import type { DiffToken } from "~/server/services/scoring.service";
+import { useRouter } from "next/navigation"; // ✅ app router
 
 // ─── Audio Waveform Player ────────────────────────────────────────────────────
 
@@ -39,16 +42,13 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>(1);
-  const [progress, setProgress] = useState(0); // 0–1
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [waveformData, setWaveformData] = useState<number[]>([]);
 
-  // ── Generate fake waveform bars (replaced by real AudioContext analysis if needed)
   useEffect(() => {
     const bars = 120;
     const data = Array.from({ length: bars }, (_, i) => {
-      // Create a naturalistic envelope
       const base = Math.sin((i / bars) * Math.PI) * 0.6 + 0.1;
       const noise = Math.random() * 0.4;
       return Math.min(1, base + noise);
@@ -56,7 +56,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
     setWaveformData(data);
   }, [audioUrl]);
 
-  // ── Draw waveform canvas
   const drawWaveform = useCallback(() => {
     const canvas = canvasRef.current;
     const audio = audioRef.current;
@@ -71,7 +70,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
-
     ctx.clearRect(0, 0, W, H);
 
     const bars = waveformData.length;
@@ -81,7 +79,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
       ? audio.currentTime / (audio.duration || 1)
       : 0;
 
-    // Probe a real DOM element to resolve theme color
     const probe = document.createElement("span");
     probe.className = "text-primary";
     probe.style.cssText =
@@ -95,7 +92,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
       const w = Math.max(1.5, barW - gap);
       const barH = Math.max(3, amp * H * 0.9);
       const y = (H - barH) / 2;
-
       const played = i / bars < currentProgress;
 
       ctx.beginPath();
@@ -107,13 +103,11 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
     });
   }, [waveformData]);
 
-  // ── Animation loop
   useEffect(() => {
     const loop = () => {
       const audio = audioRef.current;
       if (audio) {
         setCurrentTime(audio.currentTime);
-        setProgress(audio.currentTime / (audio.duration || 1));
       }
       drawWaveform();
       animFrameRef.current = requestAnimationFrame(loop);
@@ -122,7 +116,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [drawWaveform]);
 
-  // ── Resize observer
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -171,10 +164,7 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
           onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
           onEnded={() => setIsPlaying(false)}
         />
-
-        {/* Single row: play | waveform+times (80%) | speeds (20%) */}
         <div className="flex items-center gap-4">
-          {/* Play / Pause */}
           <Button
             variant="ghost"
             size="icon"
@@ -188,7 +178,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
             )}
           </Button>
 
-          {/* Waveform + timestamps — takes 80% of remaining space */}
           <div className="flex flex-col gap-1.5" style={{ flex: "0 0 85%" }}>
             <canvas
               ref={canvasRef}
@@ -205,7 +194,6 @@ function AudioPlayer({ audioUrl }: { audioUrl: string }) {
             </div>
           </div>
 
-          {/* Speed controls — takes remaining ~20% */}
           <div className="flex w-full flex-col items-center justify-end gap-1.5">
             {SPEEDS.map((s) => (
               <button
@@ -240,7 +228,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
             </span>
           );
         }
-
         if (token.type === "replace") {
           return (
             <span
@@ -256,7 +243,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
             </span>
           );
         }
-
         if (token.type === "delete") {
           return (
             <span
@@ -267,7 +253,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
             </span>
           );
         }
-
         if (token.type === "insert") {
           return (
             <span
@@ -278,7 +263,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
             </span>
           );
         }
-
         return null;
       })}
     </div>
@@ -363,6 +347,7 @@ function StatCard({
 function ResultSkeleton() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8">
+      <Skeleton className="h-4 w-16" />
       <div className="space-y-2">
         <Skeleton className="h-7 w-64" />
         <Skeleton className="h-4 w-40" />
@@ -387,6 +372,7 @@ function ResultSkeleton() {
 // ─── Inner — uses useSuspenseQuery ────────────────────────────────────────────
 
 function ResultInner({ attemptId }: { attemptId: string }) {
+  const router = useRouter(); // ✅ defined inside the component that uses it
   const [data] = trpc.result.getResult.useSuspenseQuery({ attemptId });
 
   const { attempt, test, result, diff } = data;
@@ -410,6 +396,15 @@ function ResultInner({ attemptId }: { attemptId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8">
+      {/* ── Back ── */}
+      <button
+        onClick={() => router.back()}
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back
+      </button>
+
       {/* ── Header ── */}
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -435,13 +430,12 @@ function ResultInner({ attemptId }: { attemptId: string }) {
 
       <Separator />
 
-      {/* ── Stat Cards — flex so all equal width ── */}
+      {/* ── Stat Cards ── */}
       <div className="flex gap-3">
         <StatCard
           icon={Trophy}
           label="Score"
           value={result.score}
-          // sub="correct words"
           highlight="success"
         />
         <StatCard
@@ -500,7 +494,7 @@ function ResultInner({ attemptId }: { attemptId: string }) {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Matter: side-by-side originals only ── */}
+        {/* Matter */}
         <TabsContent value="matter" className="w-full space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="relative rounded-xl bg-gradient-to-r from-emerald-400/40 via-emerald-400/10 to-transparent p-[1px]">
@@ -539,7 +533,7 @@ function ResultInner({ attemptId }: { attemptId: string }) {
           </div>
         </TabsContent>
 
-        {/* ── Outline ── */}
+        {/* Outline */}
         <TabsContent value="outline" className="w-full">
           <Card>
             <CardHeader className="pb-2">
@@ -555,7 +549,7 @@ function ResultInner({ attemptId }: { attemptId: string }) {
           </Card>
         </TabsContent>
 
-        {/* ── Explanation: annotated diff ── */}
+        {/* Explanation */}
         <TabsContent value="explanation" className="w-full">
           <Card>
             <CardHeader className="pb-3">

@@ -14,7 +14,7 @@ export async function requireAdmin() {
 }
 
 export async function requireUser() {
-  return guard(() => api.user.auth.me(), "/user/login");
+  return guard(() => api.user.me(), "/user/login");
 }
 
 export async function requireSuperAdmin() {

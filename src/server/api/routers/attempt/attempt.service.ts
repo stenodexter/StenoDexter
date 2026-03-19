@@ -151,32 +151,14 @@ export const attemptService = {
       });
 
       if (attempt.type === "assessment") {
-        const existing = await tx.query.leaderboard.findFirst({
-          where: and(
-            eq(leaderboard.userId, userId),
-            eq(leaderboard.testId, attempt.testId),
-          ),
-        });
+        await tx.insert(leaderboard).values({
+          userId,
+          testId: attempt.testId,
 
-        if (!existing) {
-          await tx.insert(leaderboard).values({
-            userId,
-            testId: attempt.testId,
-            bestScore: evaluation.score,
-            bestWpm: evaluation.wpm,
-            bestAccuracy: evaluation.accuracy,
-          });
-        } else if (evaluation.score > existing.bestScore) {
-          await tx
-            .update(leaderboard)
-            .set({
-              bestScore: evaluation.score,
-              bestWpm: evaluation.wpm,
-              bestAccuracy: evaluation.accuracy,
-              updatedAt: now,
-            })
-            .where(eq(leaderboard.id, existing.id));
-        }
+          bestScore: evaluation.score,
+          bestWpm: evaluation.wpm,
+          bestAccuracy: evaluation.accuracy,
+        });
       }
 
       return {

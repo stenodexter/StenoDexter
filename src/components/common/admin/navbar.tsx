@@ -28,10 +28,6 @@ export function AdminNavbar({ admin }: NavbarProps) {
       <span className="text-sm font-semibold">Hi , {admin.name}</span>
 
       <div className="ml-auto flex items-center gap-3">
-        <Button size={"sm"} className="">
-          <Plus />
-          <p>Create Test</p>
-        </Button>
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

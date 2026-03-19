@@ -60,7 +60,7 @@ export function TestList() {
             createdAt: new Date(t.createdAt),
           }))}
           sidebarOpen
-          onCardClick={(id) => router.push(`/admin/tests/${id}`)}
+          onCardClick={(id) => router.push(`/admin/test/${id}`)}
         />
       )}
 

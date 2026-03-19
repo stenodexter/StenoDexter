@@ -36,6 +36,20 @@
       "when": 1773900438063,
       "tag": "0004_red_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773942616489,
+      "tag": "0005_red_blizzard",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773946243093,
+      "tag": "0006_boring_zzzax",
+      "breakpoints": true
     }
   ]
 }

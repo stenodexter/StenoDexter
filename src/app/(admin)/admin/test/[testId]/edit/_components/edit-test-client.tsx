@@ -1,8 +1,10 @@
 "use client";
 
+// ─── app/admin/test/[testId]/edit/_components/edit-test-form.tsx ──────────────
+
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState, useRef, Suspense } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -12,6 +14,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   Card,
   CardContent,
@@ -44,13 +47,14 @@ import {
   Keyboard,
   CheckCircle2,
   Save,
-  Rocket,
   Info,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { trpc } from "~/trpc/react";
+import Link from "next/link";
 
-// ── Schema ──────────────────────────────────────────────────────────────────
+// ── Schema ────────────────────────────────────────────────────────────────────
 
 const formSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -58,14 +62,14 @@ const formSchema = z.object({
   dictationDuration: z.number().min(1),
   breakAfterAudio: z.number().min(0),
   typingDuration: z.number().min(1),
-  audioUrl: z.string().min(1, "Please upload an audio file"),
-  matter: z.string().min(10, "Correct answer must be at least 10 characters"),
-  outlines: z.string().optional(),
+  audioKey: z.string().min(1, "Please upload an audio file"),
+  matter: z.string().min(10, "Matter must be at least 10 characters"),
+  outline: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-// ── Timeline bar ─────────────────────────────────────────────────────────────
+// ── Timeline Bar ──────────────────────────────────────────────────────────────
 
 function TimelineBar({
   dictation,
@@ -77,10 +81,6 @@ function TimelineBar({
   typing: number;
 }) {
   const total = dictation + pause + typing || 1;
-  const dictPct = (dictation / total) * 100;
-  const pausePct = (pause / total) * 100;
-  const typePct = (typing / total) * 100;
-
   return (
     <div className="space-y-2">
       <div className="text-muted-foreground flex items-center justify-between text-xs">
@@ -90,34 +90,34 @@ function TimelineBar({
       <div className="bg-muted flex h-2.5 w-full overflow-hidden rounded-full">
         <div
           className="bg-blue-500 transition-all duration-300"
-          style={{ width: `${dictPct}%` }}
+          style={{ width: `${(dictation / total) * 100}%` }}
         />
         <div
           className="bg-amber-400 transition-all duration-300"
-          style={{ width: `${pausePct}%` }}
+          style={{ width: `${(pause / total) * 100}%` }}
         />
         <div
           className="bg-emerald-500 transition-all duration-300"
-          style={{ width: `${typePct}%` }}
+          style={{ width: `${(typing / total) * 100}%` }}
         />
       </div>
       <div className="text-muted-foreground flex gap-4 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
-          Dictation ({dictation}s)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-          Break ({pause}s)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          Typing ({typing}s)
-        </span>
+        {[
+          { color: "bg-blue-500", label: "Dictation", val: dictation },
+          { color: "bg-amber-400", label: "Break", val: pause },
+          { color: "bg-emerald-500", label: "Typing", val: typing },
+        ].map(({ color, label, val }) => (
+          <span key={label} className="flex items-center gap-1.5">
+            <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
+            {label} ({val}s)
+          </span>
+        ))}
       </div>
     </div>
   );
 }
+
+// ── Audio Dropzone ────────────────────────────────────────────────────────────
 
 function AudioDropzone({
   value,
@@ -156,31 +156,22 @@ function AudioDropzone({
       toast.error("Only audio files are supported.");
       return;
     }
-
     setUploading(true);
     setFileName(file.name);
-
     try {
       const durationSeconds = await getAudioDurationSeconds(file);
-
       const ext = file.name.split(".").pop() ?? "mp3";
-      const { uploadUrl, fileUrl, key } =
-        await generatePresignedUrl.mutateAsync({
-          folder: "dictations",
-          contentType: file.type,
-          ext,
-        });
-
-      // 3. Upload directly to R2
+      const { uploadUrl, key } = await generatePresignedUrl.mutateAsync({
+        folder: "dictations",
+        contentType: file.type,
+        ext,
+      });
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
-
       if (!uploadRes.ok) throw new Error("Upload failed");
-
-      // 4. Commit values — store the R2 object key, not the full URL
       onChange(key);
       if (durationSeconds > 0) {
         onDurationDetected(durationSeconds);
@@ -208,7 +199,16 @@ function AudioDropzone({
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         onClick={() => !uploading && inputRef.current?.click()}
-        className={`relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors ${error ? "border-destructive/60 bg-destructive/5" : "border-border hover:border-primary/50 hover:bg-muted/40"} ${uploading ? "pointer-events-none opacity-70" : ""} ${value ? "border-emerald-500/50 bg-emerald-500/5" : ""} `}
+        className={[
+          "relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors",
+          error
+            ? "border-destructive/60 bg-destructive/5"
+            : "border-border hover:border-primary/50 hover:bg-muted/40",
+          uploading ? "pointer-events-none opacity-70" : "",
+          value ? "border-emerald-500/50 bg-emerald-500/5" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <input
           ref={inputRef}
@@ -284,58 +284,50 @@ function FieldError({ errors }: { errors: string[] }) {
   return <p className="text-destructive mt-1 text-xs">{errors[0]}</p>;
 }
 
-export function CreateTestForm() {
+// ── Form (with pre-populated data) ───────────────────────────────────────────
+
+function EditTestFormInner({ testId }: { testId: string }) {
   const router = useRouter();
+  const [testData] = trpc.test.get.useSuspenseQuery({ id: testId });
+  const utils = trpc.useUtils();
 
-  // ✅ Use a ref instead of state so the value is always current
-  // when onSubmit fires — no async batching issues.
-  const submitModeRef = useRef<"draft" | "active">("draft");
-
-  // Keep a state copy only for the button label UI
-  const [submitModeLabel, setSubmitModeLabel] = useState<"draft" | "active">(
-    "draft",
-  );
-
-  const createTest = trpc.test.create.useMutation({
+  const updateTest = trpc.test.update.useMutation({
     onSuccess: () => {
-      toast.success(
-        submitModeRef.current === "draft"
-          ? "Test saved as draft."
-          : "Test launched successfully!",
-      );
-      router.push("/admin/tests");
+      void utils.test.get.invalidate({ id: testId });
+      toast.success("Test updated successfully.");
+      router.push(`/admin/test/${testId}`);
     },
     onError: (err) => toast.error(err.message),
   });
 
   const form = useForm({
     defaultValues: {
-      title: "",
-      tag: "general",
-      dictationDuration: 0,
-      breakAfterAudio: 60,
-      typingDuration: 600,
-      audioUrl: "",
-      matter: "",
-      outlines: "",
+      title: testData.title,
+      tag: testData.type as "general" | "legal",
+      dictationDuration: testData.dictationSeconds,
+      breakAfterAudio: testData.breakSeconds,
+      typingDuration: testData.writtenDurationSeconds,
+      audioKey: testData.audioKey,
+      matter: testData.matter,
+      outline: testData.outline ?? "",
     },
     onSubmit: async ({ value }) => {
       const parsed = formSchema.safeParse(value);
       if (!parsed.success) {
-        toast.error("Please fix the errors before submitting.");
+        toast.error("Please fix the errors before saving.");
         return;
       }
-
-      await createTest.mutateAsync({
+      await updateTest.mutateAsync({
+        id: testId,
         title: parsed.data.title,
         matter: parsed.data.matter,
-        audioKey: parsed.data.audioUrl,
+        audioKey: parsed.data.audioKey,
         type: parsed.data.tag,
-        outline: parsed.data.outlines,
+        outline: parsed.data.outline ?? "",
         breakSeconds: parsed.data.breakAfterAudio,
         writtenDurationSeconds: parsed.data.typingDuration,
         dictationSeconds: parsed.data.dictationDuration,
-        status: submitModeRef.current,
+        status: testData.status,
       });
     },
   });
@@ -361,7 +353,6 @@ export function CreateTestForm() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Title */}
             <form.Field
               name="title"
               validators={{
@@ -384,7 +375,6 @@ export function CreateTestForm() {
               )}
             </form.Field>
 
-            {/* Tag */}
             <form.Field name="tag">
               {(field) => (
                 <div className="space-y-1.5">
@@ -441,12 +431,12 @@ export function CreateTestForm() {
               Audio File
             </CardTitle>
             <CardDescription>
-              Upload the dictation audio for this test.
+              Upload a new dictation audio to replace the current one.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form.Field
-              name="audioUrl"
+              name="audioKey"
               validators={{
                 onChange: ({ value }) =>
                   !value ? "Audio file is required" : undefined,
@@ -479,7 +469,6 @@ export function CreateTestForm() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-3 gap-4">
-              {/* Dictation */}
               <form.Field
                 name="dictationDuration"
                 validators={{
@@ -488,13 +477,13 @@ export function CreateTestForm() {
                 }}
               >
                 {(field) => (
-                  <form.Subscribe selector={(s) => s.values.audioUrl}>
-                    {(audioUrl) => (
+                  <form.Subscribe selector={(s) => s.values.audioKey}>
+                    {(audioKey) => (
                       <div className="space-y-1.5">
                         <Label className="flex items-center gap-1.5">
                           <Mic className="h-3.5 w-3.5 text-blue-500" />
                           Dictation (sec)
-                          {audioUrl && (
+                          {audioKey && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Info className="text-muted-foreground h-3 w-3" />
@@ -516,12 +505,10 @@ export function CreateTestForm() {
                           onBlur={field.handleBlur}
                           readOnly
                           disabled
-                          className={
-                            audioUrl ? "cursor-not-allowed opacity-60" : ""
-                          }
+                          className="cursor-not-allowed opacity-60"
                         />
                         <p className="text-muted-foreground text-[11px]">
-                          {audioUrl
+                          {audioKey
                             ? "Auto-detected from audio"
                             : "Audio playback time"}
                         </p>
@@ -534,7 +521,6 @@ export function CreateTestForm() {
                 )}
               </form.Field>
 
-              {/* Break */}
               <form.Field name="breakAfterAudio">
                 {(field) => (
                   <div className="space-y-1.5">
@@ -558,7 +544,6 @@ export function CreateTestForm() {
                 )}
               </form.Field>
 
-              {/* Typing */}
               <form.Field
                 name="typingDuration"
                 validators={{
@@ -590,7 +575,6 @@ export function CreateTestForm() {
               </form.Field>
             </div>
 
-            {/* Live timeline bar */}
             <form.Subscribe
               selector={(s) => [
                 s.values.dictationDuration,
@@ -609,7 +593,7 @@ export function CreateTestForm() {
           </CardContent>
         </Card>
 
-        {/* ── 4. Content tabs ── */}
+        {/* ── 4. Content ── */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -617,7 +601,7 @@ export function CreateTestForm() {
               Test Content
             </CardTitle>
             <CardDescription>
-              Provide the matter (correct transcription) and optional outlines.
+              Edit the matter (correct transcription) and optional outlines.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -626,7 +610,7 @@ export function CreateTestForm() {
                 <TabsTrigger value="matter">
                   Matter / Correct Answer
                 </TabsTrigger>
-                <TabsTrigger value="outlines">Outlines</TabsTrigger>
+                <TabsTrigger value="outline">Outline</TabsTrigger>
               </TabsList>
 
               <TabsContent value="matter">
@@ -642,7 +626,7 @@ export function CreateTestForm() {
                   {(field) => (
                     <div className="space-y-1.5">
                       <Textarea
-                        placeholder="Enter the exact correct transcription that candidates should produce…"
+                        placeholder="Enter the exact correct transcription…"
                         rows={15}
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
@@ -662,12 +646,12 @@ export function CreateTestForm() {
                 </form.Field>
               </TabsContent>
 
-              <TabsContent value="outlines">
-                <form.Field name="outlines">
+              <TabsContent value="outline">
+                <form.Field name="outline">
                   {(field) => (
                     <div className="space-y-1.5">
                       <Textarea
-                        placeholder="Optional shorthand outlines, notes, or hints for graders…"
+                        placeholder="Optional shorthand outlines or grader notes…"
                         rows={15}
                         value={field.state.value ?? ""}
                         onChange={(e) => field.handleChange(e.target.value)}
@@ -690,44 +674,78 @@ export function CreateTestForm() {
           <Button
             type="button"
             variant="ghost"
-            onClick={() => router.push("/admin/tests")}
+            onClick={() => router.push(`/admin/test/${testId}`)}
           >
             Cancel
           </Button>
 
           <form.Subscribe selector={(s) => s.isSubmitting}>
             {(isSubmitting) => (
-              <>
-                <Button
-                  type="submit"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onMouseDown={() => {
-                    submitModeRef.current = "draft";
-                    setSubmitModeLabel("draft");
-                  }}
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  Save as Draft
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  onMouseDown={() => {
-                    submitModeRef.current = "active";
-                    setSubmitModeLabel("active");
-                  }}
-                >
-                  <Rocket className="mr-2 h-4 w-4" />
-                  {isSubmitting && submitModeLabel === "active"
-                    ? "Starting..."
-                    : "Start Test"}
-                </Button>
-              </>
+              <Button type="submit" disabled={isSubmitting}>
+                <Save className="mr-2 h-4 w-4" />
+                {isSubmitting ? "Saving…" : "Save Changes"}
+              </Button>
             )}
           </form.Subscribe>
         </div>
       </form>
     </TooltipProvider>
+  );
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function EditFormSkeleton() {
+  return (
+    <div className="space-y-5">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-56" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── Page component ────────────────────────────────────────────────────────────
+
+export default function EditTestClient({ testId }: { testId: string }) {
+  // Fire the query immediately — before the Suspense boundary renders.
+  // useSuspenseQuery inside EditTestFormInner will hit the warm cache
+  // instead of showing a loading state.
+  const router = useRouter();
+  trpc.test.get.useQuery({ id: testId }, { staleTime: 60_000 });
+
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
+      {/* Back */}
+      <button
+        onClick={() => router.back()}
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Go Back
+      </button>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Edit Test</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Update audio, timing, and content. Only draft tests can be edited.
+        </p>
+      </div>
+
+      <Separator />
+
+      <Suspense fallback={<EditFormSkeleton />}>
+        <EditTestFormInner testId={testId} />
+      </Suspense>
+    </div>
   );
 }
