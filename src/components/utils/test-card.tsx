@@ -41,16 +41,17 @@ export function TestCard({ test, onClick }: TestCardProps) {
         "group flex flex-col gap-3 rounded-xl px-4 py-3.5",
         "border-border bg-card text-card-foreground border",
         "transition-all duration-150",
-        onClick && "hover:bg-accent cursor-pointer",
+        onClick &&
+          "hover:bg-muted/40 dark:hover:bg-muted/20 hover:border-border/80 cursor-pointer hover:shadow-sm",
       ]
         .filter(Boolean)
         .join(" ")}
     >
       {/* Row 1 — title + status */}
       <div className="flex items-start justify-between gap-3">
-        <p className="flex-1 text-[14px] leading-snug font-bold tracking-tight">
+        <h6 className="flex-1 leading-snug font-bold tracking-tight">
           {test.title}
-        </p>
+        </h6>
 
         <span
           className={[
@@ -83,7 +84,7 @@ export function TestCard({ test, onClick }: TestCardProps) {
           {test.type}
         </span>
 
-        <span className="text-muted-foreground text-[11px]">
+        <span className="text-muted-foreground text-[14px]">
           {fmtSec(
             test.dictationSeconds +
               test.writtenDurationSeconds +
@@ -124,7 +125,7 @@ export function TestCard({ test, onClick }: TestCardProps) {
       </div>
 
       {/* Row 4 — footer */}
-      <p className="text-muted-foreground text-[10px]">
+      <p className="text-muted-foreground text-[12px]">
         Created{" "}
         {formatDistanceToNow(new Date(test.createdAt), { addSuffix: true })}
       </p>

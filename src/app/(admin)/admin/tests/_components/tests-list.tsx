@@ -4,11 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { TestCardGrid } from "~/components/utils/test-card";
-import { TestFilters } from "./test-filters";
-import type { SortFilter, TypeFilter, StatusFilter } from "./test-filters";
 import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, SearchX } from "lucide-react";
+import { TestFilters, type SortFilter, type StatusFilter, type TypeFilter } from "./test-filters";
 
 export function TestList() {
   const router = useRouter();

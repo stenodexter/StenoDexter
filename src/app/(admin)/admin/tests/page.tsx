@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Plus } from "lucide-react";
-import { TestList } from "~/app/_components/admin/tests/tests-list";
+import { TestList } from "./_components/tests-list";
 
 export const metadata: Metadata = {
   title: "Tests — StenoDexter Admin",

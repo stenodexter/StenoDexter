@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "~/server/guards";
 import { SidebarProvider, SidebarInset } from "~/components/ui/sidebar";
-import { AdminNavbar } from "~/app/_components/admin/common/navbar";
-import { AdminSidebar } from "~/app/_components/admin/common/sidebar";
+import { AdminNavbar } from "~/components/common/admin/navbar";
+import { AdminSidebar } from "~/components/common/admin/sidebar";
 
 export const metadata: Metadata = {
   title: "StenoDexter Admin",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CreateTestForm } from "~/app/_components/admin/tests/create-test-form";
+import { CreateTestForm } from "./_components/create-test-form";
 
 export const metadata: Metadata = {
   title: "Create Test · StenoDexter",

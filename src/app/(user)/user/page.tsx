@@ -1,7 +1,7 @@
 
-import { RecentActivity } from "~/app/_components/user/tests/activity";
-import { ScoreChart } from "~/app/_components/user/tests/score-chart";
-import { TestFeed } from "~/app/_components/user/tests/test-feed";
+import { RecentActivity } from "~/components/common/user/tests/activity";
+import { ScoreChart } from "~/components/common/user/tests/score-chart";
+import { TestFeed } from "~/components/common/user/tests/test-feed";
 import { Separator } from "~/components/ui/separator";
 
 export default function UserDashboardPage() {

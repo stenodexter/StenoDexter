@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { requireUser } from "~/server/guards";
 import { SidebarProvider, SidebarInset } from "~/components/ui/sidebar";
-import { UserNavbar } from "~/app/_components/user/common/navbar";
-import { UserSidebar } from "~/app/_components/user/common/sidebar";
+import { UserNavbar } from "~/components/common/user/navbar";
+import { UserSidebar } from "~/components/common/user/sidebar";
 
 export const metadata: Metadata = {
   title: "StenoDexter",
