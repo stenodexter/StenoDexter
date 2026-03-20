@@ -443,7 +443,7 @@ function SubmittedScreen() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AttemptPage() {
-  const params = useParams<{ id: string; attemptId: string }>();
+  const params = useParams<{ test: string; attemptId: string }>();
   const router = useRouter();
 
   const { data, isLoading, isError } = trpc.attempt.getResume.useQuery(
@@ -592,6 +592,7 @@ export default function AttemptPage() {
       attemptId: params.attemptId,
       stage: "writing",
       breakSkipped: true,
+      markWrittingStarted: true,
     });
   };
 

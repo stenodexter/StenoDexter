@@ -88,6 +88,9 @@ export const attemptService = {
     if (input.markAudioStarted && !attempt.stageStartedAt) {
       patch.stageStartedAt = new Date();
     }
+    if (input.markWrittingStarted && !attempt.writingStartedAt) {
+      patch.writingStartedAt = new Date();
+    }
 
     await db
       .update(testAttempts)

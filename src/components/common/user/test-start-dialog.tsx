@@ -48,7 +48,7 @@ export function TestStartDialog({
   const createAttempt = trpc.attempt.create.useMutation({
     onSuccess: (attempt) => {
       onOpenChange(false);
-      router.push(`/user/tests/${testId}/attempt/${attempt.id}`);
+      router.push(`/user/test/${testId}/attempt/${attempt.id}`);
     },
     onError: (err) => {
       toast.error(err.message ?? "Failed to start test. Please try again.");

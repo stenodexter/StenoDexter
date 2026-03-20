@@ -449,6 +449,7 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+        <p className="text-xs my-1 text-muted-foreground">Click on any user to view full report</p>
         <p className="text-muted-foreground mt-0.5 text-sm">
           {total !== null ? (
             <>

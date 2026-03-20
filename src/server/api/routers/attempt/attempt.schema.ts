@@ -13,6 +13,7 @@ export const syncAttemptSchema = z.object({
   breakSkipped: z.boolean().optional(),
   // Sent once when countdown ends — stamps the real audio start time server-side
   markAudioStarted: z.boolean().optional(),
+  markWrittingStarted: z.boolean().optional(),
 });
 
 export const submitAttemptSchema = z.object({
