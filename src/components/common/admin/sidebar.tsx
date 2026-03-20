@@ -49,7 +49,7 @@ const MAIN_NAV = [
 
 const MANAGE_NAV = [
   { label: "Notifications", href: "/admin/notifications", icon: BellDot  },
-  { label: "Invites", href: "/admin/invites", icon: MailPlus },
+  { label: "Admins & Invites", href: "/admin/invites", icon: MailPlus },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

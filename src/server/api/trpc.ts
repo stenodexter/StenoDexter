@@ -181,6 +181,18 @@ export const superAdminProcedure = adminProcedure.use(({ ctx, next }) => {
   return next();
 });
 
+export const systemAdminProcedure = adminProcedure.use(({ ctx, next }) => {
+  // ctx.admin here is the admin object (returned by adminProcedure)
+  if (!ctx.admin?.isSystem) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only system admins are allowed to perform this action.",
+    });
+  }
+
+  return next();
+});
+
 /**
  * Paid user procedure — requires an active subscription
  */

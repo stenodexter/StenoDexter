@@ -2,10 +2,20 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   integer,
+  pgEnum,
   pgTable,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
+export const inviteStatusEnum = pgEnum("invite_status", [
+  "active",
+  "invalidated",
+  "expired",
+  "limit_reached",
+]);
+
+export type InviteStatus = (typeof inviteStatusEnum.enumValues)[number];
 
 export const admin = pgTable("admin", {
   id: text("id").primaryKey(),
@@ -19,6 +29,7 @@ export const admin = pgTable("admin", {
   image: text("profile_picture_key"),
 
   isSuper: boolean("is_super").default(false).notNull(),
+  isSystem: boolean("is_system").default(false).notNull(),
 
   invitedByAdminId: text("invited_by_admin_id").references(
     (): any => admin.id,
@@ -59,6 +70,8 @@ export const adminInvite = pgTable("admin_invite", {
 
   maxUses: integer("max_uses").notNull(),
   usedCount: integer("used_count").default(0).notNull(),
+
+  status: inviteStatusEnum("status").default("active").notNull(),
 
   expiresAt: timestamp("expires_at", { withTimezone: true }),
 

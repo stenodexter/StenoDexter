@@ -6,6 +6,7 @@ import { serialize } from "cookie";
 import { env } from "~/env";
 import type { LoginInput, RegisterInput } from "./auth.schema";
 import type { TRPCContext } from "~/server/api/trpc";
+import { inviteService } from "../invite/invite.service";
 
 const COOKIE_NAME = "admin_token";
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
@@ -25,18 +26,18 @@ export const authService = {
     const existing = await ctx.db.query.admin.findFirst({
       where: eq(admin.username, username),
     });
-
     if (existing) throw new Error("Username already exists");
 
     let isSuper = false;
     let invitedByAdminId = null;
+    let inviteId: string | null = null;
 
-    // 🔥 SUPER ADMIN
+    // ── Super admin via env code ──────────────────────────────────────────────
     if (code === env.ADMIN_INVITE_CODE) {
       isSuper = true;
     }
 
-    // 🔥 INVITE FLOW
+    // ── Invite flow ───────────────────────────────────────────────────────────
     else {
       const invite = await ctx.db.query.adminInvite.findFirst({
         where: eq(adminInvite.token, code),
@@ -44,21 +45,31 @@ export const authService = {
 
       if (!invite) throw new Error("Invalid invite code");
 
-      if (invite.usedCount >= invite.maxUses) {
-        throw new Error("Invite usage limit reached");
+      // Check stored status first — fast path for already-dead invites
+      if (invite.status === "invalidated")
+        throw new Error("This invite has been invalidated");
+      if (invite.status === "limit_reached")
+        throw new Error("This invite has reached its usage limit");
+
+      // Check expiry against real time (status may not have been refreshed yet)
+      if (invite.expiresAt && invite.expiresAt <= new Date()) {
+        // Write the drift back so future reads are accurate
+        await ctx.db
+          .update(adminInvite)
+          .set({ status: "expired" })
+          .where(eq(adminInvite.id, invite.id));
+        throw new Error("This invite has expired");
       }
 
-      invitedByAdminId = invite.createdByAdminId;
+      if (invite.status !== "active")
+        throw new Error("This invite is no longer valid");
 
-      // increment usage
-      await ctx.db
-        .update(adminInvite)
-        .set({
-          usedCount: invite.usedCount + 1,
-        })
-        .where(eq(adminInvite.id, invite.id));
+      invitedByAdminId = invite.createdByAdminId;
+      inviteId = invite.id;
+      // Don't increment here — we do it after insert so we have the new admin's ID
     }
 
+    // ── Create admin ──────────────────────────────────────────────────────────
     const passwordHash = await hashPassword(password);
 
     const [newAdmin] = await ctx.db
@@ -73,7 +84,13 @@ export const authService = {
       })
       .returning();
 
-    if (newAdmin) return this.createSession(newAdmin, ctx);
+    if (!newAdmin) throw new Error("Failed to create admin");
+
+    if (inviteId) {
+      await inviteService.recordUse(inviteId, newAdmin.id);
+    }
+
+    return this.createSession(newAdmin, ctx);
   },
 
   async login(input: LoginInput, ctx: TRPCContext) {
@@ -99,10 +116,10 @@ export const authService = {
       await ctx.db.delete(adminSession).where(eq(adminSession.token, token));
     }
 
-    ctx.resHeaders.append(
-      "Set-Cookie",
-      serialize(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 }),
-    );
+    // ctx.resHeaders.append(
+    //   "Set-Cookie",
+    //   serialize(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 }),
+    // );
     return { success: true };
   },
 
