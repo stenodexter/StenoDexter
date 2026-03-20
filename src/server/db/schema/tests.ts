@@ -10,7 +10,7 @@ import {
 import { nanoid } from "nanoid";
 import { admin } from "./admin";
 import { user } from "./user";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const testTypeEnum = pgEnum("test_type", ["legal", "general"]);
 
@@ -41,7 +41,7 @@ export const tests = pgTable("tests", {
 
   matter: text("matter").notNull(),
   outline: text("outline").notNull(),
- 
+
   breakSeconds: integer("break_seconds").notNull(),
   writtenDurationSeconds: integer("written_duration_seconds").notNull(),
   dictationSeconds: integer("dictation_duration_seconds").notNull(),
@@ -76,53 +76,41 @@ export const testAttempts = pgTable(
       .references(() => tests.id, { onDelete: "cascade" }),
 
     type: attemptTypeEnum("type").notNull(),
-
     stage: attemptStageEnum("stage").notNull().default("audio"),
 
     stageStartedAt: timestamp("stage_started_at", {
       withTimezone: true,
     }).defaultNow(),
-
     audioProgressSeconds: integer("audio_progress_seconds").default(0),
-
-    lastAudioSyncAt: timestamp("last_audio_sync_at", {
-      withTimezone: true,
-    }),
+    lastAudioSyncAt: timestamp("last_audio_sync_at", { withTimezone: true }),
 
     answerDraft: text("answer_draft"),
     answerFinal: text("answer_final"),
 
-    writingStartedAt: timestamp("writing_started_at", {
-      withTimezone: true,
-    }),
-
+    writingStartedAt: timestamp("writing_started_at", { withTimezone: true }),
     breakSkipped: boolean("break_skipped").default(false),
-
     score: integer("score"),
-
     skippedAt: timestamp("skipped_at", { withTimezone: true }),
-
-    submittedAt: timestamp("submitted_at", {
-      withTimezone: true,
-    }),
-
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
     isSubmitted: boolean("is_submitted").default(false),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
 
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (table) => ({
-    userTestIdx: index("idx_user_test").on(table.userId, table.testId),
+  (table) => [
+    index("idx_user_test").on(table.userId, table.testId),
 
-    userTypeIdx: index("idx_user_type").on(table.userId, table.type),
+    index("idx_active_attempts")
+      .on(table.userId, table.stage)
+      .where(sql`is_submitted = false`),
 
-    stageIdx: index("idx_stage").on(table.stage),
-  }),
+    index("idx_unscored")
+      .on(table.testId, table.submittedAt)
+      .where(sql`is_submitted = true AND score IS NULL`),
+  ],
 );
 
 export const testsRelations = relations(tests, ({ many }) => ({
