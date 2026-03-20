@@ -417,7 +417,7 @@ function WritingStage({
 }
 
 // ─── Submitted ────────────────────────────────────────────────────────────────
-function SubmittedScreen() {
+function SubmittedScreen({ attemptId }: { attemptId: string }) {
   const router = useRouter();
   useEffect(() => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -434,9 +434,22 @@ function SubmittedScreen() {
           Your answer has been recorded. Results will be available shortly.
         </p>
       </div>
-      <Button variant="outline" size="sm" onClick={() => router.push("/user")}>
-        Back to dashboard
-      </Button>
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/user")}
+        >
+          Back to dashboard
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/user/attempt/${attemptId}`)}
+        >
+          View Report
+        </Button>
+      </div>
     </div>
   );
 }
@@ -686,7 +699,9 @@ export default function AttemptPage() {
           />
         )}
 
-        {stage === "submitted" && <SubmittedScreen />}
+        {stage === "submitted" && (
+          <SubmittedScreen attemptId={params.attemptId} />
+        )}
       </div>
     </div>
   );
