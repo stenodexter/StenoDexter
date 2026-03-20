@@ -15,6 +15,13 @@
       "when": 1774036491615,
       "tag": "0001_stormy_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774037663121,
+      "tag": "0002_premium_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

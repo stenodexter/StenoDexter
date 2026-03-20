@@ -28,37 +28,41 @@ export const attemptStageEnum = pgEnum("attempt_stage", [
   "submitted",
 ]);
 
-export const tests = pgTable("tests", {
-  id: text("id")
-    .$defaultFn(() => nanoid(8))
-    .primaryKey(),
+export const tests = pgTable(
+  "tests",
+  {
+    id: text("id")
+      .$defaultFn(() => nanoid(8))
+      .primaryKey(),
 
-  title: text("title").notNull(),
+    title: text("title").notNull(),
+    type: testTypeEnum("type").notNull(),
+    audioKey: text("audio_key").notNull(),
+    matter: text("matter").notNull(),
+    outline: text("outline").notNull(),
+    breakSeconds: integer("break_seconds").notNull(),
+    writtenDurationSeconds: integer("written_duration_seconds").notNull(),
+    dictationSeconds: integer("dictation_duration_seconds").notNull(),
+    status: testStatusEnum("status").notNull().default("draft"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    adminId: text("admin_id")
+      .notNull()
+      .default("system")
+      .references(() => admin.id, { onDelete: "set default" }),
+  },
+  (t) => [
+    // Most common read: fetch all active tests for users
+    index("tests_status_idx").on(t.status),
 
-  type: testTypeEnum("type").notNull(),
+    // Admin dashboard: list tests by a specific admin
+    index("tests_admin_id_idx").on(t.adminId),
 
-  audioKey: text("audio_key").notNull(),
-
-  matter: text("matter").notNull(),
-  outline: text("outline").notNull(),
-
-  breakSeconds: integer("break_seconds").notNull(),
-  writtenDurationSeconds: integer("written_duration_seconds").notNull(),
-  dictationSeconds: integer("dictation_duration_seconds").notNull(),
-
-  status: testStatusEnum("status").notNull().default("draft"),
-
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-
-  adminId: text("admin_id")
-    .notNull()
-    .default("system")
-    .references(() => admin.id, {
-      onDelete: "set default",
-    }),
-});
+    // Filtering by type (legal vs general) — often combined with status
+    index("tests_type_status_idx").on(t.type, t.status),
+  ],
+);
 
 export const testAttempts = pgTable(
   "test_attempts",
