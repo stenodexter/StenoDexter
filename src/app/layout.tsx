@@ -1,21 +1,25 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist_Mono, Roboto_Slab, Inter } from "next/font/google";
+import { Geist_Mono, Roboto_Slab, Inter, Montserrat } from "next/font/google";
+import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { Toaster } from "~/components/ui/sonner";
 import { cn } from "~/lib/utils";
-import { ThemeProvider } from "~/providers/theme-provider"; // 👈 create this
+import { ThemeProvider } from "~/providers/theme-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
 const robotoSlab = Roboto_Slab({
   subsets: ["latin"],
   variable: "--font-serif",
 });
-
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["800", "900"],
+  variable: "--font-montserrat",
+});
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -30,37 +34,35 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
         geistMono.variable,
         robotoSlab.variable,
         inter.variable,
+        montserrat.variable,
         "font-sans",
       )}
     >
-      <head>
-        {/* 🔥 Prevent theme flicker */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function () {
-                try {
-                  const stored = localStorage.getItem("theme");
-                  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  const theme = stored || (systemDark ? "dark" : "light");
-
-                  if (theme === "dark") {
-                    document.documentElement.classList.add("dark");
-                  } else {
-                    document.documentElement.classList.remove("dark");
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
-
-      <body>
+      <body suppressHydrationWarning>
+        {" "}
+        {/* 👈 add this too */}
+        {/* 🔥 Prevent theme flicker — runs before page renders */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            (function () {
+              try {
+                const stored = localStorage.getItem("theme");
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const theme = stored || (systemDark ? "dark" : "light");
+                if (theme === "dark") {
+                  document.documentElement.classList.add("dark");
+                } else {
+                  document.documentElement.classList.remove("dark");
+                }
+              } catch (e) {}
+            })();
+          `}
+        </Script>
         <ThemeProvider>
           <TooltipProvider>
             <TRPCReactProvider>{children}</TRPCReactProvider>

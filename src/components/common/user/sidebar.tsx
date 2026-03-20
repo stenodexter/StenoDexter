@@ -24,6 +24,7 @@ import {
   ClipboardList,
   ChartSpline,
 } from "lucide-react";
+import Image from "next/image";
 
 const MAIN_NAV = [
   { label: "Dashboard", href: "/user/", icon: LayoutDashboard },
@@ -49,11 +50,17 @@ export function UserSidebar() {
       <SidebarHeader className="px-4 py-4">
         <div className="flex items-center gap-2.5">
           <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg shadow-sm">
-            <Pen className="h-4 w-4" />
+            <Image
+              src={"/icon.png"}
+              alt={"Logo"}
+              width={200}
+              height={200}
+              className="m-0 h-full w-full"
+            />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="text-base font-bold tracking-tight">
-              Steno<span className="text-primary">Dexter</span>
+            <span className="font-logo text-base font-bold tracking-tight">
+              STENO<span className="text-primary"> DEXTER</span>
             </span>
             <span className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
               Dashboard

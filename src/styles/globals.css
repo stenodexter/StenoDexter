@@ -8,6 +8,8 @@
   --font-sans:
     var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  --font-logo: var(--font-montserrat);
 }
 
 :root {
@@ -164,5 +166,11 @@
   /* h7 isn’t a real HTML tag, but if you're using it as custom */
   h7 {
     @apply text-muted-foreground text-sm font-medium;
+  }
+}
+
+@layer utilities {
+  .font-logo {
+    font-family: var(--font-logo);
   }
 }

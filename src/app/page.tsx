@@ -8,11 +8,11 @@ export default function Home() {
           Welcome to Steno Dexter
         </h1>
         <p className="max-w-xl text-center text-lg text-white/80">
-          A focused space for stenography-based testing. Choose your portal.
+          This Landing Page will be changed.
         </p>
         <div className="flex flex-col gap-4 sm:flex-row">
           <Link
-            href="/dashboard"
+            href="/user"
             className="rounded-xl bg-white/10 px-8 py-3 text-center text-lg font-semibold hover:bg-white/20"
           >
             User space
