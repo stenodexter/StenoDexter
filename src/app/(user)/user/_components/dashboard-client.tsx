@@ -501,8 +501,9 @@ function Heatmap() {
   const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border p-4">
+    <div className="flex flex-col gap-2 overflow-hidden rounded-xl border p-4">
       {/* Header */}
+
       <div className="flex items-center justify-between">
         <div>
           <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">

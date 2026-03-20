@@ -26,6 +26,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  FileText,
 } from "lucide-react";
 import SendNotificationDialog from "~/components/common/admin/send-notification";
 import type { InitialRecipient } from "~/components/common/admin/send-notification";
@@ -337,14 +338,15 @@ function UsersTable({
                         <Button
                           variant="outline"
                           size="icon"
+                          aria-label="report-card"
                           className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-                          title="Message user"
+                          title="User's Report Card"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/admin/chat/${u.id}`);
+                            router.push(`/admin/report-card/${u.id}`);
                           }}
                         >
-                          <MessageSquare className="h-3.5 w-3.5" />
+                          <FileText className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -449,7 +451,9 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-        <p className="text-xs my-1 text-muted-foreground">Click on any user to view full report</p>
+        <p className="text-muted-foreground my-1 text-xs">
+          Click on any user to view full report
+        </p>
         <p className="text-muted-foreground mt-0.5 text-sm">
           {total !== null ? (
             <>
