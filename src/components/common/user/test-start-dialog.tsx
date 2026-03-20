@@ -12,13 +12,13 @@ import { useRouter } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 
-// hasAttempted drives display only — server enforces the actual type
+// isPractice drives display only — server enforces the actual type
 interface TestStartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   testId: string;
   testTitle: string;
-  hasAttempted: boolean;
+  isPractice: boolean;
 }
 
 const warnings = [
@@ -41,7 +41,7 @@ export function TestStartDialog({
   onOpenChange,
   testId,
   testTitle,
-  hasAttempted,
+  isPractice,
 }: TestStartDialogProps) {
   const router = useRouter();
 
@@ -59,12 +59,12 @@ export function TestStartDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm gap-0 p-6">
         <DialogHeader className="mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {hasAttempted ? "Practice" : "Assessment"}
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+              {isPractice ? "Practice" : "Assessment"}
             </span>
-            {!hasAttempted && (
-              <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+            {!isPractice && (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-500">
                 One-time only
               </span>
             )}
@@ -72,28 +72,30 @@ export function TestStartDialog({
           <DialogTitle className="text-lg leading-snug font-semibold">
             {testTitle}
           </DialogTitle>
-          {!hasAttempted && (
-            <p className="text-muted-foreground text-sm mt-1">
+          {!isPractice && (
+            <p className="text-muted-foreground mt-1 text-sm">
               You can only attempt this test once as an assessment. Practice
               mode unlocks after.
             </p>
           )}
         </DialogHeader>
 
-        <div className="space-y-2.5 mb-5">
+        <div className="mb-5 space-y-2.5">
           {warnings.map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3">
-              <div className="shrink-0 bg-muted rounded-md p-1.5">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <div className="bg-muted shrink-0 rounded-md p-1.5">
+                <Icon className="text-muted-foreground h-3.5 w-3.5" />
               </div>
-              <p className="text-sm text-muted-foreground leading-snug">{text}</p>
+              <p className="text-muted-foreground text-sm leading-snug">
+                {text}
+              </p>
             </div>
           ))}
         </div>
 
         <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
             className="flex-1"
             disabled={createAttempt.isPending}
             onClick={() => onOpenChange(false)}
@@ -107,11 +109,11 @@ export function TestStartDialog({
           >
             {createAttempt.isPending ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                 Starting…
               </>
             ) : (
-              <>Start {hasAttempted ? "practice" : "assessment"} →</>
+              <>Start {isPractice ? "practice" : "assessment"} →</>
             )}
           </Button>
         </div>

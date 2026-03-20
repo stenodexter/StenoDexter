@@ -1,6 +1,16 @@
 import { db } from "~/server/db";
 import { testAttempts, tests } from "~/server/db/schema/tests";
-import { eq, desc, count, and, asc, inArray, gte, lte } from "drizzle-orm";
+import {
+  eq,
+  desc,
+  count,
+  and,
+  asc,
+  inArray,
+  gte,
+  lte,
+  ilike,
+} from "drizzle-orm";
 import type {
   CreateTestInput,
   GetTestInput,
@@ -8,6 +18,7 @@ import type {
   ListTestsInput,
   ListUserTestsInput,
   listUserTestsSchema,
+  SearchTestsInput,
   UpdateTestInput,
 } from "./test.schema";
 import R2Service from "~/server/services/r2.service";
@@ -119,12 +130,12 @@ export const testService = {
   },
 
   async listForUserFeed(input: ListUserTestsInput, userId: string) {
-    const { page } = input;
-    const offset = (page - 1) * PAGE_SIZE;
+    const { page, pageSize = PAGE_SIZE } = input;
+    const offset = (page - 1) * pageSize;
 
     const data = await db.query.tests.findMany({
       where: eq(tests.status, "active"),
-      limit: PAGE_SIZE,
+      limit: pageSize,
       offset,
       orderBy: desc(tests.createdAt),
     });
@@ -135,7 +146,7 @@ export const testService = {
       return {
         data: [],
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         total: 0,
         totalPages: 0,
       };
@@ -175,15 +186,19 @@ export const testService = {
       hasAttempted: userAttemptSet.has(t.id),
     }));
 
-    const totalRows = await db.select({ total: count() }).from(tests);
+    const totalRows = await db
+      .select({ total: count() })
+      .from(tests)
+      .where(eq(tests.status, "active"));
+
     const total = totalRows[0]?.total ?? 0;
 
     return {
       data: enriched,
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       total,
-      totalPages: Math.ceil(total / PAGE_SIZE),
+      totalPages: Math.ceil(total / pageSize),
     };
   },
 
@@ -210,7 +225,72 @@ export const testService = {
     return data;
   },
 
-  async getTestsAdmin(input: GetTestsAdminInput) {
+  async searchForUser(input: SearchTestsInput, userId: string) {
+    const { query, type, page, pageSize } = input;
+    const offset = (page - 1) * pageSize;
+
+    const conditions = [
+      eq(tests.status, "active"),
+      ilike(tests.title, `%${query}%`),
+      type ? eq(tests.type, type) : undefined,
+    ].filter(Boolean);
+
+    const whereClause = and(...conditions);
+
+    const data = await db.query.tests.findMany({
+      where: whereClause,
+      limit: pageSize,
+      offset,
+      orderBy: desc(tests.createdAt),
+    });
+
+    const testIds = data.map((t) => t.id);
+
+    // Attempt counts
+    const attemptRows =
+      testIds.length > 0
+        ? await db
+            .select({ testId: testAttempts.testId, count: count() })
+            .from(testAttempts)
+            .where(inArray(testAttempts.testId, testIds))
+            .groupBy(testAttempts.testId)
+        : [];
+    const attemptCountMap = Object.fromEntries(
+      attemptRows.map((r) => [r.testId, r.count]),
+    );
+
+    // User has attempted
+    const userAttemptRows =
+      testIds.length > 0
+        ? await db
+            .select({ testId: testAttempts.testId })
+            .from(testAttempts)
+            .where(
+              and(
+                eq(testAttempts.userId, userId),
+                inArray(testAttempts.testId, testIds),
+              ),
+            )
+            .groupBy(testAttempts.testId)
+        : [];
+    const userAttemptSet = new Set(userAttemptRows.map((r) => r.testId));
+
+    const total = await db.$count(tests, whereClause);
+
+    return {
+      data: data.map((t) => ({
+        ...t,
+        attemptCount: attemptCountMap[t.id] ?? 0,
+        hasAttempted: userAttemptSet.has(t.id),
+      })),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  },
+
+  async getTests(input: GetTestsAdminInput) {
     const { page, pageSize, status, type, fromDate, toDate, adminId, sort } =
       input;
 
@@ -223,8 +303,7 @@ export const testService = {
     }
 
     if (type) {
-       conditions.push(eq(tests.type, type));
-     
+      conditions.push(eq(tests.type, type));
     }
 
     if (adminId) {

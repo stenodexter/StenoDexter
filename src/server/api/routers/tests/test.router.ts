@@ -12,6 +12,7 @@ import {
   listTestsSchema,
   listUserTestsSchema,
   getTestsAdminSchema,
+  searchTestsSchema,
 } from "./test.schema";
 
 import { testService } from "./test.service";
@@ -43,9 +44,13 @@ export const testRouter = createTRPCRouter({
     return testService.getById(input);
   }),
 
-  getTests: adminProcedure.input(getTestsAdminSchema).query(({ input }) => {
-    return testService.getTestsAdmin(input);
+  getTests: publicProcedure.input(getTestsAdminSchema).query(({ input }) => {
+    return testService.getTests(input);
   }),
+
+  search: protectedProcedure
+    .input(searchTestsSchema)
+    .query(({ input, ctx }) => testService.searchForUser(input, ctx.user.id)),
 
   todaysTest: publicProcedure.query(async () => {
     return testService.getLast24HourTests();

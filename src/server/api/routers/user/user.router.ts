@@ -11,6 +11,8 @@ import {
   dateRangeSchema,
   getAttemptsAdminSchema,
   getProgressSeriesSchema,
+  heatmapAdminSchema,
+  heatmapSchema,
   testWiseInputSchema,
   userIdSchema,
 } from "./user.schema";
@@ -135,6 +137,28 @@ export const userRouter = createTRPCRouter({
         input.page,
         input.limit,
         input.type,
+      ),
+    ),
+
+  getHeatmap: protectedProcedure
+    .input(heatmapSchema)
+    .query(({ ctx, input }) =>
+      userService.getHeatmap(
+        ctx.user.id,
+        input.from,
+        input.to,
+        input.includePractice,
+      ),
+    ),
+
+  getHeatmapAdmin: adminProcedure
+    .input(heatmapAdminSchema)
+    .query(({ input }) =>
+      userService.getHeatmap(
+        input.userId,
+        input.from,
+        input.to,
+        input.includePractice,
       ),
     ),
 });

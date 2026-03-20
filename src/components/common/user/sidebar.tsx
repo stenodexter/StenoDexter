@@ -21,10 +21,12 @@ import {
   Pen,
   Frame,
   LayoutDashboard,
+  ClipboardList,
 } from "lucide-react";
 
 const MAIN_NAV = [
   { label: "Dashboard", href: "/user/", icon: LayoutDashboard },
+  { label: "Tests", href: "/user/tests", icon: ClipboardList },
   { label: "Attempts", href: "/user/attempts", icon: Star },
   { label: "Leaderboard", href: "/user/leaderboard", icon: Trophy },
   { label: "Hall of Fame", href: "/user/hall-of-fame", icon: Frame },

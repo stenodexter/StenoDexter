@@ -45,3 +45,13 @@ export const testWiseInputSchema = z.object({
   limit: z.number().min(1).max(200).default(50),
   type: attemptTypeFilter,
 });
+
+export const heatmapSchema = z.object({
+  from: z.date(),
+  to: z.date(),
+  includePractice: z.boolean().default(true),
+});
+
+export const heatmapAdminSchema = heatmapSchema.extend({
+  userId: z.string(),
+});

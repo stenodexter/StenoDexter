@@ -152,4 +152,36 @@ export const userService = {
       },
     };
   },
+
+  async getHeatmap(
+    userId: string,
+    from: Date,
+    to: Date,
+    includePractice = true,
+  ) {
+    const conditions = [
+      eq(results.userId, userId),
+      gte(results.submittedAt, from),
+      lte(results.submittedAt, to),
+    ];
+
+    if (!includePractice) {
+      conditions.push(eq(results.type, "assessment"));
+    }
+
+    const where = and(...conditions);
+
+    const data = await db
+      .select({
+        date: sql<string>`date(${results.submittedAt})`,
+        count: sql<number>`count(*)`,
+        avgScore: sql<number>`avg(${results.score})`,
+      })
+      .from(results)
+      .where(where)
+      .groupBy(sql`date(${results.submittedAt})`)
+      .orderBy(sql`date(${results.submittedAt})`);
+
+    return data;
+  },
 };

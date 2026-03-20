@@ -45,6 +45,7 @@ export const listTestsSchema = z.object({
 
 export const listUserTestsSchema = z.object({
   page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().optional().default(12),
 });
 
 export const getTestsAdminSchema = z.object({
@@ -62,6 +63,14 @@ export const getTestsAdminSchema = z.object({
   sort: z.enum(["newest", "oldest"]).default("newest"),
 });
 
+export const searchTestsSchema = z.object({
+  query: z.string().min(1),
+  type: z.enum(["legal", "general"]).optional(),
+  page: z.number().min(1).default(1),
+  pageSize: z.number().min(1).max(50).default(12),
+});
+
+export type SearchTestsInput = z.infer<typeof searchTestsSchema>;
 export type CreateTestInput = z.infer<typeof createTestSchema>;
 export type UpdateTestInput = z.infer<typeof updateTestSchema>;
 export type GetTestInput = z.infer<typeof getTestSchema>;
