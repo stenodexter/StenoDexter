@@ -1,7 +1,7 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist_Mono, Roboto_Slab, Inter, Montserrat } from "next/font/google";
+import { Geist_Mono, Roboto_Slab, Inter, Montserrat, JetBrains_Mono } from "next/font/google";
 import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -20,7 +20,7 @@ const montserrat = Montserrat({
   weight: ["800", "900"],
   variable: "--font-montserrat",
 });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
+const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -36,12 +36,10 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-        geistMono.variable,
-        robotoSlab.variable,
-        inter.variable,
-        montserrat.variable,
-        "font-sans",
-      )}
+              robotoSlab.variable,
+              inter.variable,
+              montserrat.variable,
+            , "font-mono", jetbrainsMono.variable)}
     >
       <body suppressHydrationWarning>
         {" "}
