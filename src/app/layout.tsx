@@ -1,7 +1,12 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist_Mono, Roboto_Slab, Inter, Montserrat, JetBrains_Mono } from "next/font/google";
+import {
+  Geist_Mono,
+  Roboto_Slab,
+  Inter,
+  Montserrat,
+  JetBrains_Mono, Oxanium } from "next/font/google";
 import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -10,7 +15,7 @@ import { Toaster } from "~/components/ui/sonner";
 import { cn } from "~/lib/utils";
 import { ThemeProvider } from "~/providers/theme-provider";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const oxanium = Oxanium({subsets:['latin'],variable:'--font-sans'});
 const robotoSlab = Roboto_Slab({
   subsets: ["latin"],
   variable: "--font-serif",
@@ -20,7 +25,10 @@ const montserrat = Montserrat({
   weight: ["800", "900"],
   variable: "--font-montserrat",
 });
-const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -37,9 +45,9 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn(
               robotoSlab.variable,
-              inter.variable,
               montserrat.variable,
-            , "font-mono", jetbrainsMono.variable)}
+              jetbrainsMono.variable,
+            , "font-sans", oxanium.variable)}
     >
       <body suppressHydrationWarning>
         {" "}
