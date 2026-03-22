@@ -7,7 +7,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
-import { attemptTypeEnum, testAttempts } from "./tests";
+import { attemptTypeEnum, testAttempts, testSpeeds } from "./tests";
 import { user } from "./user";
 import { tests } from "./tests";
 import { relations } from "drizzle-orm";
@@ -22,15 +22,12 @@ export const results = pgTable(
     attemptId: text("attempt_id")
       .notNull()
       .references(() => testAttempts.id, { onDelete: "cascade" })
-      .unique(), // already creates an index — don't add another
+      .unique(),
 
+    // Kept for direct user-scoped queries without joining through attempts
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-
-    testId: text("test_id")
-      .notNull()
-      .references(() => tests.id, { onDelete: "cascade" }),
 
     type: attemptTypeEnum("type").notNull(),
 
@@ -46,11 +43,6 @@ export const results = pgTable(
   },
   (t) => [
     index("idx_results_user_id").on(t.userId),
-
-    index("idx_results_test_id").on(t.testId),
-
-    index("idx_results_user_test").on(t.userId, t.testId),
-
     index("idx_results_user_type").on(t.userId, t.type),
   ],
 );
@@ -62,57 +54,82 @@ export const leaderboard = pgTable(
       .$defaultFn(() => nanoid(8))
       .primaryKey(),
 
-    // ✅ Added FK constraints — was plain text before
     testId: text("test_id")
       .notNull()
       .references(() => tests.id, { onDelete: "cascade" }),
+
+    resultId: text("result_id")
+      .notNull()
+      .references(() => results.id, { onDelete: "restrict" })
+      .unique(),
+
+    speedId: text("speed_id")
+      .notNull()
+      .references(() => testSpeeds.id, { onDelete: "restrict" }),
 
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
 
-    bestScore: integer("best_score").notNull(),
-    bestWpm: integer("best_wpm"),
-    bestAccuracy: integer("best_accuracy"),
+    score: integer("score").notNull(),
+    wpm: integer("wpm").notNull(),
+    accuracy: integer("accuracy").notNull(),
+    mistakes: integer("mistakes"),
 
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .$onUpdate(() => new Date()),
   },
   (t) => [
-    uniqueIndex("idx_leaderboard_test_user").on(t.testId, t.userId),
+    uniqueIndex("idx_leaderboard_test_user").on(t.testId, t.userId, t.speedId),
 
-    index("idx_leaderboard_test_score").on(t.testId, t.bestScore),
+    index("idx_leaderboard_speed_score").on(t.speedId, t.score),
+
+    index("idx_leaderboard_speed_id").on(t.speedId),
   ],
 );
 
-// Relations unchanged
 export const resultsRelations = relations(results, ({ one }) => ({
   attempt: one(testAttempts, {
     fields: [results.attemptId],
     references: [testAttempts.id],
   }),
-  test: one(tests, {
-    fields: [results.testId],
-    references: [tests.id],
-  }),
-  user: one(user, {
-    fields: [results.userId],
-    references: [user.id],
-  }),
+  user: one(user, { fields: [results.userId], references: [user.id] }),
 }));
 
 export const leaderboardRelations = relations(leaderboard, ({ one }) => ({
-  test: one(tests, {
-    fields: [leaderboard.testId],
-    references: [tests.id],
+  test: one(tests, { fields: [leaderboard.testId], references: [tests.id] }),
+  speed: one(testSpeeds, {
+    fields: [leaderboard.speedId],
+    references: [testSpeeds.id],
   }),
-  user: one(user, {
-    fields: [leaderboard.userId],
-    references: [user.id],
+  user: one(user, { fields: [leaderboard.userId], references: [user.id] }),
+  result: one(results, {
+    fields: [leaderboard.resultId],
+    references: [results.id],
   }),
 }));
+
+// ─── service-layer logic (pseudocode reference) ───────────────────────────────
+/*
+  When a user starts an attempt on a test:
+
+  1. Check if user has ANY prior result for this testId (any speedId):
+       const hasAssessed = await db.query.results.findFirst({
+         where: and(eq(results.userId, userId), eq(results.testId, testId))
+       });
+
+  2. If no prior result → this is their assessment attempt:
+       - Create testAttempt with type = "assessment"
+       - On submission → insert into leaderboard for the chosen speedId
+
+  3. If prior result exists → practice:
+       - Create testAttempt with type = "practice"
+       - On submission → do NOT touch leaderboard
+
+  This logic lives entirely in the attempt service.
+  The DB uniqueIndex("idx_leaderboard_test_user") is a safety net —
+  if the service ever bugs out and tries to insert a second leaderboard entry
+  for the same (testId, userId), the DB will reject it.
+*/

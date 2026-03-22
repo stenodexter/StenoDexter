@@ -6,7 +6,9 @@ import {
   Roboto_Slab,
   Inter,
   Montserrat,
-  JetBrains_Mono, Oxanium } from "next/font/google";
+  JetBrains_Mono,
+  Oxanium,
+} from "next/font/google";
 import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -15,11 +17,10 @@ import { Toaster } from "~/components/ui/sonner";
 import { cn } from "~/lib/utils";
 import { ThemeProvider } from "~/providers/theme-provider";
 
-const oxanium = Oxanium({subsets:['latin'],variable:'--font-sans'});
-const robotoSlab = Roboto_Slab({
-  subsets: ["latin"],
-  variable: "--font-serif",
-});
+const interHeading = Inter({subsets:['latin'],variable:'--font-heading'});
+
+const oxanium = Oxanium({ subsets: ["latin"], variable: "--font-sans" });
+const robotoSlab = Roboto_Slab({subsets:['latin'],variable:'--font-serif'});
 const montserrat = Montserrat({
   subsets: ["latin"],
   weight: ["800", "900"],
@@ -44,10 +45,10 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-              robotoSlab.variable,
               montserrat.variable,
               jetbrainsMono.variable,
-            , "font-sans", oxanium.variable)}
+              oxanium.variable,
+            , "font-serif", robotoSlab.variable, interHeading.variable)}
     >
       <body suppressHydrationWarning>
         {" "}

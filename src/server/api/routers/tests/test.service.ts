@@ -1,5 +1,4 @@
-import { db } from "~/server/db";
-import { testAttempts, tests } from "~/server/db/schema/tests";
+import { testAttempts, tests, testSpeeds, results } from "~/server/db/schema";
 import {
   eq,
   desc,
@@ -10,348 +9,545 @@ import {
   gte,
   lte,
   ilike,
+  sql,
 } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import type {
   CreateTestInput,
   GetTestInput,
   GetTestsAdminInput,
   ListTestsInput,
   ListUserTestsInput,
-  listUserTestsSchema,
   SearchTestsInput,
   UpdateTestInput,
+  AddSpeedInput,
+  EditSpeedInput,
+  DeleteSpeedInput,
+  ReorderSpeedsInput,
 } from "./test.schema";
 import R2Service from "~/server/services/r2.service";
 import { notificationsService } from "../notifications/notification.service";
 
 const PAGE_SIZE = 12;
 
-export const testService = {
-  async create(input: CreateTestInput, adminId: string) {
-    const [test] = await db
-      .insert(tests)
-      .values({
-        ...input,
-        adminId,
-        outline: input.outline ?? "",
-      })
-      .returning();
+function resolveSpeed(speed: typeof testSpeeds.$inferSelect) {
+  return {
+    ...speed,
+    audioUrl: R2Service.getPublicUrl(speed.audioKey),
+  };
+}
 
-    await notificationsService.send({
-      title: "New test available",
-      message: `"${test!.title}" has just been published. Attmept now!`,
-      to: "everyone",
-      link: `/user/tests/${test!.id}`,
-      isLinkExternal: false,
-    });
+function resolveTest(test: typeof tests.$inferSelect) {
+  return {
+    ...test,
+    matterPdfUrl: R2Service.getPublicUrl(test.matterPdfKey),
+    outlinePdfUrl: test.outlinePdfKey
+      ? R2Service.getPublicUrl(test.outlinePdfKey)
+      : null,
+    solutionAudioUrl: test.solutionAudioKey
+      ? R2Service.getPublicUrl(test.solutionAudioKey)
+      : null,
+  };
+}
 
-    return test;
-  },
+import type { db as dbInstance } from "~/server/db";
+type Db = typeof dbInstance;
 
-  async update(input: UpdateTestInput) {
-    const existing = await db.query.tests.findFirst({
-      where: eq(tests.id, input.id),
-    });
+export function createTestService(db: Db) {
+  return {
+    async create(input: CreateTestInput, adminId: string) {
+      const { speeds, ...testFields } = input;
 
-    if (!existing) throw new Error("Test not found");
+      const result = await db.transaction(async (tx) => {
+        const [test] = await tx
+          .insert(tests)
+          .values({ ...testFields, adminId })
+          .returning();
 
-    if (existing.status === "active" && input.status !== "active") {
-      throw new Error("Active tests cannot be modified");
-    }
+        await tx.insert(testSpeeds).values(
+          speeds.map((s, i) => ({
+            id: nanoid(8),
+            testId: test!.id,
+            ...s,
+            sortOrder: s.sortOrder ?? i,
+          })),
+        );
 
-    const { id, ...rest } = input;
+        return test!;
+      });
 
-    const [updated] = await db
-      .update(tests)
-      .set({ ...rest, outline: rest.outline ?? "" })
-      .where(eq(tests.id, id))
-      .returning();
+      await notificationsService.send({
+        title: "New test available",
+        message: `"${result.title}" has just been published. Attempt now!`,
+        to: "everyone",
+        link: `/user/tests/${result.id}`,
+        isLinkExternal: false,
+      });
 
-    return updated;
-  },
+      return result;
+    },
 
-  async delete(input: GetTestInput) {
-    await db.delete(tests).where(eq(tests.id, input.id));
-    return { success: true };
-  },
+    async update(input: UpdateTestInput) {
+      const { id, upsertSpeeds = [], deleteSpeeds = [], ...testFields } = input;
 
-  async list(input: ListTestsInput) {
-    const offset = (input.page - 1) * PAGE_SIZE;
+      const existing = await db.query.tests.findFirst({
+        where: eq(tests.id, id),
+      });
+      if (!existing) throw new Error("Test not found");
 
-    // Build where conditions
-    const conditions = [];
+      if (existing.status === "active") {
+        const blockedChanges = Object.keys(testFields).filter(
+          (k) => !["solutionAudioKey", "correctAnswer"].includes(k),
+        );
+        if (blockedChanges.length > 0) {
+          throw new Error(
+            "Active tests: only solutionAudioKey and correctAnswer can be modified",
+          );
+        }
+        if (upsertSpeeds.some((s) => "id" in s)) {
+          throw new Error(
+            "Cannot edit existing speed variants on an active test",
+          );
+        }
+        if (deleteSpeeds.length > 0) {
+          throw new Error("Cannot delete speed variants from an active test");
+        }
+      }
 
-    if (input.type !== "all") {
-      conditions.push(eq(tests.type, input.type));
-    }
+      await db.transaction(async (tx) => {
+        if (Object.keys(testFields).length > 0) {
+          await tx.update(tests).set(testFields).where(eq(tests.id, id));
+        }
 
-    if (input.status !== "all") {
-      conditions.push(eq(tests.status, input.status));
-    }
-
-    const orderBy =
-      input.sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
-
-    // Fetch tests
-    const data = await db.query.tests.findMany({
-      limit: PAGE_SIZE,
-      offset,
-      orderBy,
-      where: conditions.length > 0 ? and(...conditions) : undefined,
-    });
-
-    // Fetch attempt counts for each test in one query
-    const testIds = data.map((t) => t.id);
-
-    const attemptRows =
-      testIds.length > 0
-        ? await db
-            .select({
-              testId: testAttempts.testId,
-              count: count(),
-            })
-            .from(testAttempts)
-            .where(inArray(testAttempts.testId, testIds))
-            .groupBy(testAttempts.testId)
-        : [];
-
-    const attemptCounts = Object.fromEntries(
-      attemptRows.map((r) => [r.testId, r.count]),
-    );
-
-    const totalRows = await db
-      .select({ total: count() })
-      .from(tests)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    const total = totalRows[0]?.total ?? 0;
-
-    return {
-      data: data.map((t) => ({
-        ...t,
-        attemptCount: attemptCounts[t.id] ?? 0,
-      })),
-      page: input.page,
-      pageSize: PAGE_SIZE,
-      total,
-      totalPages: Math.ceil(total / PAGE_SIZE),
-    };
-  },
-
-  async listForUserFeed(input: ListUserTestsInput, userId: string) {
-    const { page, pageSize = PAGE_SIZE } = input;
-    const offset = (page - 1) * pageSize;
-
-    const data = await db.query.tests.findMany({
-      where: eq(tests.status, "active"),
-      limit: pageSize,
-      offset,
-      orderBy: desc(tests.createdAt),
-    });
-
-    const testIds = data.map((t) => t.id);
-
-    if (testIds.length === 0) {
-      return {
-        data: [],
-        page,
-        pageSize,
-        total: 0,
-        totalPages: 0,
-      };
-    }
-
-    const attemptRows = await db
-      .select({
-        testId: testAttempts.testId,
-        count: count(),
-      })
-      .from(testAttempts)
-      .where(inArray(testAttempts.testId, testIds))
-      .groupBy(testAttempts.testId);
-
-    const attemptCountMap = Object.fromEntries(
-      attemptRows.map((r) => [r.testId, r.count]),
-    );
-
-    const userAttemptRows = await db
-      .select({
-        testId: testAttempts.testId,
-      })
-      .from(testAttempts)
-      .where(
-        and(
-          eq(testAttempts.userId, userId),
-          inArray(testAttempts.testId, testIds),
-        ),
-      )
-      .groupBy(testAttempts.testId);
-
-    const userAttemptSet = new Set(userAttemptRows.map((r) => r.testId));
-
-    const enriched = data.map((t) => ({
-      ...t,
-      attemptCount: attemptCountMap[t.id] ?? 0,
-      hasAttempted: userAttemptSet.has(t.id),
-    }));
-
-    const totalRows = await db
-      .select({ total: count() })
-      .from(tests)
-      .where(eq(tests.status, "active"));
-
-    const total = totalRows[0]?.total ?? 0;
-
-    return {
-      data: enriched,
-      page,
-      pageSize,
-      total,
-      totalPages: Math.ceil(total / pageSize),
-    };
-  },
-
-  async getById(input: GetTestInput) {
-    const test = await db.query.tests.findFirst({
-      where: eq(tests.id, input.id),
-    });
-
-    if (!test) throw new Error("Test not found");
-
-    return { ...test, audioUrl: R2Service.getPublicUrl(test.audioKey) };
-  },
-
-  async getLast24HourTests() {
-    const now = new Date();
-
-    const past24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    const data = await db.query.tests.findMany({
-      where: gte(tests.createdAt, past24Hours),
-      orderBy: desc(tests.createdAt),
-    });
-
-    return data;
-  },
-
-  async searchForUser(input: SearchTestsInput, userId: string) {
-    const { query, type, page, pageSize } = input;
-    const offset = (page - 1) * pageSize;
-
-    const conditions = [
-      eq(tests.status, "active"),
-      ilike(tests.title, `%${query}%`),
-      type ? eq(tests.type, type) : undefined,
-    ].filter(Boolean);
-
-    const whereClause = and(...conditions);
-
-    const data = await db.query.tests.findMany({
-      where: whereClause,
-      limit: pageSize,
-      offset,
-      orderBy: desc(tests.createdAt),
-    });
-
-    const testIds = data.map((t) => t.id);
-
-    // Attempt counts
-    const attemptRows =
-      testIds.length > 0
-        ? await db
-            .select({ testId: testAttempts.testId, count: count() })
-            .from(testAttempts)
-            .where(inArray(testAttempts.testId, testIds))
-            .groupBy(testAttempts.testId)
-        : [];
-    const attemptCountMap = Object.fromEntries(
-      attemptRows.map((r) => [r.testId, r.count]),
-    );
-
-    // User has attempted
-    const userAttemptRows =
-      testIds.length > 0
-        ? await db
-            .select({ testId: testAttempts.testId })
-            .from(testAttempts)
+        if (deleteSpeeds.length > 0) {
+          await tx
+            .delete(testSpeeds)
             .where(
               and(
-                eq(testAttempts.userId, userId),
-                inArray(testAttempts.testId, testIds),
+                inArray(testSpeeds.id, deleteSpeeds),
+                eq(testSpeeds.testId, id),
               ),
-            )
-            .groupBy(testAttempts.testId)
-        : [];
-    const userAttemptSet = new Set(userAttemptRows.map((r) => r.testId));
+            );
+        }
 
-    const total = await db.$count(tests, whereClause);
+        if (upsertSpeeds.length > 0) {
+          type NewSpeed = Required<
+            Pick<
+              typeof testSpeeds.$inferInsert,
+              | "wpm"
+              | "audioKey"
+              | "dictationSeconds"
+              | "breakSeconds"
+              | "writtenDurationSeconds"
+            >
+          > & { sortOrder?: number };
 
-    return {
-      data: data.map((t) => ({
-        ...t,
-        attemptCount: attemptCountMap[t.id] ?? 0,
-        hasAttempted: userAttemptSet.has(t.id),
-      })),
-      page,
-      pageSize,
-      total,
-      totalPages: Math.ceil(total / pageSize),
-    };
-  },
+          const toInsert: NewSpeed[] = [];
+          const toUpdate: Array<{ id: string } & Partial<NewSpeed>> = [];
 
-  async getTests(input: GetTestsAdminInput) {
-    const { page, pageSize, status, type, fromDate, toDate, adminId, sort } =
-      input;
+          for (const s of upsertSpeeds) {
+            if ("id" in s) {
+              toUpdate.push(s as { id: string } & Partial<NewSpeed>);
+            } else {
+              toInsert.push(s as NewSpeed);
+            }
+          }
 
-    const offset = (page - 1) * pageSize;
+          if (toInsert.length > 0) {
+            await tx.insert(testSpeeds).values(
+              toInsert.map((s, i) => ({
+                id: nanoid(8),
+                testId: id,
+                wpm: s.wpm,
+                audioKey: s.audioKey,
+                dictationSeconds: s.dictationSeconds,
+                breakSeconds: s.breakSeconds,
+                writtenDurationSeconds: s.writtenDurationSeconds,
+                sortOrder: s.sortOrder ?? i,
+              })),
+            );
+          }
 
-    const conditions = [];
+          await Promise.all(
+            toUpdate.map(({ id: speedId, ...fields }) =>
+              tx
+                .update(testSpeeds)
+                .set(fields)
+                .where(
+                  and(eq(testSpeeds.id, speedId), eq(testSpeeds.testId, id)),
+                ),
+            ),
+          );
+        }
+      });
 
-    if (status) {
-      conditions.push(eq(tests.status, status));
-    }
+      return db.query.tests.findFirst({ where: eq(tests.id, id) });
+    },
 
-    if (type) {
-      conditions.push(eq(tests.type, type));
-    }
+    // ── delete ────────────────────────────────────────────────────────────────
 
-    if (adminId) {
-      conditions.push(eq(tests.adminId, adminId));
-    }
+    async delete(input: GetTestInput) {
+      await db.delete(tests).where(eq(tests.id, input.id));
+      return { success: true };
+    },
 
-    if (fromDate) {
-      conditions.push(gte(tests.createdAt, fromDate));
-    }
+    // ── list (admin) ──────────────────────────────────────────────────────────
 
-    if (toDate) {
-      conditions.push(lte(tests.createdAt, toDate));
-    }
+    async list(input: ListTestsInput) {
+      const offset = (input.page - 1) * PAGE_SIZE;
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const conditions = [];
+      if (input.type !== "all") conditions.push(eq(tests.type, input.type));
+      if (input.status !== "all")
+        conditions.push(eq(tests.status, input.status));
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const orderBy =
+        input.sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
 
-    const orderBy =
-      sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
+      const rows = await db.execute<{
+        id: string;
+        title: string;
+        type: string;
+        status: string;
+        created_at: Date;
+        admin_id: string;
+        matter_pdf_key: string;
+        outline_pdf_key: string | null;
+        correct_answer: string;
+        solution_audio_key: string | null;
+        attempt_count: number;
+        total_count: number;
+      }>(sql`
+        SELECT
+          t.*,
+          COUNT(ta.id) OVER (PARTITION BY t.id) AS attempt_count,
+          COUNT(*) OVER ()                       AS total_count
+        FROM tests t
+        LEFT JOIN test_attempts ta ON ta.test_id = t.id
+        ${where ? sql`WHERE ${where}` : sql``}
+        GROUP BY t.id
+        ORDER BY ${orderBy}
+        LIMIT ${PAGE_SIZE} OFFSET ${offset}
+      `);
 
-    const data = await db.query.tests.findMany({
-      where: whereClause,
-      limit: pageSize,
-      offset,
-      orderBy,
-    });
+      const total = Number(rows[0]?.total_count ?? 0);
 
-    const totalRows = await db
-      .select({ total: count() })
-      .from(tests)
-      .where(whereClause);
+      return {
+        data: rows.map((r) => ({
+          ...r,
+          attemptCount: Number(r.attempt_count),
+          ...resolveTest(r as any),
+        })),
+        page: input.page,
+        pageSize: PAGE_SIZE,
+        total,
+        totalPages: Math.ceil(total / PAGE_SIZE),
+      };
+    },
 
-    const total = totalRows[0]?.total ?? 0;
+    // ── listForUserFeed ───────────────────────────────────────────────────────
 
-    return {
-      data,
-      page,
-      pageSize,
-      total,
-      totalPages: Math.ceil(total / pageSize),
-    };
-  },
-};
+    async listForUserFeed(input: ListUserTestsInput, userId: string) {
+      const { page, pageSize = PAGE_SIZE } = input;
+      const offset = (page - 1) * pageSize;
+
+      const rows = await db.execute<{
+        id: string;
+        title: string;
+        type: string;
+        status: string;
+        created_at: Date;
+        admin_id: string;
+        matter_pdf_key: string;
+        outline_pdf_key: string | null;
+        correct_answer: string;
+        solution_audio_key: string | null;
+        attempt_count: string;
+        total_count: string;
+      }>(sql`
+        SELECT
+          t.*,
+          COUNT(ta.id) OVER (PARTITION BY t.id) AS attempt_count,
+          COUNT(*) OVER ()                       AS total_count
+        FROM tests t
+        LEFT JOIN test_attempts ta ON ta.test_id = t.id
+        WHERE t.status = 'active'
+        GROUP BY t.id
+        ORDER BY t.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+
+      if (rows.length === 0)
+        return { data: [], page, pageSize, total: 0, totalPages: 0 };
+
+      const testIds = rows.map((r) => r.id);
+      const total = Number(rows[0]!.total_count);
+
+      const assessedRows = await db
+        .select({ testId: testAttempts.testId })
+        .from(results)
+        .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
+        .where(
+          and(
+            eq(results.userId, userId),
+            inArray(testAttempts.testId, testIds),
+          ),
+        )
+        .groupBy(testAttempts.testId);
+
+      const assessedSet = new Set(assessedRows.map((r) => r.testId));
+
+      return {
+        data: rows.map((r) => ({
+          ...r,
+          attemptCount: Number(r.attempt_count),
+          hasAttempted: assessedSet.has(r.id),
+          ...resolveTest(r as any),
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    },
+
+    // ── getById ───────────────────────────────────────────────────────────────
+
+    async getById(input: GetTestInput) {
+      const test = await db.query.tests.findFirst({
+        where: eq(tests.id, input.id),
+        with: { speeds: { orderBy: asc(testSpeeds.sortOrder) } },
+      });
+
+      if (!test) throw new Error("Test not found");
+
+      return { ...resolveTest(test), speeds: test.speeds.map(resolveSpeed) };
+    },
+
+    // ── getLast24HourTests ────────────────────────────────────────────────────
+
+    async getLast24HourTests() {
+      const past24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      return db.query.tests.findMany({
+        where: and(
+          eq(tests.status, "active"),
+          gte(tests.createdAt, past24Hours),
+        ),
+        orderBy: desc(tests.createdAt),
+        with: { speeds: { orderBy: asc(testSpeeds.sortOrder) } },
+      });
+    },
+
+    // ── searchForUser ─────────────────────────────────────────────────────────
+
+    async searchForUser(input: SearchTestsInput, userId: string) {
+      const { query, type, page, pageSize } = input;
+      const offset = (page - 1) * pageSize;
+
+      const rows = await db.execute<{
+        id: string;
+        title: string;
+        type: string;
+        status: string;
+        created_at: Date;
+        attempt_count: string;
+        total_count: string;
+        matter_pdf_key: string;
+        outline_pdf_key: string | null;
+        correct_answer: string;
+        solution_audio_key: string | null;
+      }>(sql`
+        SELECT
+          t.*,
+          COUNT(ta.id) OVER (PARTITION BY t.id) AS attempt_count,
+          COUNT(*) OVER ()                       AS total_count
+        FROM tests t
+        LEFT JOIN test_attempts ta ON ta.test_id = t.id
+        WHERE t.status = 'active'
+          AND t.title ILIKE ${`%${query}%`}
+          ${type ? sql`AND t.type = ${type}` : sql``}
+        GROUP BY t.id
+        ORDER BY t.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+
+      if (rows.length === 0)
+        return { data: [], page, pageSize, total: 0, totalPages: 0 };
+
+      const testIds = rows.map((r) => r.id);
+      const total = Number(rows[0]!.total_count);
+
+      const assessedRows = await db
+        .select({ testId: testAttempts.testId })
+        .from(results)
+        .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
+        .where(
+          and(
+            eq(results.userId, userId),
+            inArray(testAttempts.testId, testIds),
+          ),
+        )
+        .groupBy(testAttempts.testId);
+
+      const assessedSet = new Set(assessedRows.map((r) => r.testId));
+
+      return {
+        data: rows.map((r) => ({
+          ...r,
+          attemptCount: Number(r.attempt_count),
+          hasAttempted: assessedSet.has(r.id),
+          ...resolveTest(r as any),
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    },
+
+    async getTests(input: GetTestsAdminInput) {
+      const { page, pageSize, status, type, fromDate, toDate, adminId, sort } =
+        input;
+      const offset = (page - 1) * pageSize;
+
+      const conditions = [
+        status ? eq(tests.status, status) : undefined,
+        type ? eq(tests.type, type) : undefined,
+        adminId ? eq(tests.adminId, adminId) : undefined,
+        fromDate ? gte(tests.createdAt, fromDate) : undefined,
+        toDate ? lte(tests.createdAt, toDate) : undefined,
+      ].filter(Boolean);
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const orderBy =
+        sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
+
+      const [data, totalRows] = await Promise.all([
+        db.query.tests.findMany({
+          where,
+          limit: pageSize,
+          offset,
+          orderBy,
+          with: { speeds: { orderBy: asc(testSpeeds.sortOrder) } },
+        }),
+        db.select({ total: count() }).from(tests).where(where),
+      ]);
+
+      const total = totalRows[0]?.total ?? 0;
+
+      return {
+        data: data.map((t) => ({
+          ...resolveTest(t),
+          speeds: t.speeds.map(resolveSpeed),
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    },
+
+    // ── addSpeed ──────────────────────────────────────────────────────────────
+
+    async addSpeed(input: AddSpeedInput) {
+      const { testId, ...speedFields } = input;
+      const test = await db.query.tests.findFirst({
+        where: eq(tests.id, testId),
+      });
+      if (!test) throw new Error("Test not found");
+
+      const [speed] = await db
+        .insert(testSpeeds)
+        .values({ id: nanoid(8), testId, ...speedFields })
+        .returning();
+
+      return resolveSpeed(speed!);
+    },
+
+    // ── editSpeed ─────────────────────────────────────────────────────────────
+
+    async editSpeed(input: EditSpeedInput) {
+      const { id, testId, ...fields } = input;
+
+      const [test, speed] = await Promise.all([
+        db.query.tests.findFirst({ where: eq(tests.id, testId) }),
+        db.query.testSpeeds.findFirst({
+          where: and(eq(testSpeeds.id, id), eq(testSpeeds.testId, testId)),
+        }),
+      ]);
+
+      if (!test) throw new Error("Test not found");
+      if (!speed) throw new Error("Speed not found");
+      if (test.status === "active")
+        throw new Error("Cannot edit speed variants on an active test");
+
+      const [updated] = await db
+        .update(testSpeeds)
+        .set(fields)
+        .where(and(eq(testSpeeds.id, id), eq(testSpeeds.testId, testId)))
+        .returning();
+
+      return resolveSpeed(updated!);
+    },
+
+    // ── deleteSpeed ───────────────────────────────────────────────────────────
+
+    async deleteSpeed(input: DeleteSpeedInput) {
+      const { id, testId } = input;
+
+      const [test, [countRow]] = await Promise.all([
+        db.query.tests.findFirst({ where: eq(tests.id, testId) }),
+        db
+          .select({ total: count() })
+          .from(testSpeeds)
+          .where(eq(testSpeeds.testId, testId)),
+      ]);
+
+      if (!test) throw new Error("Test not found");
+      if (test.status === "active")
+        throw new Error("Cannot delete speed variants from an active test");
+      if ((countRow?.total ?? 0) <= 1)
+        throw new Error("A test must have at least one speed variant");
+
+      await db
+        .delete(testSpeeds)
+        .where(and(eq(testSpeeds.id, id), eq(testSpeeds.testId, testId)));
+
+      return { ok: true };
+    },
+
+    // ── reorderSpeeds ─────────────────────────────────────────────────────────
+
+    async reorderSpeeds(input: ReorderSpeedsInput) {
+      const { testId, speeds } = input;
+
+      const existing = await db.query.testSpeeds.findMany({
+        where: eq(testSpeeds.testId, testId),
+        columns: { id: true },
+      });
+
+      const existingIds = new Set(existing.map((s) => s.id));
+      if (!speeds.every((s) => existingIds.has(s.id))) {
+        throw new Error("One or more speed ids do not belong to this test");
+      }
+
+      await Promise.all(
+        speeds.map((s) =>
+          db
+            .update(testSpeeds)
+            .set({ sortOrder: s.sortOrder })
+            .where(and(eq(testSpeeds.id, s.id), eq(testSpeeds.testId, testId))),
+        ),
+      );
+
+      return { ok: true };
+    },
+  };
+}
+
+// ── default export bound to global db ────────────────────────────────────────
+// Normal usage: testService.create(input, adminId)
+// Cross-service transaction: createTestService(tx).create(input, adminId)
+
+import { db } from "~/server/db";
+export const testService = createTestService(db);

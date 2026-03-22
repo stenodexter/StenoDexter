@@ -2,7 +2,7 @@ CREATE TYPE "public"."invite_status" AS ENUM('active', 'invalidated', 'expired',
 CREATE TYPE "public"."attempt_stage" AS ENUM('audio', 'break', 'writing', 'submitted');--> statement-breakpoint
 CREATE TYPE "public"."attempt_type" AS ENUM('assessment', 'practice');--> statement-breakpoint
 CREATE TYPE "public"."test_status" AS ENUM('draft', 'active');--> statement-breakpoint
-CREATE TYPE "public"."test_type" AS ENUM('legal', 'general');--> statement-breakpoint
+CREATE TYPE "public"."test_type" AS ENUM('legal', 'general', 'special');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -113,6 +113,7 @@ CREATE TABLE "test_attempts" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"test_id" text NOT NULL,
+	"speed_id" text NOT NULL,
 	"type" "attempt_type" NOT NULL,
 	"stage" "attempt_stage" DEFAULT 'audio' NOT NULL,
 	"stage_started_at" timestamp with time zone DEFAULT now(),
@@ -130,36 +131,50 @@ CREATE TABLE "test_attempts" (
 	"updated_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
+CREATE TABLE "test_speeds" (
+	"id" text PRIMARY KEY NOT NULL,
+	"test_id" text NOT NULL,
+	"wpm" integer NOT NULL,
+	"audio_key" text NOT NULL,
+	"dictation_seconds" integer NOT NULL,
+	"break_seconds" integer NOT NULL,
+	"written_duration_seconds" integer NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "tests" (
 	"id" text PRIMARY KEY NOT NULL,
 	"title" text NOT NULL,
 	"type" "test_type" NOT NULL,
-	"audio_key" text NOT NULL,
-	"matter" text NOT NULL,
-	"outline" text NOT NULL,
-	"break_seconds" integer NOT NULL,
-	"written_duration_seconds" integer NOT NULL,
-	"dictation_duration_seconds" integer NOT NULL,
+	"matter_pdf_key" text NOT NULL,
+	"outline_pdf_key" text,
+	"correct_answer" text NOT NULL,
 	"status" "test_status" DEFAULT 'draft' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"solution_audio_key" text,
 	"admin_id" text DEFAULT 'system' NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "leaderboard" (
 	"id" text PRIMARY KEY NOT NULL,
 	"test_id" text NOT NULL,
+	"result_id" text NOT NULL,
+	"speed_id" text NOT NULL,
 	"user_id" text NOT NULL,
-	"best_score" integer NOT NULL,
-	"best_wpm" integer,
-	"best_accuracy" integer,
-	"created_at" timestamp with time zone DEFAULT now()
+	"score" integer NOT NULL,
+	"wpm" integer NOT NULL,
+	"accuracy" integer NOT NULL,
+	"mistakes" integer,
+	"attempted_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "leaderboard_result_id_unique" UNIQUE("result_id")
 );
 --> statement-breakpoint
 CREATE TABLE "results" (
 	"id" text PRIMARY KEY NOT NULL,
 	"attempt_id" text NOT NULL,
 	"user_id" text NOT NULL,
-	"test_id" text NOT NULL,
 	"type" "attempt_type" NOT NULL,
 	"score" integer NOT NULL,
 	"wpm" integer NOT NULL,
@@ -191,15 +206,48 @@ ALTER TABLE "admin_invite_usage" ADD CONSTRAINT "admin_invite_usage_used_by_admi
 ALTER TABLE "admin_session" ADD CONSTRAINT "admin_session_admin_id_admin_id_fk" FOREIGN KEY ("admin_id") REFERENCES "public"."admin"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_attempts" ADD CONSTRAINT "test_attempts_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_attempts" ADD CONSTRAINT "test_attempts_test_id_tests_id_fk" FOREIGN KEY ("test_id") REFERENCES "public"."tests"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "test_attempts" ADD CONSTRAINT "test_attempts_speed_id_test_speeds_id_fk" FOREIGN KEY ("speed_id") REFERENCES "public"."test_speeds"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "test_speeds" ADD CONSTRAINT "test_speeds_test_id_tests_id_fk" FOREIGN KEY ("test_id") REFERENCES "public"."tests"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tests" ADD CONSTRAINT "tests_admin_id_admin_id_fk" FOREIGN KEY ("admin_id") REFERENCES "public"."admin"("id") ON DELETE set default ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "leaderboard" ADD CONSTRAINT "leaderboard_test_id_tests_id_fk" FOREIGN KEY ("test_id") REFERENCES "public"."tests"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "leaderboard" ADD CONSTRAINT "leaderboard_result_id_results_id_fk" FOREIGN KEY ("result_id") REFERENCES "public"."results"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "leaderboard" ADD CONSTRAINT "leaderboard_speed_id_test_speeds_id_fk" FOREIGN KEY ("speed_id") REFERENCES "public"."test_speeds"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "leaderboard" ADD CONSTRAINT "leaderboard_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "results" ADD CONSTRAINT "results_attempt_id_test_attempts_id_fk" FOREIGN KEY ("attempt_id") REFERENCES "public"."test_attempts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "results" ADD CONSTRAINT "results_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "results" ADD CONSTRAINT "results_test_id_tests_id_fk" FOREIGN KEY ("test_id") REFERENCES "public"."tests"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "account_provider_account_idx" ON "account" USING btree ("provider_id","account_id");--> statement-breakpoint
+CREATE INDEX "account_user_id_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "session_token_expires_idx" ON "session" USING btree ("token","expires_at");--> statement-breakpoint
+CREATE INDEX "session_user_id_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "session_expires_at_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "verification_identifier_expires_idx" ON "verification" USING btree ("identifier","expires_at");--> statement-breakpoint
+CREATE INDEX "verification_expires_at_idx" ON "verification" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "admin_invited_by_idx" ON "admin" USING btree ("invited_by_admin_id");--> statement-breakpoint
+CREATE INDEX "admin_is_super_idx" ON "admin" USING btree ("is_super");--> statement-breakpoint
+CREATE INDEX "admin_is_system_idx" ON "admin" USING btree ("is_system");--> statement-breakpoint
+CREATE INDEX "admin_invite_created_by_idx" ON "admin_invite" USING btree ("created_by_admin_id");--> statement-breakpoint
+CREATE INDEX "admin_invite_status_idx" ON "admin_invite" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "admin_invite_token_status_expires_idx" ON "admin_invite" USING btree ("token","status","expires_at");--> statement-breakpoint
+CREATE INDEX "admin_invite_expires_at_idx" ON "admin_invite" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "admin_invite_usage_invite_id_idx" ON "admin_invite_usage" USING btree ("invite_id");--> statement-breakpoint
+CREATE INDEX "admin_invite_usage_used_by_idx" ON "admin_invite_usage" USING btree ("used_by_admin_id");--> statement-breakpoint
+CREATE INDEX "admin_invite_usage_invite_used_by_idx" ON "admin_invite_usage" USING btree ("invite_id","used_by_admin_id");--> statement-breakpoint
+CREATE INDEX "admin_session_token_expires_idx" ON "admin_session" USING btree ("token","expires_at");--> statement-breakpoint
+CREATE INDEX "admin_session_admin_id_idx" ON "admin_session" USING btree ("admin_id");--> statement-breakpoint
+CREATE INDEX "admin_session_expires_at_idx" ON "admin_session" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "idx_user_test" ON "test_attempts" USING btree ("user_id","test_id");--> statement-breakpoint
-CREATE INDEX "idx_user_type" ON "test_attempts" USING btree ("user_id","type");--> statement-breakpoint
-CREATE INDEX "idx_stage" ON "test_attempts" USING btree ("stage");--> statement-breakpoint
-CREATE INDEX "idx_results_user" ON "results" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_results_test" ON "results" USING btree ("test_id");--> statement-breakpoint
-CREATE INDEX "idx_results_type" ON "results" USING btree ("type");--> statement-breakpoint
+CREATE INDEX "idx_active_attempts" ON "test_attempts" USING btree ("user_id","stage") WHERE is_submitted = false;--> statement-breakpoint
+CREATE INDEX "idx_unscored" ON "test_attempts" USING btree ("test_id","submitted_at") WHERE is_submitted = true AND score IS NULL;--> statement-breakpoint
+CREATE INDEX "idx_attempts_speed_id" ON "test_attempts" USING btree ("speed_id");--> statement-breakpoint
+CREATE INDEX "test_speeds_test_id_idx" ON "test_speeds" USING btree ("test_id");--> statement-breakpoint
+CREATE INDEX "test_speeds_test_wpm_idx" ON "test_speeds" USING btree ("test_id","wpm");--> statement-breakpoint
+CREATE INDEX "tests_status_idx" ON "tests" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "tests_admin_id_idx" ON "tests" USING btree ("admin_id");--> statement-breakpoint
+CREATE INDEX "tests_type_status_idx" ON "tests" USING btree ("type","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_leaderboard_test_user" ON "leaderboard" USING btree ("test_id","user_id","speed_id");--> statement-breakpoint
+CREATE INDEX "idx_leaderboard_speed_score" ON "leaderboard" USING btree ("speed_id","score");--> statement-breakpoint
+CREATE INDEX "idx_leaderboard_speed_id" ON "leaderboard" USING btree ("speed_id");--> statement-breakpoint
+CREATE INDEX "idx_results_user_id" ON "results" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_results_user_type" ON "results" USING btree ("user_id","type");--> statement-breakpoint
 CREATE INDEX "notif_to_idx" ON "notifications" USING btree ("to");--> statement-breakpoint
 CREATE INDEX "notif_created_at_idx" ON "notifications" USING btree ("created_at");

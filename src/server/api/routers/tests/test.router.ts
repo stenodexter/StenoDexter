@@ -1,10 +1,13 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// FILE 3: test.router.ts
+// ═══════════════════════════════════════════════════════════════════════════════
+
 import {
   adminProcedure,
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-
 import {
   createTestSchema,
   updateTestSchema,
@@ -13,46 +16,74 @@ import {
   listUserTestsSchema,
   getTestsAdminSchema,
   searchTestsSchema,
+  addSpeedSchema,
+  editSpeedSchema,
+  deleteSpeedSchema,
+  reorderSpeedsSchema,
 } from "./test.schema";
-
 import { testService } from "./test.service";
 
 export const testRouter = createTRPCRouter({
-  create: adminProcedure.input(createTestSchema).mutation(({ input, ctx }) => {
-    return testService.create(input, ctx.admin.id);
-  }),
+  // ── test CRUD ──────────────────────────────────────────────────────────────
 
-  update: adminProcedure.input(updateTestSchema).mutation(({ input }) => {
-    return testService.update(input);
-  }),
+  create: adminProcedure
+    .input(createTestSchema)
+    .mutation(({ input, ctx }) => testService.create(input, ctx.admin.id)),
 
-  delete: adminProcedure.input(getTestSchema).mutation(({ input }) => {
-    return testService.delete(input);
-  }),
+  update: adminProcedure
+    .input(updateTestSchema)
+    .mutation(({ input }) => testService.update(input)),
 
-  list: publicProcedure.input(listTestsSchema).query(({ input }) => {
-    return testService.list(input);
-  }),
+  delete: adminProcedure
+    .input(getTestSchema)
+    .mutation(({ input }) => testService.delete(input)),
 
+  // ── speed management ───────────────────────────────────────────────────────
+  // Standalone routes — admin manages speeds independently after test creation.
+
+  addSpeed: adminProcedure
+    .input(addSpeedSchema)
+    .mutation(({ input }) => testService.addSpeed(input)),
+
+  editSpeed: adminProcedure
+    .input(editSpeedSchema)
+    .mutation(({ input }) => testService.editSpeed(input)),
+
+  deleteSpeed: adminProcedure
+    .input(deleteSpeedSchema)
+    .mutation(({ input }) => testService.deleteSpeed(input)),
+
+  reorderSpeeds: adminProcedure
+    .input(reorderSpeedsSchema)
+    .mutation(({ input }) => testService.reorderSpeeds(input)),
+
+  // ── queries ────────────────────────────────────────────────────────────────
+
+  // Admin: paginated test list with attempt counts
+  list: adminProcedure
+    .input(listTestsSchema)
+    .query(({ input }) => testService.list(input)),
+
+  // User: active tests feed with hasAttempted flag
   listForUser: protectedProcedure
     .input(listUserTestsSchema)
-    .query(({ input, ctx }) => {
-      return testService.listForUserFeed(input, ctx.user.id);
-    }),
+    .query(({ input, ctx }) => testService.listForUserFeed(input, ctx.user.id)),
 
-  get: publicProcedure.input(getTestSchema).query(({ input }) => {
-    return testService.getById(input);
-  }),
+  // Public: get single test with all speeds (test detail page)
+  get: publicProcedure
+    .input(getTestSchema)
+    .query(({ input }) => testService.getById(input)),
 
-  getTests: publicProcedure.input(getTestsAdminSchema).query(({ input }) => {
-    return testService.getTests(input);
-  }),
+  // Admin: rich filtered list with speeds
+  getTests: adminProcedure
+    .input(getTestsAdminSchema)
+    .query(({ input }) => testService.getTests(input)),
 
+  // User: search active tests
   search: protectedProcedure
     .input(searchTestsSchema)
     .query(({ input, ctx }) => testService.searchForUser(input, ctx.user.id)),
 
-  todaysTest: publicProcedure.query(async () => {
-    return testService.getLast24HourTests();
-  }),
+  // Public: tests created in last 24h (dashboard featured strip)
+  todaysTests: publicProcedure.query(() => testService.getLast24HourTests()),
 });

@@ -7,13 +7,14 @@ export const metadata: Metadata = {
 
 export default function NewTestPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-2 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Create Stenography Test
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Configure audio, timing, and content for the candidate assessment.
+    <div className="mx-auto w-[80%] py-8">
+      <div className="mb-7">
+        <p className="text-muted-foreground mb-1 font-mono text-[10px] font-bold tracking-[0.15em] uppercase">
+          Admin · Tests
+        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">Create Test</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Configure speeds, content, and timing for the new assessment.
         </p>
       </div>
       <CreateTestForm />

@@ -1,5 +1,5 @@
 {
-  "id": "a21e31cd-fe10-48e0-bf87-fed3dfa00637",
+  "id": "b5330f6a-2432-40ac-9c1b-18c50500186b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -87,7 +87,44 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "account_provider_account_idx": {
+          "name": "account_provider_account_idx",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "account_user_id_idx": {
+          "name": "account_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "account_user_id_user_id_fk": {
           "name": "account_user_id_user_id_fk",
@@ -162,7 +199,59 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "session_token_expires_idx": {
+          "name": "session_token_expires_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_user_id_idx": {
+          "name": "session_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_expires_at_idx": {
+          "name": "session_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "session_user_id_user_id_fk": {
           "name": "session_user_id_user_id_fk",
@@ -308,7 +397,44 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "verification_identifier_expires_idx": {
+          "name": "verification_identifier_expires_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "verification_expires_at_idx": {
+          "name": "verification_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -466,7 +592,53 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "admin_invited_by_idx": {
+          "name": "admin_invited_by_idx",
+          "columns": [
+            {
+              "expression": "invited_by_admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_is_super_idx": {
+          "name": "admin_is_super_idx",
+          "columns": [
+            {
+              "expression": "is_super",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_is_system_idx": {
+          "name": "admin_is_system_idx",
+          "columns": [
+            {
+              "expression": "is_system",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "admin_invited_by_admin_id_admin_id_fk": {
           "name": "admin_invited_by_admin_id_admin_id_fk",
@@ -553,7 +725,80 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "admin_invite_created_by_idx": {
+          "name": "admin_invite_created_by_idx",
+          "columns": [
+            {
+              "expression": "created_by_admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_status_idx": {
+          "name": "admin_invite_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_token_status_expires_idx": {
+          "name": "admin_invite_token_status_expires_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_expires_at_idx": {
+          "name": "admin_invite_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "admin_invite_created_by_admin_id_admin_id_fk": {
           "name": "admin_invite_created_by_admin_id_admin_id_fk",
@@ -613,7 +858,59 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "admin_invite_usage_invite_id_idx": {
+          "name": "admin_invite_usage_invite_id_idx",
+          "columns": [
+            {
+              "expression": "invite_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_usage_used_by_idx": {
+          "name": "admin_invite_usage_used_by_idx",
+          "columns": [
+            {
+              "expression": "used_by_admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_usage_invite_used_by_idx": {
+          "name": "admin_invite_usage_invite_used_by_idx",
+          "columns": [
+            {
+              "expression": "invite_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "used_by_admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "admin_invite_usage_invite_id_admin_invite_id_fk": {
           "name": "admin_invite_usage_invite_id_admin_invite_id_fk",
@@ -695,7 +992,59 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "admin_session_token_expires_idx": {
+          "name": "admin_session_token_expires_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_session_admin_id_idx": {
+          "name": "admin_session_admin_id_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_session_expires_at_idx": {
+          "name": "admin_session_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "admin_session_admin_id_admin_id_fk": {
           "name": "admin_session_admin_id_admin_id_fk",
@@ -743,6 +1092,12 @@
         },
         "test_id": {
           "name": "test_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "speed_id": {
+          "name": "speed_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -869,8 +1224,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_user_type": {
-          "name": "idx_user_type",
+        "idx_active_attempts": {
+          "name": "idx_active_attempts",
           "columns": [
             {
               "expression": "user_id",
@@ -879,22 +1234,45 @@
               "nulls": "last"
             },
             {
-              "expression": "type",
+              "expression": "stage",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
+          "where": "is_submitted = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "idx_stage": {
-          "name": "idx_stage",
+        "idx_unscored": {
+          "name": "idx_unscored",
           "columns": [
             {
-              "expression": "stage",
+              "expression": "test_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "submitted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "is_submitted = true AND score IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_attempts_speed_id": {
+          "name": "idx_attempts_speed_id",
+          "columns": [
+            {
+              "expression": "speed_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -923,6 +1301,139 @@
         "test_attempts_test_id_tests_id_fk": {
           "name": "test_attempts_test_id_tests_id_fk",
           "tableFrom": "test_attempts",
+          "tableTo": "tests",
+          "columnsFrom": [
+            "test_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "test_attempts_speed_id_test_speeds_id_fk": {
+          "name": "test_attempts_speed_id_test_speeds_id_fk",
+          "tableFrom": "test_attempts",
+          "tableTo": "test_speeds",
+          "columnsFrom": [
+            "speed_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.test_speeds": {
+      "name": "test_speeds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "test_id": {
+          "name": "test_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wpm": {
+          "name": "wpm",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audio_key": {
+          "name": "audio_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dictation_seconds": {
+          "name": "dictation_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "break_seconds": {
+          "name": "break_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "written_duration_seconds": {
+          "name": "written_duration_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "test_speeds_test_id_idx": {
+          "name": "test_speeds_test_id_idx",
+          "columns": [
+            {
+              "expression": "test_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "test_speeds_test_wpm_idx": {
+          "name": "test_speeds_test_wpm_idx",
+          "columns": [
+            {
+              "expression": "test_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "wpm",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "test_speeds_test_id_tests_id_fk": {
+          "name": "test_speeds_test_id_tests_id_fk",
+          "tableFrom": "test_speeds",
           "tableTo": "tests",
           "columnsFrom": [
             "test_id"
@@ -963,39 +1474,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "audio_key": {
-          "name": "audio_key",
+        "matter_pdf_key": {
+          "name": "matter_pdf_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "matter": {
-          "name": "matter",
+        "outline_pdf_key": {
+          "name": "outline_pdf_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "outline": {
-          "name": "outline",
+        "correct_answer": {
+          "name": "correct_answer",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "break_seconds": {
-          "name": "break_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "written_duration_seconds": {
-          "name": "written_duration_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dictation_duration_seconds": {
-          "name": "dictation_duration_seconds",
-          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -1014,6 +1507,12 @@
           "notNull": true,
           "default": "now()"
         },
+        "solution_audio_key": {
+          "name": "solution_audio_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "admin_id": {
           "name": "admin_id",
           "type": "text",
@@ -1022,7 +1521,59 @@
           "default": "'system'"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "tests_status_idx": {
+          "name": "tests_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "tests_admin_id_idx": {
+          "name": "tests_admin_id_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "tests_type_status_idx": {
+          "name": "tests_type_status_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "tests_admin_id_admin_id_fk": {
           "name": "tests_admin_id_admin_id_fk",
@@ -1060,42 +1611,191 @@
           "primaryKey": false,
           "notNull": true
         },
+        "result_id": {
+          "name": "result_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "speed_id": {
+          "name": "speed_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "best_score": {
-          "name": "best_score",
+        "score": {
+          "name": "score",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "best_wpm": {
-          "name": "best_wpm",
+        "wpm": {
+          "name": "wpm",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accuracy": {
+          "name": "accuracy",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mistakes": {
+          "name": "mistakes",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "best_accuracy": {
-          "name": "best_accuracy",
-          "type": "integer",
+        "attempted_at": {
+          "name": "attempted_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "idx_leaderboard_test_user": {
+          "name": "idx_leaderboard_test_user",
+          "columns": [
+            {
+              "expression": "test_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "speed_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_leaderboard_speed_score": {
+          "name": "idx_leaderboard_speed_score",
+          "columns": [
+            {
+              "expression": "speed_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_leaderboard_speed_id": {
+          "name": "idx_leaderboard_speed_id",
+          "columns": [
+            {
+              "expression": "speed_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "leaderboard_test_id_tests_id_fk": {
+          "name": "leaderboard_test_id_tests_id_fk",
+          "tableFrom": "leaderboard",
+          "tableTo": "tests",
+          "columnsFrom": [
+            "test_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "leaderboard_result_id_results_id_fk": {
+          "name": "leaderboard_result_id_results_id_fk",
+          "tableFrom": "leaderboard",
+          "tableTo": "results",
+          "columnsFrom": [
+            "result_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "leaderboard_speed_id_test_speeds_id_fk": {
+          "name": "leaderboard_speed_id_test_speeds_id_fk",
+          "tableFrom": "leaderboard",
+          "tableTo": "test_speeds",
+          "columnsFrom": [
+            "speed_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "leaderboard_user_id_user_id_fk": {
+          "name": "leaderboard_user_id_user_id_fk",
+          "tableFrom": "leaderboard",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "leaderboard_result_id_unique": {
+          "name": "leaderboard_result_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "result_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1118,12 +1818,6 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "test_id": {
-          "name": "test_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1174,8 +1868,8 @@
         }
       },
       "indexes": {
-        "idx_results_user": {
-          "name": "idx_results_user",
+        "idx_results_user_id": {
+          "name": "idx_results_user_id",
           "columns": [
             {
               "expression": "user_id",
@@ -1189,24 +1883,15 @@
           "method": "btree",
           "with": {}
         },
-        "idx_results_test": {
-          "name": "idx_results_test",
+        "idx_results_user_type": {
+          "name": "idx_results_user_type",
           "columns": [
             {
-              "expression": "test_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_results_type": {
-          "name": "idx_results_type",
-          "columns": [
+            },
             {
               "expression": "type",
               "isExpression": false,
@@ -1240,19 +1925,6 @@
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "results_test_id_tests_id_fk": {
-          "name": "results_test_id_tests_id_fk",
-          "tableFrom": "results",
-          "tableTo": "tests",
-          "columnsFrom": [
-            "test_id"
           ],
           "columnsTo": [
             "id"
@@ -1410,7 +2082,8 @@
       "schema": "public",
       "values": [
         "legal",
-        "general"
+        "general",
+        "special"
       ]
     }
   },

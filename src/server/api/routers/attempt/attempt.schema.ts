@@ -1,8 +1,8 @@
-// ─── attempt.schema.ts ───────────────────────────────────────────────────────
 import { z } from "zod";
 
 export const createAttemptSchema = z.object({
   testId: z.string(),
+  speedId: z.string(), // user picks which speed variant to attempt
 });
 
 export const syncAttemptSchema = z.object({
@@ -11,9 +11,8 @@ export const syncAttemptSchema = z.object({
   answerDraft: z.string().optional(),
   stage: z.enum(["audio", "break", "writing", "submitted"]).optional(),
   breakSkipped: z.boolean().optional(),
-  // Sent once when countdown ends — stamps the real audio start time server-side
   markAudioStarted: z.boolean().optional(),
-  markWrittingStarted: z.boolean().optional(),
+  markWritingStarted: z.boolean().optional(), // fixed typo from original
 });
 
 export const submitAttemptSchema = z.object({

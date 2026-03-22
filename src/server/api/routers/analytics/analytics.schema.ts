@@ -5,15 +5,11 @@ export const dateRangeSchema = z.object({
   to: z.date().optional(),
 });
 
-// optional filters for future scaling
 export const analyticsFilterSchema = z.object({
   from: z.date().optional(),
   to: z.date().optional(),
   testId: z.string().optional(),
 });
-
-export type DateRangeInput = z.infer<typeof dateRangeSchema>;
-export type AnalyticsFilterInput = z.infer<typeof analyticsFilterSchema>;
 
 export const getGlobalTopPerformersSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -30,8 +26,10 @@ export const getUsersSchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
 });
 
-export type GetUsersInput = z.infer<typeof getUsersSchema>;
-
 export const getTestStatsSchema = z.object({
   testId: z.string(),
 });
+
+export type DateRangeInput = z.infer<typeof dateRangeSchema>;
+export type AnalyticsFilterInput = z.infer<typeof analyticsFilterSchema>;
+export type GetUsersInput = z.infer<typeof getUsersSchema>;

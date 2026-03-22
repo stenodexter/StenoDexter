@@ -13,31 +13,25 @@ import {
 } from "./results.schema";
 
 export const resultRouter = createTRPCRouter({
+  // User: view their own attempt result
   getResult: paidUserProcedure
-    .input(
-      z.object({
-        attemptId: z.string(),
-      }),
-    )
-    .query(async ({ input, ctx }) => {
-      return await resultService.getResult(input.attemptId, ctx.user.id);
-    }),
+    .input(z.object({ attemptId: z.string() }))
+    .query(({ input, ctx }) =>
+      resultService.getResult(input.attemptId, ctx.user.id),
+    ),
 
+  // Admin/public: all results for a test (optionally filtered by speed)
   getTestResults: publicProcedure
     .input(getTestResultsSchema)
-    .query(async ({ input }) => {
-      return await resultService.getTestResults(input);
-    }),
+    .query(({ input }) => resultService.getTestResults(input)),
 
+  // Admin: global results feed with rich filters
   getResults: adminProcedure
     .input(getResultsAdminSchema)
-    .query(async ({ input }) => {
-      return await resultService.getResultsAdmin(input);
-    }),
+    .query(({ input }) => resultService.getResultsAdmin(input)),
 
+  // Public: leaderboard for a test (per-speed or all speeds)
   getTopPerformersByTest: publicProcedure
     .input(GetTopPerformersByTestSchema)
-    .query(async ({ input }) => {
-      return await resultService.getTopPerformersByTest(input);
-    }),
+    .query(({ input }) => resultService.getTopPerformersByTest(input)),
 });
