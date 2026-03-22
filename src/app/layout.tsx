@@ -16,10 +16,37 @@ import { TooltipProvider } from "~/components/ui/tooltip";
 import { Toaster } from "~/components/ui/sonner";
 import { cn } from "~/lib/utils";
 import { ThemeProvider } from "~/providers/theme-provider";
+import localFont from "next/font/local";
+
+const calibri = localFont({
+  src: [
+    {
+      path: "../../public/fonts/calibri/Calibri.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/calibri/Calibri-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/calibri/Calibri-Italic.woff2",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/calibri/Calibri-BoldItalic.woff2",
+      weight: "700",
+      style: "italic",
+    },
+  ],
+  variable: "--font-calibri",
+  display: "swap",
+});
 
 const interHeading = Inter({ subsets: ["latin"], variable: "--font-heading" });
 
-const montserrat = Montserrat({subsets:['latin'],variable:'--font-sans'});
 const robotoSlab = Roboto_Slab({
   subsets: ["latin"],
   variable: "--font-serif",
@@ -29,6 +56,7 @@ const montserrat = Montserrat({
   weight: ["800", "900"],
   variable: "--font-montserrat",
 });
+
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
@@ -48,10 +76,13 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-              jetbrainsMono.variable,
-              robotoSlab.variable,
-              interHeading.variable,
-            , "font-sans", montserrat.variable)}
+        calibri.variable,
+        jetbrainsMono.variable,
+        robotoSlab.variable,
+        interHeading.variable,
+        "font-sans",
+        montserrat.variable,
+      )}
     >
       <body suppressHydrationWarning>
         {" "}

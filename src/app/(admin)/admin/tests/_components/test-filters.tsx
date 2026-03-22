@@ -1,49 +1,69 @@
+// ─── app/admin/tests/_components/test-filters.tsx ────────────────────────────
 "use client";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { Button } from "~/components/ui/button";
+import { LayoutGrid, List } from "lucide-react";
+import { useCallback } from "react";
 
-export type SortFilter   = "newest" | "oldest";
-export type TypeFilter   = "all" | "legal" | "general";
+export type SortFilter = "newest" | "oldest";
+export type TypeFilter = "all" | "legal" | "general" | "special";
 export type StatusFilter = "all" | "active" | "draft";
 
+import type { ViewMode } from "~/hooks/use-view";
+
 interface TestFiltersProps {
-  sort:   SortFilter;
-  type:   TypeFilter;
+  sort: SortFilter;
+  type: TypeFilter;
   status: StatusFilter;
+  view: ViewMode;
+  onView: (v: ViewMode) => void;
   total?: number;
-  onSortChange:   (v: SortFilter)   => void;
-  onTypeChange:   (v: TypeFilter)   => void;
-  onStatusChange: (v: StatusFilter) => void;
 }
 
 export function TestFilters({
   sort,
   type,
   status,
+  view,
+  onView,
   total,
-  onSortChange,
-  onTypeChange,
-  onStatusChange,
 }: TestFiltersProps) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
+  const set = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(key, value);
+      if (key !== "page") params.set("page", "1");
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams],
+  );
+
+  const handleView = (v: ViewMode) => onView(v);
+
+  return (
+    <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
       {/* Sort */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        <span className="text-muted-foreground/60 text-[10px] font-semibold tracking-widest uppercase">
           Sort
         </span>
         <ToggleGroup
           type="single"
           value={sort}
-          onValueChange={(v) => v && onSortChange(v as SortFilter)}
-          className="h-8 rounded-md border border-border bg-muted/40 p-0.5 gap-0"
+          onValueChange={(v) => v && set("sort", v)}
+          className="bg-muted/40 h-8 gap-0 rounded-md border p-0.5"
         >
           {(["newest", "oldest"] as SortFilter[]).map((v) => (
             <ToggleGroupItem
               key={v}
               value={v}
-              className="h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:bg-background data-[state=on]:shadow-sm data-[state=on]:text-foreground data-[state=off]:text-muted-foreground"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=off]:text-muted-foreground h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:shadow-sm"
             >
               {v}
             </ToggleGroupItem>
@@ -53,20 +73,20 @@ export function TestFilters({
 
       {/* Type */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        <span className="text-muted-foreground/60 text-[10px] font-semibold tracking-widest uppercase">
           Type
         </span>
         <ToggleGroup
           type="single"
           value={type}
-          onValueChange={(v) => v && onTypeChange(v as TypeFilter)}
-          className="h-8 rounded-md border border-border bg-muted/40 p-0.5 gap-0"
+          onValueChange={(v) => v && set("type", v)}
+          className="bg-muted/40 h-8 gap-0 rounded-md border p-0.5"
         >
-          {(["all", "legal", "general"] as TypeFilter[]).map((v) => (
+          {(["all", "legal", "general", "special"] as TypeFilter[]).map((v) => (
             <ToggleGroupItem
               key={v}
               value={v}
-              className="h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:bg-background data-[state=on]:shadow-sm data-[state=on]:text-foreground data-[state=off]:text-muted-foreground"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=off]:text-muted-foreground h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:shadow-sm"
             >
               {v}
             </ToggleGroupItem>
@@ -76,20 +96,20 @@ export function TestFilters({
 
       {/* Status */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        <span className="text-muted-foreground/60 text-[10px] font-semibold tracking-widest uppercase">
           Status
         </span>
         <ToggleGroup
           type="single"
           value={status}
-          onValueChange={(v) => v && onStatusChange(v as StatusFilter)}
-          className="h-8 rounded-md border border-border bg-muted/40 p-0.5 gap-0"
+          onValueChange={(v) => v && set("status", v)}
+          className="bg-muted/40 h-8 gap-0 rounded-md border p-0.5"
         >
           {(["all", "active", "draft"] as StatusFilter[]).map((v) => (
             <ToggleGroupItem
               key={v}
               value={v}
-              className="h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:bg-background data-[state=on]:shadow-sm data-[state=on]:text-foreground data-[state=off]:text-muted-foreground"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=off]:text-muted-foreground h-7 rounded px-3 text-xs font-medium capitalize data-[state=on]:shadow-sm"
             >
               {v}
             </ToggleGroupItem>
@@ -97,12 +117,33 @@ export function TestFilters({
         </ToggleGroup>
       </div>
 
-      {/* Total count */}
+      <div className="flex-1" />
+
       {total !== undefined && (
-        <p className="ml-auto self-end pb-1 text-xs tabular-nums text-muted-foreground/50">
+        <p className="text-muted-foreground/50 self-end pb-1 text-xs tabular-nums">
           {total} test{total !== 1 ? "s" : ""}
         </p>
       )}
+
+      {/* View toggle — persisted to cookie, not URL */}
+      <div className="bg-muted/40 flex items-center gap-0.5 rounded-md border p-0.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleView("grid")}
+          className={`h-7 w-7 ${view === "grid" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleView("list")}
+          className={`h-7 w-7 ${view === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+        >
+          <List className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

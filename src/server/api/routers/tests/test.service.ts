@@ -10,6 +10,7 @@ import {
   lte,
   ilike,
   sql,
+  SQL,
 } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type {
@@ -196,7 +197,7 @@ export function createTestService(db: Db) {
     async list(input: ListTestsInput) {
       const offset = (input.page - 1) * PAGE_SIZE;
 
-      const conditions = [];
+      const conditions: SQL[] = [];
       if (input.type !== "all") conditions.push(eq(tests.type, input.type));
       if (input.status !== "all")
         conditions.push(eq(tests.status, input.status));
@@ -204,39 +205,33 @@ export function createTestService(db: Db) {
       const orderBy =
         input.sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
 
-      const rows = await db.execute<{
-        id: string;
-        title: string;
-        type: string;
-        status: string;
-        created_at: Date;
-        admin_id: string;
-        matter_pdf_key: string;
-        outline_pdf_key: string | null;
-        correct_answer: string;
-        solution_audio_key: string | null;
-        attempt_count: number;
-        total_count: number;
-      }>(sql`
-        SELECT
-          t.*,
-          COUNT(ta.id) OVER (PARTITION BY t.id) AS attempt_count,
-          COUNT(*) OVER ()                       AS total_count
-        FROM tests t
-        LEFT JOIN test_attempts ta ON ta.test_id = t.id
-        ${where ? sql`WHERE ${where}` : sql``}
-        GROUP BY t.id
-        ORDER BY ${orderBy}
-        LIMIT ${PAGE_SIZE} OFFSET ${offset}
-      `);
+      // Run data + count + speeds in parallel — all proper Drizzle, no raw SQL
+      const [rows, [countRow]] = await Promise.all([
+        db.query.tests.findMany({
+          where,
+          orderBy,
+          limit: PAGE_SIZE,
+          offset,
+          with: {
+            speeds: {
+              columns: { id: true, wpm: true, sortOrder: true },
+              orderBy: asc(testSpeeds.sortOrder),
+            },
+            attempts: {
+              columns: { id: true },
+            },
+          },
+        }),
+        db.select({ count: count() }).from(tests).where(where),
+      ]);
 
-      const total = Number(rows[0]?.total_count ?? 0);
+      const total = countRow?.count ?? 0;
 
       return {
-        data: rows.map((r) => ({
-          ...r,
-          attemptCount: Number(r.attempt_count),
-          ...resolveTest(r as any),
+        data: rows.map((t) => ({
+          ...resolveTest(t),
+          speeds: t.speeds,
+          attemptCount: t.attempts.length,
         })),
         page: input.page,
         pageSize: PAGE_SIZE,
@@ -251,58 +246,92 @@ export function createTestService(db: Db) {
       const { page, pageSize = PAGE_SIZE } = input;
       const offset = (page - 1) * pageSize;
 
-      const rows = await db.execute<{
-        id: string;
-        title: string;
-        type: string;
-        status: string;
-        created_at: Date;
-        admin_id: string;
-        matter_pdf_key: string;
-        outline_pdf_key: string | null;
-        correct_answer: string;
-        solution_audio_key: string | null;
-        attempt_count: string;
-        total_count: string;
-      }>(sql`
-        SELECT
-          t.*,
-          COUNT(ta.id) OVER (PARTITION BY t.id) AS attempt_count,
-          COUNT(*) OVER ()                       AS total_count
-        FROM tests t
-        LEFT JOIN test_attempts ta ON ta.test_id = t.id
-        WHERE t.status = 'active'
-        GROUP BY t.id
-        ORDER BY t.created_at DESC
-        LIMIT ${pageSize} OFFSET ${offset}
-      `);
+      const [rows, [countRow], assessedRows] = await Promise.all([
+        db.query.tests.findMany({
+          where: eq(tests.status, "active"),
+          orderBy: desc(tests.createdAt),
+          limit: pageSize,
+          offset,
+          with: {
+            attempts: { columns: { id: true } },
+          },
+        }),
 
-      if (rows.length === 0)
+        db
+          .select({ count: count() })
+          .from(tests)
+          .where(eq(tests.status, "active")),
+
+        // Which tests has this user submitted any result on (any speed)
+        db
+          .selectDistinct({ testId: testAttempts.testId })
+          .from(results)
+          .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
+          .where(eq(results.userId, userId)),
+      ]);
+
+      const total = countRow?.count ?? 0;
+
+      if (rows.length === 0) {
         return { data: [], page, pageSize, total: 0, totalPages: 0 };
+      }
 
       const testIds = rows.map((r) => r.id);
-      const total = Number(rows[0]!.total_count);
+      const hasAttemptedSet = new Set(assessedRows.map((r) => r.testId));
 
-      const assessedRows = await db
-        .select({ testId: testAttempts.testId })
-        .from(results)
-        .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
-        .where(
-          and(
-            eq(results.userId, userId),
-            inArray(testAttempts.testId, testIds),
+      // Second batch: speeds + per-speed assessed status, now that we have testIds
+      const [speedRows, assessedSpeedRows] = await Promise.all([
+        db
+          .select({
+            id: testSpeeds.id,
+            testId: testSpeeds.testId,
+            wpm: testSpeeds.wpm,
+            dictationSeconds: testSpeeds.dictationSeconds,
+            breakSeconds: testSpeeds.breakSeconds,
+            writtenDurationSeconds: testSpeeds.writtenDurationSeconds,
+            sortOrder: testSpeeds.sortOrder,
+          })
+          .from(testSpeeds)
+          .where(inArray(testSpeeds.testId, testIds))
+          .orderBy(asc(testSpeeds.sortOrder)),
+
+        // Which (testId, speedId) combos has this user assessed on
+        db
+          .selectDistinct({
+            testId: testAttempts.testId,
+            speedId: testAttempts.speedId,
+          })
+          .from(results)
+          .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
+          .where(
+            and(
+              eq(results.userId, userId),
+              inArray(testAttempts.testId, testIds),
+            ),
           ),
-        )
-        .groupBy(testAttempts.testId);
+      ]);
 
-      const assessedSet = new Set(assessedRows.map((r) => r.testId));
+      const assessedSpeedSet = new Set(
+        assessedSpeedRows.map((r) => `${r.testId}:${r.speedId}`),
+      );
+
+      const speedsByTest = speedRows.reduce<Record<string, typeof speedRows>>(
+        (acc, s) => {
+          (acc[s.testId] ??= []).push(s);
+          return acc;
+        },
+        {},
+      );
 
       return {
-        data: rows.map((r) => ({
-          ...r,
-          attemptCount: Number(r.attempt_count),
-          hasAttempted: assessedSet.has(r.id),
-          ...resolveTest(r as any),
+        data: rows.map((t) => ({
+          ...resolveTest(t),
+          attemptCount: t.attempts.length,
+          hasAttempted: hasAttemptedSet.has(t.id),
+          speeds: (speedsByTest[t.id] ?? []).map((s) => ({
+            ...s,
+            hasAssessed: assessedSpeedSet.has(`${t.id}:${s.id}`),
+          })),
         })),
         page,
         pageSize,

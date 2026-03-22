@@ -264,7 +264,7 @@ export function createAttemptService(db: Db) {
         test: attempt.test,
         speed: {
           ...speed,
-          audioUrl: R2Service.getPublicUrl(speed.audioKey),
+          audioUrl: R2Service.getPublicUrl(speed.audioKey)!,
         },
         secondsLeft,
         elapsedSeconds,

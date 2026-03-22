@@ -49,7 +49,7 @@ export function UserSidebar() {
       {/* ── Brand header ── */}
       <SidebarHeader className="px-4 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg shadow-sm">
+          <div className="bg-white text-primary-foreground flex h-8 w-8 items-center justify-center rounded-sm shadow-sm">
             <Image
               src={"/icon.png"}
               alt={"Logo"}

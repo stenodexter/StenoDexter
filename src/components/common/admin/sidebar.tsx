@@ -11,10 +11,17 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader,
   SidebarFooter,
-  SidebarSeparator,
 } from "~/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "~/components/ui/collapsible";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -25,20 +32,19 @@ import {
   MailPlus,
   Settings,
   Plus,
-  Keyboard,
-  Pen,
-  Frame,
   Users,
-  MessageSquare,
+  Frame,
   BellDot,
+  ChevronRight,
+  Gavel,
+  FileText,
+  Star,
 } from "lucide-react";
 import { trpc } from "~/trpc/react";
 import { useMemo } from "react";
 import Image from "next/image";
 
 const MAIN_NAV = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Tests", href: "/admin/tests", icon: ClipboardList },
   { label: "Leaderboard", href: "/admin/leaderboard", icon: Trophy },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart2 },
   { label: "Users", href: "/admin/users", icon: Users },
@@ -48,6 +54,13 @@ const MAIN_NAV = [
     icon: Frame,
     badge: "New",
   },
+];
+
+const TEST_TYPES = [
+  { label: "All Tests", href: "/admin/tests", icon: ClipboardList },
+  { label: "Legal", href: "/admin/tests?type=legal", icon: Gavel },
+  { label: "General", href: "/admin/tests?type=general", icon: FileText },
+  { label: "Special", href: "/admin/tests?type=special", icon: Star },
 ];
 
 const MANAGE_NAV = [
@@ -63,29 +76,34 @@ const MANAGE_NAV = [
     icon: MailPlus,
     super: true,
   },
-  {
-    label: "Settings",
-    href: "/admin/settings",
-    icon: Settings,
-  },
+  { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const admin = trpc.admin.auth.me.useQuery();
+  const isSuper = useMemo(() => admin.data?.isSuper, [admin.data]);
 
   const isActive = (href: string) =>
-    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+    href === "/admin"
+      ? pathname === "/admin"
+      : pathname.startsWith(href.split("?")[0]!);
 
-  const isSuper = useMemo(() => admin.data?.isSuper, [admin.data]);
+  const isTestsSection = pathname.startsWith("/admin/tests");
 
   return (
     <Sidebar>
-      {/* ── Brand header ── */}
+      {/* ── Brand ── */}
       <SidebarHeader className="px-4 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg shadow-sm">
-            <Image src={"/icon.png"} alt={"Logo"} width={200} height={200} className="h-full w-full m-0" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-white shadow-sm">
+            <Image
+              src="/icon.png"
+              alt="Logo"
+              width={200}
+              height={200}
+              className="h-full w-full"
+            />
           </div>
           <div className="flex flex-col leading-none">
             <span className="font-logo text-base font-bold tracking-tight">
@@ -99,7 +117,7 @@ export function AdminSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        {/* ── Create Assessment CTA ── */}
+        {/* ── Create CTA ── */}
         <div className="mb-1 px-2 pt-1">
           <Button asChild className="w-full justify-start gap-2" size="sm">
             <Link href="/admin/tests/new">
@@ -109,11 +127,73 @@ export function AdminSidebar() {
           </Button>
         </div>
 
-        {/* ── Main navigation ── */}
-        <SidebarGroup className="mb-3">
+        {/* ── Main nav ── */}
+        <SidebarGroup className="mb-2">
           <SidebarGroupLabel>General</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Dashboard */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin"}>
+                  <Link href="/admin">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Tests — collapsible with type sub-items */}
+              <Collapsible
+                defaultOpen={isTestsSection}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={isTestsSection}>
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Tests</span>
+                      <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {TEST_TYPES.map(({ label, href, icon: Icon }) => {
+                        // Active: exact match for "All Tests", type-param match for others
+                        const active = href.includes("?type=")
+                          ? pathname === "/admin/tests" &&
+                            new URLSearchParams(href.split("?")[1]).get(
+                              "type",
+                            ) ===
+                              new URLSearchParams(
+                                typeof window !== "undefined"
+                                  ? window.location.search
+                                  : "",
+                              ).get("type")
+                          : pathname === "/admin/tests" &&
+                            !new URLSearchParams(
+                              typeof window !== "undefined"
+                                ? window.location.search
+                                : "",
+                            ).get("type");
+
+                        return (
+                          <SidebarMenuSubItem key={href}>
+                            <SidebarMenuSubButton asChild isActive={active}>
+                              <Link href={href}>
+                                <Icon className="h-3.5 w-3.5" />
+                                {label}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {/* Rest of main nav */}
               {MAIN_NAV.map(({ label, href, icon: Icon, badge }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton asChild isActive={isActive(href)}>
@@ -141,7 +221,7 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* ── Management navigation ── */}
+        {/* ── Manage nav ── */}
         <SidebarGroup>
           <SidebarGroupLabel>Manage</SidebarGroupLabel>
           <SidebarGroupContent>

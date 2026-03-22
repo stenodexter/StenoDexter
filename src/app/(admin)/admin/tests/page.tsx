@@ -1,12 +1,11 @@
+// ─── app/admin/tests/page.tsx ─────────────────────────────────────────────────
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Plus } from "lucide-react";
 import { TestList } from "./_components/tests-list";
 
-export const metadata: Metadata = {
-  title: "Tests — StenoDexter Admin",
-};
+export const metadata: Metadata = { title: "Tests — StenoDexter Admin" };
 
 export default function TestsPage() {
   return (
@@ -18,18 +17,13 @@ export default function TestsPage() {
             Manage stenography assessments and dictation sessions.
           </p>
         </div>
-        <Button
-          asChild
-          size="sm"
-          className="h-8 gap-1.5 px-3 text-xs font-semibold"
-        >
+        <Button asChild size="sm">
           <Link href="/admin/tests/new">
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Test
           </Link>
         </Button>
       </div>
-
       <TestList />
     </div>
   );

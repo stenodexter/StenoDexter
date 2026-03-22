@@ -1,76 +1,94 @@
 "use client";
 
+// ─── app/(user)/test/[test]/attempt/[attemptId]/page.tsx ─────────────────────
+
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { SkipForward, Send, CheckCircle2 } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { SkipForward, Send, CheckCircle2, ZoomIn, ZoomOut } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const COUNTDOWN_SECONDS = 5;
+const SYNC_LOCAL_MS = 3_000; // save to localStorage every 3s
+const SYNC_SERVER_MS = 15_000; // push to server every 15s
+const AUDIO_SYNC_MS = 5_000; // sync audio progress every 5s
+
+const DRAFT_KEY = (attemptId: string) => `attempt_draft_${attemptId}`;
+
+// ─── types ────────────────────────────────────────────────────────────────────
+
 type Stage = "countdown" | "audio" | "break" | "writing" | "submitted";
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-const COUNTDOWN_SECONDS = 5; // tweak this to change the pre-test countdown
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
 function formatTime(s: number) {
-  const m = Math.floor(s / 60)
-    .toString()
-    .padStart(2, "0");
-  const sec = (s % 60).toString().padStart(2, "0");
-  return `${m}:${sec}`;
+  const m = Math.floor(s / 60);
+  return `${pad(m)}:${pad(s % 60)}`;
 }
 
 // ─── Circular progress ────────────────────────────────────────────────────────
+
 function CircularProgress({
   pct,
   timeLeft,
   total,
+  danger = false,
+  size = 120,
 }: {
   pct: number;
   timeLeft: number;
   total: number;
+  danger?: boolean;
+  size?: number;
 }) {
-  const R = 44;
+  const strokeW = Math.max(4, size * 0.05);
+  const R = (size - strokeW) / 2;
   const circ = 2 * Math.PI * R;
-  const dash = circ * (1 - pct / 100);
+  const cx = size / 2;
 
   return (
     <div
       className="relative flex items-center justify-center"
-      style={{ width: 120, height: 120 }}
+      style={{ width: size, height: size }}
     >
-      <svg width={120} height={120} className="-rotate-90">
-        {/* Track */}
+      <svg width={size} height={size} className="-rotate-90 transform">
+        {/* background */}
         <circle
-          cx={60}
-          cy={60}
+          cx={cx}
+          cy={cx}
           r={R}
           fill="none"
-          stroke="hsl(var(--border))"
-          strokeWidth={6}
+          stroke="gray" // temp debug
+          strokeWidth={strokeW}
         />
-        {/* Progress */}
+
+        {/* progress */}
         <circle
-          cx={60}
-          cy={60}
+          cx={cx}
+          cy={cx}
           r={R}
           fill="none"
-          stroke="hsl(var(--primary))"
-          strokeWidth={6}
+          stroke={danger ? "red" : "green"} // temp debug
+          strokeWidth={strokeW}
           strokeLinecap="round"
           strokeDasharray={circ}
-          strokeDashoffset={dash}
+          strokeDashoffset={circ * (1 - pct / 100)}
           style={{ transition: "stroke-dashoffset 1s linear" }}
         />
       </svg>
+
       <div className="absolute flex flex-col items-center">
-        <span className="text-foreground text-sm leading-none font-bold tabular-nums">
-          {formatTime(timeLeft)}
-        </span>
-        <span className="text-muted-foreground mt-0.5 text-[10px]">
+        <span className="font-bold">{formatTime(timeLeft)}</span>
+        <span className="text-muted-foreground text-xs">
           / {formatTime(total)}
         </span>
       </div>
@@ -79,16 +97,13 @@ function CircularProgress({
 }
 
 // ─── Waveform ─────────────────────────────────────────────────────────────────
+
 function AudioWaveform({ isPlaying }: { isPlaying: boolean }) {
   const BAR_COUNT = 48;
-
-  // Generate stable random heights per bar using useMemo
   const baseHeights = useMemo(
     () => Array.from({ length: BAR_COUNT }, () => 0.15 + Math.random() * 0.55),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-
   const [heights, setHeights] = useState(baseHeights);
   const rafRef = useRef<number>(0);
   const lastRef = useRef<number>(0);
@@ -98,21 +113,21 @@ function AudioWaveform({ isPlaying }: { isPlaying: boolean }) {
       setHeights(baseHeights.map((h) => h * 0.3));
       return;
     }
-
     const animate = (ts: number) => {
       if (ts - lastRef.current > 80) {
         lastRef.current = ts;
         setHeights((prev) =>
           prev.map((_, i) => {
             const base = baseHeights[i] ?? 0.3;
-            const jitter = (Math.random() - 0.5) * 0.35;
-            return Math.max(0.08, Math.min(1, base + jitter));
+            return Math.max(
+              0.08,
+              Math.min(1, base + (Math.random() - 0.5) * 0.35),
+            );
           }),
         );
       }
       rafRef.current = requestAnimationFrame(animate);
     };
-
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
   }, [isPlaying, baseHeights]);
@@ -138,16 +153,34 @@ function AudioWaveform({ isPlaying }: { isPlaying: boolean }) {
   );
 }
 
-// ─── Countdown ────────────────────────────────────────────────────────────────
-function CountdownOverlay({ count }: { count: number }) {
+// ─── Countdown overlay ────────────────────────────────────────────────────────
+
+function CountdownOverlay({
+  count,
+  testTitle,
+  attemptType,
+}: {
+  count: number;
+  testTitle: string;
+  attemptType: string;
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 select-none">
-      <div className="space-y-1.5 text-center">
-        <p className="text-foreground text-base font-semibold">
+    <div className="flex h-full flex-col items-center justify-center gap-8 px-6 text-center select-none">
+      <div className="space-y-2">
+        <p className="text-lg font-semibold">{testTitle}</p>
+        <Badge
+          variant={attemptType === "assessment" ? "default" : "secondary"}
+          className="capitalize"
+        >
+          {attemptType}
+        </Badge>
+      </div>
+      <div className="space-y-1">
+        <p className="text-muted-foreground text-sm">
           Get ready — audio begins shortly
         </p>
         <p className="text-muted-foreground text-xs">
-          Find a quiet place and keep this window in fullscreen
+          Find a quiet place and stay in fullscreen
         </p>
       </div>
       <span
@@ -164,6 +197,7 @@ function CountdownOverlay({ count }: { count: number }) {
 }
 
 // ─── Audio stage ──────────────────────────────────────────────────────────────
+
 function AudioStage({
   audioUrl,
   durationSeconds,
@@ -181,70 +215,67 @@ function AudioStage({
   const [isPlaying, setIsPlaying] = useState(false);
   const elapsed = durationSeconds - secondsLeft;
   const pct = Math.min(100, (elapsed / durationSeconds) * 100);
+  const onEndedRef = useRef(onEnded);
+  const onProgressRef = useRef(onProgress);
+  onEndedRef.current = onEnded;
+  onProgressRef.current = onProgress;
 
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-
-    // Seek to resume position, lock controls
     el.currentTime = elapsed;
-    el.addEventListener("play", () => setIsPlaying(true));
-    el.addEventListener("pause", () => setIsPlaying(false));
-    el.addEventListener("ended", () => {
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnd = () => {
       setIsPlaying(false);
-      onEnded();
-    });
-
-    void el
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => null);
+      onEndedRef.current();
+    };
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("ended", onEnd);
+    void el.play().catch(() => null);
 
     const tick = setInterval(() => {
-      if (el && !el.paused) onProgress(Math.floor(el.currentTime));
-    }, 2000);
+      if (el && !el.paused) onProgressRef.current(Math.floor(el.currentTime));
+    }, AUDIO_SYNC_MS);
 
     return () => {
       clearInterval(tick);
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("ended", onEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-10">
-      {/* Label */}
       <div className="flex items-center gap-2">
         <span
-          className={`inline-block h-2 w-2 rounded-full ${isPlaying ? "animate-pulse bg-red-500" : "bg-muted-foreground"}`}
+          className={`h-2 w-2 rounded-full ${isPlaying ? "animate-pulse bg-red-500" : "bg-muted-foreground"}`}
         />
         <span className="text-muted-foreground text-xs font-medium tracking-[0.15em] uppercase">
           {isPlaying ? "Playing" : "Paused"}
         </span>
       </div>
-
-      {/* Waveform */}
       <div className="w-full max-w-md px-8">
         <AudioWaveform isPlaying={isPlaying} />
       </div>
-
-      {/* Circular timer */}
       <CircularProgress
         pct={pct}
         timeLeft={secondsLeft}
         total={durationSeconds}
       />
-
       <p className="text-muted-foreground text-xs">
         A break follows once audio ends
       </p>
-
-      {/* Hidden audio — no controls exposed */}
       <audio ref={audioRef} src={audioUrl} className="hidden" />
     </div>
   );
 }
 
 // ─── Break stage ──────────────────────────────────────────────────────────────
+
 function BreakStage({
   secondsLeft,
   totalSeconds,
@@ -254,10 +285,10 @@ function BreakStage({
   totalSeconds: number;
   onSkip: () => void;
 }) {
-  const pct = Math.min(
-    100,
-    ((totalSeconds - secondsLeft) / totalSeconds) * 100,
-  );
+  const pct =
+    totalSeconds > 0
+      ? Math.min(100, ((totalSeconds - secondsLeft) / totalSeconds) * 100)
+      : 0;
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8">
@@ -265,24 +296,23 @@ function BreakStage({
         Break
       </p>
 
-      <CircularProgress pct={pct} timeLeft={secondsLeft} total={totalSeconds} />
+      <CircularProgress
+        pct={pct}
+        timeLeft={secondsLeft}
+        total={totalSeconds}
+        size={160}
+      />
 
       <div className="space-y-1 text-center">
-        <p className="text-foreground text-sm font-medium">
-          Use this time to review your notes
+        <p className="text-sm font-medium">
+          Use this time to gather your thoughts
         </p>
         <p className="text-muted-foreground text-xs">
-          Writing begins automatically when the break ends
+          Writing begins automatically when break ends
         </p>
       </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onSkip}
-        className="gap-2 text-xs"
-      >
-        <SkipForward className="h-3 w-3" />
+      <Button variant="outline" size="sm" onClick={onSkip} className="gap-2">
+        <SkipForward className="h-3.5 w-3.5" />
         Skip break
       </Button>
     </div>
@@ -290,6 +320,8 @@ function BreakStage({
 }
 
 // ─── Writing stage ────────────────────────────────────────────────────────────
+// Full width, Calibri font, zoom in/out
+
 function WritingStage({
   secondsLeft,
   totalSeconds,
@@ -307,82 +339,105 @@ function WritingStage({
   isSubmitting: boolean;
   isSyncing: boolean;
 }) {
+  const [fontSize, setFontSize] = useState(16); // px
+  const isLow = secondsLeft < 60;
   const pct = Math.min(
     100,
     ((totalSeconds - secondsLeft) / totalSeconds) * 100,
   );
-  const isLow = secondsLeft < 60;
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
-  const R = 14;
+  const charCount = answer.length;
+
+  // Mini ring for top bar
+  const R = 11;
   const circ = 2 * Math.PI * R;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-3 px-6 py-4">
-      {/* ── Header row ── */}
-      <div className="flex shrink-0 items-center justify-between gap-4">
-        {/* Left: timer ring + time */}
-        <div className="flex items-center gap-3">
-          <div
-            className="relative flex shrink-0 items-center justify-center"
-            style={{ width: 36, height: 36 }}
+    <div className="flex h-full flex-col">
+      {/* ── Top bar ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-2.5">
+        {/* Timer */}
+        <div className="flex items-center gap-2.5">
+          <svg width={26} height={26} className="-rotate-90">
+            <circle
+              cx={13}
+              cy={13}
+              r={R}
+              fill="none"
+              stroke="hsl(var(--border))"
+              strokeWidth={2}
+            />
+            <circle
+              cx={13}
+              cy={13}
+              r={R}
+              fill="none"
+              stroke={isLow ? "hsl(var(--destructive))" : "hsl(var(--primary))"}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeDasharray={circ}
+              strokeDashoffset={circ * (1 - pct / 100)}
+              style={{ transition: "stroke-dashoffset 1s linear" }}
+            />
+          </svg>
+          <span
+            className={`text-sm leading-none font-semibold tabular-nums ${isLow ? "text-destructive" : ""}`}
           >
-            <svg width={36} height={36} className="-rotate-90">
-              <circle
-                cx={18}
-                cy={18}
-                r={R}
-                fill="none"
-                stroke="hsl(var(--border))"
-                strokeWidth={2.5}
-              />
-              <circle
-                cx={18}
-                cy={18}
-                r={R}
-                fill="none"
-                stroke={
-                  isLow ? "hsl(var(--destructive))" : "hsl(var(--primary))"
-                }
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeDasharray={circ}
-                strokeDashoffset={circ * (1 - pct / 100)}
-                style={{ transition: "stroke-dashoffset 1s linear" }}
-              />
-            </svg>
-          </div>
-          <div className="flex flex-col">
-            <span
-              className={`text-sm leading-none font-semibold tabular-nums ${isLow ? "text-destructive" : "text-foreground"}`}
-            >
-              {formatTime(secondsLeft)}
-            </span>
-            <span className="text-muted-foreground mt-0.5 text-[10px] leading-none">
-              remaining
-            </span>
-          </div>
+            {formatTime(secondsLeft)}
+          </span>
+          {isLow && (
+            <Badge variant="destructive" className="text-[10px]">
+              Low time
+            </Badge>
+          )}
         </div>
 
-        {/* Center: save status */}
+        {/* Save status */}
         <div className="flex items-center gap-1.5">
           <span
-            className={`inline-block h-1.5 w-1.5 rounded-full transition-colors ${isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`}
+            className={`h-1.5 w-1.5 rounded-full transition-colors ${isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`}
           />
           <span className="text-muted-foreground text-[11px]">
-            {isSyncing ? "Saving draft…" : "Draft saved"}
+            {isSyncing ? "Saving…" : "Saved"}
           </span>
         </div>
 
-        {/* Right: word count + submit */}
+        {/* Zoom + stats + submit */}
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground text-xs tabular-nums">
-            {wordCount} {wordCount === 1 ? "word" : "words"}
+          <span className="text-muted-foreground hidden text-xs tabular-nums sm:block">
+            {wordCount}w · {charCount}c
           </span>
+
+          {/* Zoom controls */}
+          <div className="bg-muted/40 flex items-center gap-0.5 rounded-md border p-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setFontSize((f) => Math.max(12, f - 2))}
+              disabled={fontSize <= 12}
+            >
+              <ZoomOut className="h-3 w-3" />
+            </Button>
+            <span className="text-muted-foreground w-8 text-center text-[10px] tabular-nums">
+              {fontSize}px
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setFontSize((f) => Math.min(28, f + 2))}
+              disabled={fontSize >= 28}
+            >
+              <ZoomIn className="h-3 w-3" />
+            </Button>
+          </div>
+
           <Button
             size="sm"
             onClick={onSubmit}
             disabled={isSubmitting || !answer.trim()}
-            className="shrink-0 gap-1.5"
+            className="gap-1.5"
           >
             <Send className="h-3.5 w-3.5" />
             {isSubmitting ? "Submitting…" : "Submit"}
@@ -391,16 +446,21 @@ function WritingStage({
       </div>
 
       {/* ── Progress line ── */}
-      <div className="bg-border h-px w-full shrink-0 overflow-hidden rounded-full">
+      <div className="bg-border h-0.5 w-full shrink-0">
         <div
-          className={`h-full rounded-full transition-all duration-1000 ${isLow ? "bg-destructive" : "bg-primary"}`}
+          className={`h-full transition-all duration-1000 ${isLow ? "bg-destructive" : "bg-primary"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
 
-      {/* ── Textarea ── */}
+      {/* ── Writing area — full width, Calibri ── */}
       <Textarea
-        className="border-border bg-muted/20 placeholder:text-muted-foreground/40 focus-visible:ring-ring min-h-0 flex-1 resize-none rounded-lg p-4 font-mono text-sm leading-7 focus-visible:ring-1"
+        className="flex-1 resize-none rounded-none border-0 px-8 py-6 leading-8 focus-visible:ring-0 focus-visible:ring-offset-0"
+        style={{
+          fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
+          fontSize: `${fontSize}px`,
+          lineHeight: "1.8",
+        }}
         placeholder="Begin typing your transcription here…"
         value={answer}
         onChange={(e) => onChange(e.target.value)}
@@ -408,15 +468,21 @@ function WritingStage({
         spellCheck={false}
       />
 
-      {/* ── Footer hint ── */}
-      <p className="text-muted-foreground shrink-0 text-center text-[11px]">
-        Draft is saved automatically every 5 seconds · Submit when you are done
-      </p>
+      {/* ── Footer ── */}
+      <div className="flex shrink-0 items-center justify-between border-t px-6 py-2">
+        <p className="text-muted-foreground text-[11px]">
+          Draft saved automatically · Submit when done
+        </p>
+        <span className="text-muted-foreground text-xs tabular-nums sm:hidden">
+          {wordCount}w · {charCount}c
+        </span>
+      </div>
     </div>
   );
 }
 
 // ─── Submitted ────────────────────────────────────────────────────────────────
+
 function SubmittedScreen({ attemptId }: { attemptId: string }) {
   const router = useRouter();
   useEffect(() => {
@@ -434,20 +500,19 @@ function SubmittedScreen({ attemptId }: { attemptId: string }) {
           Your answer has been recorded. Results will be available shortly.
         </p>
       </div>
-      <div className="flex items-center justify-center gap-3 w-auto">
+      <div className="flex items-center gap-3">
         <Button
           variant="outline"
           size="sm"
           onClick={() => router.push("/user")}
         >
-          Back to dashboard
+          Back to tests
         </Button>
         <Button
-          variant="outline"
           size="sm"
           onClick={() => router.push(`/user/attempt/${attemptId}`)}
         >
-          View Report
+          View result
         </Button>
       </div>
     </div>
@@ -455,66 +520,124 @@ function SubmittedScreen({ attemptId }: { attemptId: string }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+
 export default function AttemptPage() {
   const params = useParams<{ test: string; attemptId: string }>();
   const router = useRouter();
 
   const { data, isLoading, isError } = trpc.attempt.getResume.useQuery(
     { attemptId: params.attemptId },
-    { retry: false },
+    { retry: false, refetchOnWindowFocus: false },
   );
 
   const [stage, setStage] = useState<Stage>("countdown");
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [timeLeft, setTimeLeft] = useState(0);
   const [answer, setAnswer] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const syncMutation = trpc.attempt.sync.useMutation();
+  const syncMutation = trpc.attempt.sync.useMutation({
+    onMutate: () => setIsSyncing(true),
+    onSettled: () => setIsSyncing(false),
+  });
   const submitMutation = trpc.attempt.submit.useMutation({
     onSuccess: () => setStage("submitted"),
     onError: () => toast.error("Submission failed — please try again."),
   });
 
-  // ── Debounce: ref-based so it's always fresh, no stale closure issues ──
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSyncedAnswerRef = useRef<string>("");
+  // ── Draft refs ──────────────────────────────────────────────────────────────
+  // answerRef always has the latest value without stale closures
+  const answerRef = useRef("");
+  const lastServerSyncRef = useRef("");
+  const localSyncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const serverSyncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleAnswerChange = useCallback(
-    (val: string) => {
-      setAnswer(val);
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = setTimeout(() => {
-        if (val === lastSyncedAnswerRef.current) return;
-        lastSyncedAnswerRef.current = val;
-        syncMutation.mutate({
-          attemptId: params.attemptId,
-          answerDraft: val,
-        });
-      }, 5000);
-    },
-    [params.attemptId, syncMutation],
-  );
+  // Save to localStorage
+  const saveLocal = useCallback(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY(params.attemptId), answerRef.current);
+    } catch {}
+  }, [params.attemptId]);
 
-  // Flush draft on unmount (navigation away) so nothing is lost
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
+  // Push to server (only if changed)
+  const saveServer = useCallback(() => {
+    if (answerRef.current === lastServerSyncRef.current) return;
+    lastServerSyncRef.current = answerRef.current;
+    syncMutation.mutate({
+      attemptId: params.attemptId,
+      answerDraft: answerRef.current,
+    });
+  }, [params.attemptId, syncMutation]);
+
+  // Start sync intervals — called once writing starts
+  const startSyncIntervals = useCallback(() => {
+    localSyncTimer.current = setInterval(saveLocal, SYNC_LOCAL_MS);
+    serverSyncTimer.current = setInterval(saveServer, SYNC_SERVER_MS);
+  }, [saveLocal, saveServer]);
+
+  const stopSyncIntervals = useCallback(() => {
+    if (localSyncTimer.current) {
+      clearInterval(localSyncTimer.current);
+      localSyncTimer.current = null;
+    }
+    if (serverSyncTimer.current) {
+      clearInterval(serverSyncTimer.current);
+      serverSyncTimer.current = null;
+    }
   }, []);
 
-  // Hydrate on load
+  // onChange: update ref + state, no debounce (intervals handle persistence)
+  const handleAnswerChange = useCallback((val: string) => {
+    answerRef.current = val;
+    setAnswer(val);
+  }, []);
+
+  // Flush on unmount
+  useEffect(() => {
+    return () => {
+      stopSyncIntervals();
+      saveLocal();
+      // Best-effort server flush on unmount
+      if (answerRef.current !== lastServerSyncRef.current) {
+        void syncMutation
+          .mutateAsync({
+            attemptId: params.attemptId,
+            answerDraft: answerRef.current,
+          })
+          .catch(() => null);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Hydrate from server + localStorage on load ───────────────────────────────
+
   useEffect(() => {
     if (!data) return;
-    const { attempt, secondsLeft } = data;
+    const { attempt, secondsLeft, speed } = data;
 
-    // Restore draft answer
-    setAnswer(attempt.answerDraft ?? "");
+    // Prefer localStorage draft (more recent than server's answerDraft)
+    const localDraft = (() => {
+      try {
+        return localStorage.getItem(DRAFT_KEY(params.attemptId));
+      } catch {
+        return null;
+      }
+    })();
+    const initialAnswer = localDraft ?? attempt.answerDraft ?? "";
+    answerRef.current = initialAnswer;
+    lastServerSyncRef.current = attempt.answerDraft ?? "";
+    setAnswer(initialAnswer);
+
+    if (attempt.stage === "submitted") {
+      setStage("submitted");
+      return;
+    }
 
     if (attempt.stage === "audio" && !attempt.stageStartedAt) {
-      // Attempt created but countdown never finished — start from countdown
       setStage("countdown");
       setCountdown(COUNTDOWN_SECONDS);
-      setTimeLeft(data.test.dictationSeconds);
+      setTimeLeft(speed.dictationSeconds);
     } else if (attempt.stage === "audio") {
       setStage("audio");
       setTimeLeft(secondsLeft);
@@ -524,24 +647,25 @@ export default function AttemptPage() {
     } else if (attempt.stage === "writing") {
       setStage("writing");
       setTimeLeft(secondsLeft);
-    } else if (attempt.stage === "submitted") {
-      setStage("submitted");
+      startSyncIntervals();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // Fullscreen — request on countdown, never terminate on exit
+  // ── Fullscreen on countdown ──────────────────────────────────────────────────
+
   useEffect(() => {
     if (stage === "countdown") {
       document.documentElement.requestFullscreen().catch(() => null);
     }
   }, [stage]);
 
-  // Countdown tick
+  // ── Countdown tick ───────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (stage !== "countdown") return;
     if (countdown === 0) {
       setStage("audio");
-      // Stamp the real audio start time — countdown is excluded from the timer
       syncMutation.mutate({
         attemptId: params.attemptId,
         stage: "audio",
@@ -554,7 +678,35 @@ export default function AttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, countdown]);
 
-  // Stage timer
+  // ── Stage timer ──────────────────────────────────────────────────────────────
+
+  const handleStageEnd = useCallback(() => {
+    if (stage === "audio") {
+      const breakTotal = data?.speed.breakSeconds ?? 0;
+      setStage("break");
+      setTimeLeft(breakTotal);
+      syncMutation.mutate({ attemptId: params.attemptId, stage: "break" });
+    } else if (stage === "break") {
+      const writingTotal = data?.speed.writtenDurationSeconds ?? 0;
+      setStage("writing");
+      setTimeLeft(writingTotal);
+      startSyncIntervals();
+      syncMutation.mutate({
+        attemptId: params.attemptId,
+        stage: "writing",
+        markWritingStarted: true,
+      });
+    } else if (stage === "writing") {
+      stopSyncIntervals();
+      saveLocal();
+      submitMutation.mutate({
+        attemptId: params.attemptId,
+        answerFinal: answerRef.current,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, data]);
+
   useEffect(() => {
     if (!["audio", "break", "writing"].includes(stage)) return;
     if (timeLeft <= 0) {
@@ -566,54 +718,36 @@ export default function AttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, timeLeft]);
 
-  // Route-change auto-submit: flush draft when navigating away mid-writing
-  // (handled by the unmount flush in handleAnswerChange's cleanup)
+  // ── Manual submit ────────────────────────────────────────────────────────────
 
-  const handleAutoSubmit = useCallback(() => {
-    // On abrupt submit (timeout / route change), use the last synced draft
-    // as the final answer if the in-memory answer is somehow empty
-    const finalAnswer = answer || lastSyncedAnswerRef.current;
+  const handleSubmit = useCallback(() => {
+    stopSyncIntervals();
+    saveLocal();
     submitMutation.mutate({
       attemptId: params.attemptId,
-      answerFinal: finalAnswer,
+      answerFinal: answerRef.current,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer]);
+  }, []);
 
-  const handleStageEnd = useCallback(() => {
-    if (stage === "audio") {
-      const breakTotal = data?.test.breakSeconds ?? 0;
-      setStage("break");
-      setTimeLeft(breakTotal);
-      syncMutation.mutate({ attemptId: params.attemptId, stage: "break" });
-    } else if (stage === "break") {
-      const writingTotal = data?.test.writtenDurationSeconds ?? 0;
-      setStage("writing");
-      setTimeLeft(writingTotal);
-      syncMutation.mutate({ attemptId: params.attemptId, stage: "writing" });
-    } else if (stage === "writing") {
-      handleAutoSubmit();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, data]);
+  // ── Skip break ───────────────────────────────────────────────────────────────
 
-  const handleSkipBreak = () => {
-    const writingTotal = data?.test.writtenDurationSeconds ?? 0;
+  const handleSkipBreak = useCallback(() => {
+    const writingTotal = data?.speed.writtenDurationSeconds ?? 0;
     setStage("writing");
     setTimeLeft(writingTotal);
+    startSyncIntervals();
     syncMutation.mutate({
       attemptId: params.attemptId,
       stage: "writing",
       breakSkipped: true,
-      markWrittingStarted: true,
+      markWritingStarted: true,
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
-  const handleSubmit = () => {
-    submitMutation.mutate({ attemptId: params.attemptId, answerFinal: answer });
-  };
+  // ── Loading / error ──────────────────────────────────────────────────────────
 
-  // ── Loading / error ──
   if (isLoading) {
     return (
       <div className="bg-background fixed inset-0 flex items-center justify-center">
@@ -627,9 +761,9 @@ export default function AttemptPage() {
   if (isError || !data) {
     return (
       <div className="bg-background fixed inset-0 flex flex-col items-center justify-center gap-4">
-        <p className="text-foreground font-medium">Test not found</p>
+        <p className="font-medium">Test not found</p>
         <Button variant="outline" onClick={() => router.push("/user")}>
-          Back to dashboard
+          Back to tests
         </Button>
       </div>
     );
@@ -637,37 +771,45 @@ export default function AttemptPage() {
 
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
-      {/* Top bar — hidden during countdown and submitted */}
+      {/* ── Top bar — hidden during countdown & submitted ── */}
       {stage !== "countdown" && stage !== "submitted" && (
-        <div className="border-border flex shrink-0 items-center justify-between border-b px-6 py-3">
-          <p className="text-foreground max-w-sm truncate text-sm font-medium">
+        <div className="flex shrink-0 items-center justify-between border-b px-6 py-3">
+          <p className="max-w-sm truncate text-sm font-medium">
             {data.test.title}
           </p>
           <div className="flex items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${
-                data.attempt.type === "assessment"
-                  ? "bg-amber-500/10 text-amber-500 ring-amber-500/20"
-                  : "bg-primary/10 text-primary ring-primary/20"
-              }`}
+            <Badge
+              variant={
+                data.attempt.type === "assessment" ? "default" : "secondary"
+              }
+              className="capitalize"
             >
               {data.attempt.type}
-            </span>
+            </Badge>
             <span className="text-muted-foreground text-xs capitalize">
               {stage}
             </span>
+            <Badge variant="outline" className="text-[10px] tabular-nums">
+              {data.speed.wpm} WPM
+            </Badge>
           </div>
         </div>
       )}
 
-      {/* Stage content */}
+      {/* ── Stage content ── */}
       <div className="flex-1 overflow-hidden">
-        {stage === "countdown" && <CountdownOverlay count={countdown} />}
+        {stage === "countdown" && (
+          <CountdownOverlay
+            count={countdown}
+            testTitle={data.test.title}
+            attemptType={data.attempt.type}
+          />
+        )}
 
         {stage === "audio" && (
           <AudioStage
-            audioUrl={data.test.audioUrl ?? ""}
-            durationSeconds={data.test.dictationSeconds}
+            audioUrl={data.speed.audioUrl}
+            durationSeconds={data.speed.dictationSeconds}
             secondsLeft={timeLeft}
             onEnded={handleStageEnd}
             onProgress={(s) =>
@@ -682,7 +824,7 @@ export default function AttemptPage() {
         {stage === "break" && (
           <BreakStage
             secondsLeft={timeLeft}
-            totalSeconds={data.test.breakSeconds}
+            totalSeconds={data.speed.breakSeconds}
             onSkip={handleSkipBreak}
           />
         )}
@@ -690,12 +832,12 @@ export default function AttemptPage() {
         {stage === "writing" && (
           <WritingStage
             secondsLeft={timeLeft}
-            totalSeconds={data.test.writtenDurationSeconds}
+            totalSeconds={data.speed.writtenDurationSeconds}
             answer={answer}
             onChange={handleAnswerChange}
             onSubmit={handleSubmit}
             isSubmitting={submitMutation.isPending}
-            isSyncing={syncMutation.isPending}
+            isSyncing={isSyncing}
           />
         )}
 

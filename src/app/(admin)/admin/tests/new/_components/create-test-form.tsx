@@ -4,16 +4,14 @@
 
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { trpc } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { Separator } from "~/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -22,7 +20,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import {
-  Upload,
   CheckCircle2,
   X,
   Plus,
@@ -36,31 +33,30 @@ import {
   FilePlus,
   ChevronDown,
   ChevronUp,
-  GripVertical,
-  Zap,
+  Music2,
 } from "lucide-react";
 
 // ─── schemas ──────────────────────────────────────────────────────────────────
 
 const speedSchema = z.object({
-  wpm: z.number().int().min(1, "Required"),
-  audioKey: z.string().min(1, "Upload audio"),
-  dictationSeconds: z.number().int().min(1, "Min 1s"),
+  wpm: z.number().int().min(1),
+  audioKey: z.string().min(1),
+  dictationSeconds: z.number().int().min(1),
   breakSeconds: z.number().int().min(0),
-  writtenDurationSeconds: z.number().int().min(1, "Min 1s"),
+  writtenDurationSeconds: z.number().int().min(1),
 });
 
 const formSchema = z.object({
-  title: z.string().min(3, "Min 3 characters"),
+  title: z.string().min(3),
   type: z.enum(["general", "legal", "special"]),
-  matterPdfKey: z.string().min(1, "Upload matter PDF"),
+  matterPdfKey: z.string().min(1),
   outlinePdfKey: z.string().optional(),
-  correctAnswer: z.string().min(10, "Min 10 characters"),
-  speeds: z.array(speedSchema).min(1, "Add at least one speed"),
+  correctAnswer: z.string().min(10),
+  speeds: z.array(speedSchema).min(1),
 });
 
 type SpeedDraft = {
-  id: string; // local only
+  id: string;
   wpm: number;
   audioKey: string;
   audioFileName: string;
@@ -78,56 +74,72 @@ function uid() {
 }
 
 function fmtSec(s: number) {
+  if (!s) return "—";
   const m = Math.floor(s / 60),
     sec = s % 60;
-  return m > 0 ? `${m}m ${sec}s` : `${s}s`;
+  return m > 0 ? (sec > 0 ? `${m}m ${sec}s` : `${m}m`) : `${s}s`;
 }
 
-function SectionHeader({
-  num,
+// ─── section wrapper ──────────────────────────────────────────────────────────
+
+function Section({
+  step,
   title,
   description,
+  children,
 }: {
-  num: string;
+  step: string;
   title: string;
   description: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-start gap-4">
-      <div className="bg-primary text-primary-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-[11px] font-black tracking-widest">
-        {num}
+    <div className="border-b px-8 py-8">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+          {step}
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-muted-foreground text-sm">{description}</p>
+        </div>
       </div>
-      <div>
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-        <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
-      </div>
+      {children}
     </div>
   );
 }
 
-function FieldErr({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return <p className="text-destructive mt-1 text-[11px]">{msg}</p>;
+// ─── small helpers ────────────────────────────────────────────────────────────
+
+function Label({
+  children,
+  optional,
+}: {
+  children: React.ReactNode;
+  optional?: boolean;
+}) {
+  return (
+    <p className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+      {children}
+      {optional && (
+        <span className="text-muted-foreground font-normal">(optional)</span>
+      )}
+    </p>
+  );
 }
 
-// ─── file dropzone (generic) ──────────────────────────────────────────────────
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-muted-foreground mt-1 text-xs">{children}</p>;
+}
 
-type DropzoneProps = {
-  accept: string;
-  label: string;
-  hint: string;
-  value: string;
-  fileName: string;
-  uploading: boolean;
-  error?: string;
-  onFile: (file: File) => void;
-  onClear: () => void;
-  icon: React.ReactNode;
-  accentClass: string; // e.g. "border-violet-500/50 bg-violet-500/5"
-};
+function Err({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <p className="text-destructive mt-1 text-xs">{msg}</p>;
+}
 
-function Dropzone({
-  accept,
+// ─── PDF dropzone ─────────────────────────────────────────────────────────────
+
+function PdfDropzone({
   label,
   hint,
   value,
@@ -136,36 +148,46 @@ function Dropzone({
   error,
   onFile,
   onClear,
-  icon,
-  accentClass,
-}: DropzoneProps) {
+  accent,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  fileName: string;
+  uploading: boolean;
+  error?: string;
+  onFile: (f: File) => void;
+  onClear: () => void;
+  accent: "violet" | "blue";
+}) {
   const ref = useRef<HTMLInputElement>(null);
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f) onFile(f);
-  };
+  const doneCls =
+    accent === "violet"
+      ? "border-violet-400/50 bg-violet-500/5"
+      : "border-blue-400/50 bg-blue-500/5";
 
   return (
-    <div className="space-y-1">
+    <div>
       <div
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
         onClick={() => !uploading && ref.current?.click()}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if (f) onFile(f);
+        }}
         className={cn(
-          "relative flex min-h-[88px] cursor-pointer items-center gap-4 rounded-lg border-2 border-dashed px-5 py-4 transition-all",
-          error ? "border-destructive/50 bg-destructive/5" : "",
+          "relative flex min-h-[90px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-4 text-center transition-all",
           value
-            ? cn("border-dashed", accentClass)
-            : "border-border hover:border-primary/40 hover:bg-muted/30",
-          uploading ? "pointer-events-none opacity-60" : "",
+            ? doneCls
+            : "border-border hover:border-primary/50 hover:bg-muted/20",
+          uploading && "pointer-events-none opacity-50",
         )}
       >
         <input
           ref={ref}
           type="file"
-          accept={accept}
+          accept="application/pdf"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -173,65 +195,48 @@ function Dropzone({
           }}
         />
 
-        <div
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
-            value
-              ? "bg-emerald-500/15 text-emerald-500"
-              : "bg-muted text-muted-foreground",
-          )}
-        >
-          {uploading ? (
-            <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-          ) : value ? (
-            <CheckCircle2 className="h-5 w-5" />
-          ) : (
-            icon
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {value ? (
-            <>
-              <p className="truncate text-sm font-medium text-emerald-600">
-                {fileName || label}
-              </p>
-              <p className="text-muted-foreground text-xs">Click to replace</p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-medium">
-                {uploading ? "Uploading…" : label}
-              </p>
-              <p className="text-muted-foreground mt-0.5 text-[11px]">{hint}</p>
-            </>
-          )}
-        </div>
-
-        {value && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClear();
-            }}
-            className="text-muted-foreground hover:text-foreground absolute top-2 right-2"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        {value ? (
+          <>
+            <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              {fileName}
+            </p>
+            <p className="text-muted-foreground text-xs">Click to replace</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              className="text-muted-foreground hover:text-foreground absolute top-2 right-2"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : uploading ? (
+          <>
+            <div className="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
+            <p className="text-sm">Uploading…</p>
+          </>
+        ) : (
+          <>
+            <FileText className="text-muted-foreground h-6 w-6" />
+            <p className="text-sm font-medium">{label}</p>
+            <p className="text-muted-foreground text-xs">{hint}</p>
+          </>
         )}
       </div>
-      {error && <p className="text-destructive text-[11px]">{error}</p>}
+      {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
     </div>
   );
 }
 
-// ─── timeline bar ─────────────────────────────────────────────────────────────
+// ─── timeline ─────────────────────────────────────────────────────────────────
 
 function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
   const total = d + b + t || 1;
   return (
-    <div className="space-y-1.5">
+    <div className="bg-muted/40 space-y-1.5 rounded-lg p-3">
       <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
         <div
           className="bg-blue-500 transition-all"
@@ -246,10 +251,10 @@ function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
           style={{ width: `${(t / total) * 100}%` }}
         />
       </div>
-      <div className="text-muted-foreground flex gap-4 text-[10px]">
+      <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-          Dict {fmtSec(d)}
+          Listening {fmtSec(d)}
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
@@ -257,7 +262,7 @@ function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Write {fmtSec(t)}
+          Writing {fmtSec(t)}
         </span>
         <span className="text-foreground/70 ml-auto font-medium">
           Total {fmtSec(d + b + t)}
@@ -268,6 +273,8 @@ function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
 }
 
 // ─── speed card ───────────────────────────────────────────────────────────────
+
+const WPM_PRESETS = [80, 85, 90, 95, 100, 105, 110, 120];
 
 function SpeedCard({
   speed,
@@ -288,14 +295,14 @@ function SpeedCard({
 
   const getAudioDuration = (file: File): Promise<number> =>
     new Promise((resolve) => {
-      const audio = new Audio();
+      const a = new Audio();
       const url = URL.createObjectURL(file);
-      audio.src = url;
-      audio.onloadedmetadata = () => {
+      a.src = url;
+      a.onloadedmetadata = () => {
         URL.revokeObjectURL(url);
-        resolve(Math.ceil(audio.duration));
+        resolve(Math.ceil(a.duration));
       };
-      audio.onerror = () => {
+      a.onerror = () => {
         URL.revokeObjectURL(url);
         resolve(0);
       };
@@ -303,12 +310,12 @@ function SpeedCard({
 
   const handleAudio = async (file: File) => {
     if (!file.type.startsWith("audio/")) {
-      toast.error("Audio files only");
+      toast.error("Please upload an audio file");
       return;
     }
     onUpdate(speed.id, { uploading: true, audioFileName: file.name });
     try {
-      const [duration, presigned] = await Promise.all([
+      const [duration, { uploadUrl, key }] = await Promise.all([
         getAudioDuration(file),
         presign.mutateAsync({
           folder: "dictations",
@@ -316,18 +323,22 @@ function SpeedCard({
           ext: file.name.split(".").pop() ?? "mp3",
         }),
       ]);
-      const res = await fetch(presigned.uploadUrl, {
+      const res = await fetch(uploadUrl, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) throw new Error();
       onUpdate(speed.id, {
-        audioKey: presigned.key,
+        audioKey: key,
         dictationSeconds: duration > 0 ? duration : speed.dictationSeconds,
         uploading: false,
       });
-      toast.success(`${fmtSec(duration)} detected`);
+      toast.success(
+        duration > 0
+          ? `Audio ready · ${fmtSec(duration)} detected`
+          : "Audio uploaded",
+      );
     } catch {
       toast.error("Audio upload failed");
       onUpdate(speed.id, { uploading: false });
@@ -336,44 +347,47 @@ function SpeedCard({
 
   const u = (k: keyof SpeedDraft, v: SpeedDraft[keyof SpeedDraft]) =>
     onUpdate(speed.id, { [k]: v });
+  const isComplete =
+    speed.wpm > 0 &&
+    !!speed.audioKey &&
+    speed.dictationSeconds > 0 &&
+    speed.writtenDurationSeconds > 0;
 
   return (
-    <div className="bg-card overflow-hidden rounded-lg border">
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border-2 transition-colors",
+        isComplete ? "border-emerald-500/30" : "border-border",
+      )}
+    >
       {/* Header */}
       <div
-        className="hover:bg-muted/30 flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors select-none"
+        className="hover:bg-muted/30 flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors"
         onClick={() => u("expanded", !speed.expanded)}
       >
-        <GripVertical className="text-muted-foreground/40 h-4 w-4 shrink-0" />
-
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="bg-primary/10 flex h-6 w-6 shrink-0 items-center justify-center rounded">
-            <Zap className="text-primary h-3.5 w-3.5" />
-          </div>
-          <span className="text-sm font-semibold">Speed {index + 1}</span>
-          {speed.wpm > 0 && (
-            <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
-              {speed.wpm} WPM
-            </span>
+        <div
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+            isComplete
+              ? "bg-emerald-500/15 text-emerald-600"
+              : "bg-muted text-muted-foreground",
           )}
-          {speed.audioKey && (
-            <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-              Audio ✓
-            </span>
-          )}
-          {speed.dictationSeconds > 0 && (
-            <span className="text-muted-foreground text-[10px] tabular-nums">
-              {fmtSec(
-                speed.dictationSeconds +
-                  speed.breakSeconds +
-                  speed.writtenDurationSeconds,
-              )}{" "}
-              total
-            </span>
-          )}
+        >
+          {isComplete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">
+            {speed.wpm > 0 ? `${speed.wpm} WPM` : `Speed ${index + 1}`}
+          </p>
+          <p className="text-muted-foreground truncate text-xs">
+            {speed.audioKey
+              ? `${speed.audioFileName} · ${fmtSec(speed.dictationSeconds + speed.breakSeconds + speed.writtenDurationSeconds)}`
+              : "Upload audio to get started"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1">
           {canRemove && (
             <button
               type="button"
@@ -381,7 +395,7 @@ function SpeedCard({
                 e.stopPropagation();
                 onRemove(speed.id);
               }}
-              className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-md p-1.5 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -396,158 +410,207 @@ function SpeedCard({
 
       {/* Body */}
       {speed.expanded && (
-        <div className="space-y-4 border-t px-4 py-4">
-          {/* WPM + Audio row */}
-          <div className="grid grid-cols-[140px_1fr] items-start gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                WPM
-              </Label>
+        <div className="bg-muted/10 space-y-5 border-t px-5 py-5">
+          {/* Audio */}
+          <div>
+            <Label>
+              <Music2 className="h-3.5 w-3.5 text-blue-500" />
+              Audio Recording
+            </Label>
+            <div
+              onClick={() => !speed.uploading && audioRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const f = e.dataTransfer.files[0];
+                if (f) void handleAudio(f);
+              }}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 transition-all",
+                speed.audioKey
+                  ? "border-emerald-400/50 bg-emerald-500/5"
+                  : "border-border hover:bg-muted/20 hover:border-blue-400/50",
+                speed.uploading && "pointer-events-none opacity-50",
+              )}
+            >
+              <input
+                ref={audioRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleAudio(f);
+                }}
+              />
+              <div
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                  speed.audioKey
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : "bg-blue-500/10 text-blue-500",
+                )}
+              >
+                {speed.uploading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                ) : speed.audioKey ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                {speed.audioKey ? (
+                  <>
+                    <p className="truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                      {speed.audioFileName}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Click to replace
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium">
+                      {speed.uploading
+                        ? "Uploading…"
+                        : "Click or drag audio here"}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      MP3, WAV, MP4 · Duration detected automatically
+                    </p>
+                  </>
+                )}
+              </div>
+              {speed.audioKey && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    u("audioKey", "");
+                    u("audioFileName", "");
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* WPM */}
+          <div>
+            <Label>Speed (WPM)</Label>
+            <div className="flex items-center gap-3">
               <Input
                 type="number"
                 min={1}
                 value={speed.wpm || ""}
                 placeholder="e.g. 95"
                 onChange={(e) => u("wpm", Number(e.target.value))}
-                className="text-sm tabular-nums"
+                className="w-24"
               />
-              <p className="text-muted-foreground text-[10px]">
-                Words per minute
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                Audio file
-              </Label>
-              <div
-                onClick={() => !speed.uploading && audioRef.current?.click()}
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 transition-all",
-                  speed.audioKey
-                    ? "border-emerald-500/40 bg-emerald-500/5"
-                    : "border-border hover:border-primary/40 hover:bg-muted/20",
-                  speed.uploading && "pointer-events-none opacity-60",
-                )}
-              >
-                <input
-                  ref={audioRef}
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleAudio(f);
-                  }}
-                />
-                <div
-                  className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded",
-                    speed.audioKey
-                      ? "bg-emerald-500/15 text-emerald-500"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {speed.uploading ? (
-                    <div className="border-primary h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" />
-                  ) : speed.audioKey ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  {speed.audioKey ? (
-                    <>
-                      <p className="truncate text-sm font-medium text-emerald-600">
-                        {speed.audioFileName}
-                      </p>
-                      <p className="text-muted-foreground text-[10px]">
-                        Click to replace
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium">
-                        {speed.uploading
-                          ? "Uploading…"
-                          : "Drop audio or click to upload"}
-                      </p>
-                      <p className="text-muted-foreground text-[10px]">
-                        MP3, WAV, MP4 audio
-                      </p>
-                    </>
-                  )}
-                </div>
-                {speed.audioKey && (
+              <div className="flex flex-wrap gap-1.5">
+                {WPM_PRESETS.map((w) => (
                   <button
+                    key={w}
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      u("audioKey", "");
-                      u("audioFileName", "");
-                    }}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    onClick={() => u("wpm", w)}
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors",
+                      speed.wpm === w
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground",
+                    )}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    {w}
                   </button>
-                )}
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Timing row */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase">
-                <Mic className="h-3 w-3 text-blue-500" />
-                Dictation (sec)
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                value={speed.dictationSeconds || ""}
-                onChange={(e) => u("dictationSeconds", Number(e.target.value))}
-                className="text-sm tabular-nums"
-                readOnly={!!speed.audioKey}
-              />
-              {speed.audioKey && (
-                <p className="text-muted-foreground text-[10px]">
-                  Auto-detected
+          {/* Timing */}
+          <div>
+            <Label>
+              <PauseCircle className="h-3.5 w-3.5 text-amber-400" />
+              Timing
+            </Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                  <Mic className="h-3 w-3 text-blue-500" />
+                  {speed.audioKey && speed.dictationSeconds < 60
+                    ? "Listening (sec)"
+                    : "Listening (min)"}
                 </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase">
-                <PauseCircle className="h-3 w-3 text-amber-400" />
-                Break (sec)
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={speed.breakSeconds}
-                onChange={(e) => u("breakSeconds", Number(e.target.value))}
-                className="text-sm tabular-nums"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase">
-                <Keyboard className="h-3 w-3 text-emerald-500" />
-                Writing (sec)
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                value={speed.writtenDurationSeconds || ""}
-                onChange={(e) =>
-                  u("writtenDurationSeconds", Number(e.target.value))
-                }
-                className="text-sm tabular-nums"
-              />
+                <Input
+                  type="number"
+                  min={0}
+                  step={speed.audioKey && speed.dictationSeconds < 60 ? 1 : 0.5}
+                  value={
+                    speed.dictationSeconds
+                      ? speed.audioKey && speed.dictationSeconds < 60
+                        ? speed.dictationSeconds
+                        : +(speed.dictationSeconds / 60).toFixed(2)
+                      : ""
+                  }
+                  readOnly={!!speed.audioKey}
+                  onChange={(e) =>
+                    u(
+                      "dictationSeconds",
+                      Math.round(Number(e.target.value) * 60),
+                    )
+                  }
+                />
+                {speed.audioKey && (
+                  <Hint>Auto-filled · {fmtSec(speed.dictationSeconds)}</Hint>
+                )}
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                  <PauseCircle className="h-3 w-3 text-amber-400" />
+                  Break (min)
+                </p>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={
+                    speed.breakSeconds
+                      ? +(speed.breakSeconds / 60).toFixed(2)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    u("breakSeconds", Math.round(Number(e.target.value) * 60))
+                  }
+                />
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                  <Keyboard className="h-3 w-3 text-emerald-500" />
+                  Writing (min)
+                </p>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={
+                    speed.writtenDurationSeconds
+                      ? +(speed.writtenDurationSeconds / 60).toFixed(2)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    u(
+                      "writtenDurationSeconds",
+                      Math.round(Number(e.target.value) * 60),
+                    )
+                  }
+                />
+              </div>
             </div>
           </div>
 
-          {/* Timeline */}
           {speed.dictationSeconds +
             speed.breakSeconds +
             speed.writtenDurationSeconds >
@@ -593,44 +656,27 @@ export function CreateTestForm() {
   const createTest = trpc.test.create.useMutation({
     onSuccess: () => {
       toast.success(
-        submitModeRef.current === "draft" ? "Saved as draft" : "Test launched!",
+        submitModeRef.current === "draft"
+          ? "Saved as draft"
+          : "Test is now live!",
       );
       router.push("/admin/tests");
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const addSpeed = () =>
-    setSpeeds((p) => [
-      ...p,
-      {
-        id: uid(),
-        wpm: 0,
-        audioKey: "",
-        audioFileName: "",
-        dictationSeconds: 0,
-        breakSeconds: 60,
-        writtenDurationSeconds: 600,
-        uploading: false,
-        expanded: true,
-      },
-    ]);
-
   const updateSpeed = (id: string, patch: Partial<SpeedDraft>) =>
     setSpeeds((p) => p.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-
-  const removeSpeed = (id: string) =>
-    setSpeeds((p) => p.filter((s) => s.id !== id));
 
   const uploadPdf = async (
     file: File,
     folder: string,
     setUploading: (v: boolean) => void,
     setName: (v: string) => void,
-    fieldSetter: (key: string) => void,
+    onKey: (k: string) => void,
   ) => {
     if (file.type !== "application/pdf") {
-      toast.error("PDF files only");
+      toast.error("Please upload a PDF");
       return;
     }
     setUploading(true);
@@ -647,7 +693,7 @@ export function CreateTestForm() {
         headers: { "Content-Type": "application/pdf" },
       });
       if (!res.ok) throw new Error();
-      fieldSetter(key);
+      onKey(key);
       toast.success("PDF uploaded");
     } catch {
       toast.error("PDF upload failed");
@@ -666,18 +712,17 @@ export function CreateTestForm() {
       correctAnswer: "",
     },
     onSubmit: async ({ value }) => {
-      const speedsValid = speeds.every(
+      const speedsOk = speeds.every(
         (s) =>
           s.wpm > 0 &&
           s.audioKey &&
           s.dictationSeconds > 0 &&
           s.writtenDurationSeconds > 0,
       );
-      if (!speedsValid) {
-        toast.error("Complete all speed configurations");
+      if (!speedsOk) {
+        toast.error("Please complete all speed configurations");
         return;
       }
-
       const parsed = formSchema.safeParse({
         ...value,
         speeds: speeds.map(
@@ -696,12 +741,10 @@ export function CreateTestForm() {
           }),
         ),
       });
-
       if (!parsed.success) {
-        toast.error(parsed.error.errors[0]?.message ?? "Fix form errors");
+        toast.error(parsed.error.errors[0]?.message ?? "Please check the form");
         return;
       }
-
       await createTest.mutateAsync({
         ...parsed.data,
         status: submitModeRef.current,
@@ -715,16 +758,15 @@ export function CreateTestForm() {
         e.preventDefault();
         void form.handleSubmit();
       }}
-      className="w-full space-y-0"
+      className="w-full"
     >
-      {/* ─── 01 Basics ─────────────────────────────────────────────────────── */}
-      <div className="border-b px-8 py-8">
-        <SectionHeader
-          num="01"
-          title="Test Details"
-          description="Title and category for this assessment."
-        />
-        <div className="grid grid-cols-[1fr_240px] gap-6">
+      {/* ── 1. Details ──────────────────────────────────────────────────────── */}
+      <Section
+        step="1"
+        title="Test Details"
+        description="Give your test a name and choose its category."
+      >
+        <div className="grid grid-cols-[1fr_200px] gap-4">
           <form.Field
             name="title"
             validators={{
@@ -733,35 +775,30 @@ export function CreateTestForm() {
             }}
           >
             {(field) => (
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                  Title
-                </Label>
+              <div>
+                <Label>Title</Label>
                 <Input
                   placeholder="e.g. Legal Dictation — Session 12"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  className="h-10 text-sm"
                 />
-                <FieldErr msg={(field.state.meta.errors as string[])[0]} />
+                <Err msg={(field.state.meta.errors as string[])[0]} />
               </div>
             )}
           </form.Field>
 
           <form.Field name="type">
             {(field) => (
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                  Category
-                </Label>
+              <div>
+                <Label>Category</Label>
                 <Select
                   value={field.state.value}
                   onValueChange={(v) =>
                     field.handleChange(v as typeof field.state.value)
                   }
                 >
-                  <SelectTrigger size={"sm"} className="h-10 text-sm">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -774,16 +811,14 @@ export function CreateTestForm() {
             )}
           </form.Field>
         </div>
-      </div>
+      </Section>
 
-      {/* ─── 02 Speeds ─────────────────────────────────────────────────────── */}
-      <div className="border-b px-8 py-8">
-        <SectionHeader
-          num="02"
-          title="Speed Variants"
-          description="Each speed has its own audio file, WPM rating, and timing. Users choose before starting."
-        />
-
+      {/* ── 2. Speeds ───────────────────────────────────────────────────────── */}
+      <Section
+        step="2"
+        title="Speed Levels"
+        description="Add one or more speed levels. Students pick one before starting."
+      >
         <div className="space-y-3">
           {speeds.map((s, i) => (
             <SpeedCard
@@ -791,47 +826,58 @@ export function CreateTestForm() {
               speed={s}
               index={i}
               onUpdate={updateSpeed}
-              onRemove={removeSpeed}
+              onRemove={(id) => setSpeeds((p) => p.filter((x) => x.id !== id))}
               canRemove={speeds.length > 1}
               presign={presign}
             />
           ))}
         </div>
-
         <button
           type="button"
-          onClick={addSpeed}
-          className="border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-muted/20 mt-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed py-3 text-sm font-medium transition-colors"
+          onClick={() =>
+            setSpeeds((p) => [
+              ...p,
+              {
+                id: uid(),
+                wpm: 0,
+                audioKey: "",
+                audioFileName: "",
+                dictationSeconds: 0,
+                breakSeconds: 60,
+                writtenDurationSeconds: 600,
+                uploading: false,
+                expanded: true,
+              },
+            ])
+          }
+          className="border-border text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 text-sm font-medium transition-all"
         >
           <Plus className="h-4 w-4" />
-          Add another speed
+          Add another speed level
         </button>
-      </div>
+      </Section>
 
-      {/* ─── 03 Content ────────────────────────────────────────────────────── */}
-      <div className="border-b px-8 py-8">
-        <SectionHeader
-          num="03"
-          title="Test Content"
-          description="Upload matter and outline PDFs. The correct answer is used for scoring."
-        />
-
-        <div className="mb-6 grid grid-cols-2 gap-6">
-          {/* Matter PDF */}
+      {/* ── 3. Materials ────────────────────────────────────────────────────── */}
+      <Section
+        step="3"
+        title="Test Materials"
+        description="Upload the matter and outline PDFs, then type the correct answer."
+      >
+        <div className="mb-5 grid grid-cols-2 gap-4">
           <form.Field name="matterPdfKey">
             {(field) => (
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                  Matter PDF <span className="text-destructive">*</span>
+              <div>
+                <Label>
+                  <FileText className="h-3.5 w-3.5" />
+                  Matter PDF
                 </Label>
-                <Dropzone
-                  accept="application/pdf"
+                <PdfDropzone
                   label="Upload matter PDF"
-                  hint="The source material for this test"
+                  hint="The source material students transcribe"
                   value={field.state.value}
                   fileName={matterFileName}
                   uploading={matterUploading}
-                  error={(field.state.meta.errors as unknown as string[])[0]}
+                  error={field.state.meta.errors.at(0)}
                   onFile={(f) =>
                     uploadPdf(
                       f,
@@ -845,27 +891,22 @@ export function CreateTestForm() {
                     field.handleChange("");
                     setMatterFileName("");
                   }}
-                  icon={<FileText className="h-5 w-5" />}
-                  accentClass="border-violet-500/40 bg-violet-500/5"
+                  accent="violet"
                 />
               </div>
             )}
           </form.Field>
 
-          {/* Outline PDF */}
           <form.Field name="outlinePdfKey">
             {(field) => (
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                  Outline PDF{" "}
-                  <span className="text-muted-foreground/50 font-normal normal-case">
-                    (optional)
-                  </span>
+              <div>
+                <Label optional>
+                  <FilePlus className="h-3.5 w-3.5" />
+                  Outline PDF
                 </Label>
-                <Dropzone
-                  accept="application/pdf"
+                <PdfDropzone
                   label="Upload outline PDF"
-                  hint="Shorthand notes or grader reference"
+                  hint="Shorthand notes for graders"
                   value={field.state.value ?? ""}
                   fileName={outlineFileName}
                   uploading={outlineUploading}
@@ -882,15 +923,13 @@ export function CreateTestForm() {
                     field.handleChange("");
                     setOutlineFileName("");
                   }}
-                  icon={<FilePlus className="h-5 w-5" />}
-                  accentClass="border-blue-500/40 bg-blue-500/5"
+                  accent="blue"
                 />
               </div>
             )}
           </form.Field>
         </div>
 
-        {/* Correct Answer */}
         <form.Field
           name="correctAnswer"
           validators={{
@@ -899,31 +938,29 @@ export function CreateTestForm() {
           }}
         >
           {(field) => (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-                  Correct Answer <span className="text-destructive">*</span>
-                </Label>
-                <span className="text-muted-foreground text-[11px] tabular-nums">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label>Correct Answer</Label>
+                <span className="text-muted-foreground text-xs tabular-nums">
                   {field.state.value.length} chars
                 </span>
               </div>
               <Textarea
-                placeholder="Enter the exact correct transcription. This is used for automatic scoring against user submissions."
+                placeholder="Type the exact correct transcription here — student answers are scored against this."
                 rows={12}
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                className="resize-none font-mono text-sm leading-relaxed"
+                className="resize-none font-calibri min-h-[200px] text-lg"
               />
-              <FieldErr msg={(field.state.meta.errors as string[])[0]} />
+              <Err msg={(field.state.meta.errors as string[])[0]} />
             </div>
           )}
         </form.Field>
-      </div>
+      </Section>
 
-      {/* ─── Actions ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-8 py-5">
+      {/* ── Actions ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between border-t px-8 py-5">
         <Button
           type="button"
           variant="ghost"
@@ -931,10 +968,9 @@ export function CreateTestForm() {
         >
           Cancel
         </Button>
-
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Button
                 type="submit"
                 variant="outline"
@@ -943,8 +979,8 @@ export function CreateTestForm() {
                   submitModeRef.current = "draft";
                 }}
               >
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-                Save Draft
+                <Save className="mr-2 h-4 w-4" />
+                Save as Draft
               </Button>
               <Button
                 type="submit"
@@ -954,8 +990,8 @@ export function CreateTestForm() {
                 }}
                 className="bg-emerald-600 text-white hover:bg-emerald-500"
               >
-                <Rocket className="mr-1.5 h-3.5 w-3.5" />
-                {isSubmitting ? "Launching…" : "Launch Test"}
+                <Rocket className="mr-2 h-4 w-4" />
+                {isSubmitting ? "Publishing…" : "Publish Test"}
               </Button>
             </div>
           )}
