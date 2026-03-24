@@ -39,6 +39,7 @@ import {
   Gavel,
   FileText,
   Star,
+  UserKey,
 } from "lucide-react";
 import { trpc } from "~/trpc/react";
 import { useMemo } from "react";
@@ -63,6 +64,12 @@ const TEST_TYPES = [
 ];
 
 const MANAGE_NAV = [
+  {
+    label: "Admissions",
+    href: "/admin/admissions",
+    icon: UserKey,
+    super: true,
+  },
   {
     label: "Notifications",
     href: "/admin/notifications",

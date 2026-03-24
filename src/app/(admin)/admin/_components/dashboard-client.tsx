@@ -2,7 +2,7 @@
 
 // ─── app/admin/_components/dashboard-client.tsx ───────────────────────────────
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { trpc } from "~/trpc/react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Button } from "~/components/ui/button";
@@ -11,7 +11,6 @@ import {
   Users,
   FileText,
   Activity,
-  BarChart3,
   Plus,
   Gavel,
   Layers,
@@ -19,14 +18,20 @@ import {
   ArrowRight,
   ExternalLink,
   TrendingUp,
-  Zap,
   Clock,
   Target,
   ClipboardList,
+  CheckCircle2,
+  XCircle,
+  Image as ImageIcon,
+  CreditCard,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
+import { toast } from "sonner";
+import { RejectDialog } from "../admissions/_components/rejection-dialog";
+import { ScreenshotDialog } from "../admissions/_components/screenshot-dialog";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,18 +73,6 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
-// Dark card with a soft radial glow in the corner, matching the screenshot style.
-
-type StatCardConfig = {
-  label: string;
-  value: string | number;
-  descriptor: string;
-  sub: string;
-  badge?: string;
-  badgeColor?: string;
-  icon: React.ElementType;
-  glowColor: string; // inline CSS color for the glow blob
-};
 
 type TrendDir = "up" | "down" | "neutral";
 
@@ -117,12 +110,10 @@ export function StatCard({
           "radial-gradient(ellipse at top right, color-mix(in oklch, var(--chart-1) 8%, var(--card)), var(--card))",
       }}
     >
-      {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <p className="text-muted-foreground text-xs leading-none font-medium">
           {label}
         </p>
-
         {trend && (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${trendStyles}`}
@@ -132,12 +123,10 @@ export function StatCard({
         )}
       </div>
 
-      {/* Value */}
       <p className="text-4xl leading-none font-bold tracking-tight tabular-nums">
         {value}
       </p>
 
-      {/* Divider */}
       {(story || sub) && (
         <div className="space-y-1">
           {story && (
@@ -146,7 +135,6 @@ export function StatCard({
               <Icon className="text-muted-foreground h-3.5 w-3.5" />
             </p>
           )}
-
           {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
         </div>
       )}
@@ -168,7 +156,6 @@ function KpiRow() {
         trend={`+${overview.activeUsers.last7d}`}
         trendDir="up"
       />
-
       <StatCard
         label="Total Tests"
         value={fmtNum(overview.totalTests)}
@@ -176,7 +163,6 @@ function KpiRow() {
         sub="Across all categories"
         icon={ClipboardList}
       />
-
       <StatCard
         label="Total Attempts"
         value={fmtNum(overview.totalAttempts)}
@@ -186,7 +172,6 @@ function KpiRow() {
         trend={`+${overview.activeUsers.last1d}`}
         trendDir="up"
       />
-
       <StatCard
         label="Active Users"
         value={fmtNum(overview.activeUsers.last30d)}
@@ -239,6 +224,235 @@ function SectionHeader({
           <ArrowRight className="h-3 w-3" />
         </Link>
       )}
+    </div>
+  );
+}
+
+// ─── Pending Admissions ───────────────────────────────────────────────────────
+
+type Payment = {
+  id: string;
+  amount: number;
+  status: "pending" | "approved" | "rejected";
+  transactionId: string | null;
+  screenshotURL: string;
+  rejectionReason: string | null;
+  createdAt: Date;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    userProfilePic: string | null;
+  };
+};
+
+function PendingAdmissions() {
+  const utils = trpc.useUtils();
+
+  const [rejectTarget, setRejectTarget] = useState<Payment | null>(null);
+  const [screenshotTarget, setScreenshotTarget] = useState<Payment | null>(
+    null,
+  );
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  const [{ data, meta }] = trpc.payment.list.useSuspenseQuery({
+    status: "pending",
+    page: 0,
+    limit: 10,
+  }) as unknown as [{ data: Payment[]; meta: { total: number } }];
+
+  const verify = trpc.payment.verify.useMutation({
+    onSuccess: () => utils.payment.list.invalidate(),
+  });
+
+  async function handleApprove(p: Payment) {
+    setApprovingId(p.id);
+    try {
+      await verify.mutateAsync({ paymentId: p.id, action: "approve" });
+      const name = p.user.name ?? p.user.email ?? "Student";
+      toast.success(`${name} has been approved`, {
+        description: "Their subscription is now active.",
+        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to approve");
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function handleRejectConfirm(reason: string) {
+    if (!rejectTarget) return;
+    setRejectingId(rejectTarget.id);
+    try {
+      await verify.mutateAsync({
+        paymentId: rejectTarget.id,
+        action: "reject",
+        rejectionReason: reason || undefined,
+      });
+      const name =
+        rejectTarget.user.name ?? rejectTarget.user.email ?? "Student";
+      toast.error(`${name}'s payment rejected`, {
+        description: reason || "No reason provided.",
+      });
+      setRejectTarget(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to reject");
+    } finally {
+      setRejectingId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col">
+      <SectionHeader
+        icon={CreditCard}
+        title="Pending Admissions"
+        count={meta?.total}
+        href="/admin/admissions"
+        hrefLabel="View all"
+      />
+      <div className="overflow-hidden rounded-2xl border">
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-11 text-center">
+            <CheckCircle2 className="text-muted-foreground/20 h-7 w-7" />
+            <p className="text-muted-foreground text-sm">All caught up!</p>
+            
+          </div>
+        ) : (
+          <>
+            {data.map((p, idx) => {
+              const isApproving = approvingId === p.id;
+              const isRejecting = rejectingId === p.id;
+              const isBusy = isApproving || isRejecting;
+              const name = p.user.name ?? p.user.email ?? "Unknown";
+              const initial = name[0]?.toUpperCase() ?? "?";
+
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "group hover:bg-muted/30 flex items-center gap-3 px-4 py-3 transition-colors",
+                    idx !== data.length - 1 && "border-b",
+                  )}
+                >
+                  {/* Avatar */}
+                  {p.user.userProfilePic ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.user.userProfilePic}
+                      alt={name}
+                      className="h-7 w-7 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase">
+                      {initial}
+                    </div>
+                  )}
+
+                  {/* Name + amount */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{name}</p>
+                    <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
+                      <span className="font-semibold text-amber-600 tabular-nums dark:text-amber-400">
+                        ₹{p.amount.toLocaleString("en-IN")}
+                      </span>
+                      <span className="text-muted-foreground/40">·</span>
+                      <Clock className="h-2.5 w-2.5" />
+                      {formatDistanceToNow(new Date(p.createdAt), {
+                        addSuffix: true,
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Actions — visible on hover or during loading */}
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center gap-1 transition-opacity",
+                      isBusy
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100",
+                    )}
+                  >
+                    {/* Screenshot */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setScreenshotTarget(p)}
+                    >
+                      <ImageIcon className="h-3 w-3" />
+                    </Button>
+
+                    {/* Approve */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isBusy}
+                      onClick={() => handleApprove(p)}
+                      className="h-6 w-6 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-500"
+                    >
+                      {isApproving ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                    </Button>
+
+                    {/* Reject */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isBusy}
+                      onClick={() => setRejectTarget(p)}
+                      className="h-6 w-6 text-rose-600 hover:bg-rose-500/10 hover:text-rose-500"
+                    >
+                      {isRejecting ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-rose-500 border-t-transparent" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* View all footer link */}
+            {meta && meta.total > 10 && (
+              <Link
+                href="/admin/admissions"
+                className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 border-t px-4 py-2.5 text-xs transition-colors"
+              >
+                View all {meta.total} pending
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Dialogs */}
+      <RejectDialog
+        open={!!rejectTarget}
+        onOpenChange={(v) => !v && setRejectTarget(null)}
+        userName={
+          rejectTarget?.user.name ?? rejectTarget?.user.email ?? "this student"
+        }
+        onConfirm={handleRejectConfirm}
+        isLoading={rejectingId === rejectTarget?.id}
+      />
+      <ScreenshotDialog
+        open={!!screenshotTarget}
+        onOpenChange={(v) => !v && setScreenshotTarget(null)}
+        screenshotUrl={screenshotTarget?.screenshotURL ?? ""}
+        userName={
+          screenshotTarget?.user.name ??
+          screenshotTarget?.user.email ??
+          "Student"
+        }
+      />
     </div>
   );
 }
@@ -417,20 +631,6 @@ function ActiveTests() {
           </div>
         ) : (
           <>
-            <div className="bg-muted/30 grid grid-cols-[1fr_60px_68px_60px_56px] items-center gap-2 border-b px-4 py-2.5">
-              {["Test", "Attempts", "Avg Score", "Acc", "WPM"].map((h, i) => (
-                <span
-                  key={h}
-                  className={cn(
-                    "text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase",
-                    i > 0 && "text-right",
-                  )}
-                >
-                  {h}
-                </span>
-              ))}
-            </div>
-
             {tests.data.map((t, idx) => {
               const p = perfMap.get(t.id);
               return (
@@ -438,11 +638,12 @@ function ActiveTests() {
                   key={t.id}
                   href={`/admin/test/${t.id}`}
                   className={cn(
-                    "group hover:bg-muted/30 grid grid-cols-[1fr_60px_68px_60px_56px] items-center gap-2 px-4 py-3 transition-colors",
+                    "group hover:bg-muted/30 flex items-center justify-between gap-3 px-4 py-3 transition-colors",
                     idx !== tests.data.length - 1 && "border-b",
                   )}
                 >
-                  <div className="flex min-w-0 items-center gap-2">
+                  {/* Title + type badge */}
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span
                       className={cn(
                         "flex shrink-0 items-center justify-center rounded p-1",
@@ -451,27 +652,20 @@ function ActiveTests() {
                     >
                       {TYPE_ICON[t.type] ?? <FileText className="h-3 w-3" />}
                     </span>
-                    <span className="truncate text-sm">{t.title}</span>
+                    <span className="truncate text-sm font-medium">
+                      {t.title}
+                    </span>
                   </div>
 
+                  {/* Stats — right-aligned compact pill */}
                   {p ? (
-                    <>
-                      <span className="text-right text-sm tabular-nums">
-                        {p.attempts}
-                      </span>
-                      <span className="text-right text-sm font-semibold tabular-nums">
-                        {Math.round(Number(p.avgScore))}
-                      </span>
-                      <div className="flex justify-end">
-                        <AccuracyBadge v={Math.round(Number(p.avgAccuracy))} />
-                      </div>
-                      <span className="text-muted-foreground text-right text-sm tabular-nums">
-                        {Math.round(Number(p.avgWpm))}
-                      </span>
-                    </>
+                    <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                      <span>{p.attempts} att.</span>
+                      <AccuracyBadge v={Math.round(Number(p.avgAccuracy))} />
+                    </div>
                   ) : (
-                    <span className="text-muted-foreground/40 col-span-4 text-right text-xs">
-                      No attempts yet
+                    <span className="text-muted-foreground/40 shrink-0 text-xs">
+                      No attempts
                     </span>
                   )}
                 </Link>
@@ -627,11 +821,16 @@ function ColSkeleton({ rows = 5 }: { rows?: number }) {
             i !== rows - 1 && "border-b",
           )}
         >
+          <Skeleton className="h-7 w-7 rounded-full" />
           <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3.5 w-28" />
             <Skeleton className="h-2.5 w-20" />
           </div>
-          <Skeleton className="h-3.5 w-14" />
+          <div className="flex gap-1">
+            <Skeleton className="h-6 w-6 rounded-md" />
+            <Skeleton className="h-6 w-6 rounded-md" />
+            <Skeleton className="h-6 w-6 rounded-md" />
+          </div>
         </div>
       ))}
     </div>
@@ -657,6 +856,10 @@ export default function DashboardClient() {
   trpc.test.getTests.useQuery(
     { page: 1, pageSize: 8, status: "active", sort: "newest" },
     { staleTime: 60_000 },
+  );
+  trpc.payment.list.useQuery(
+    { status: "pending", page: 0, limit: 10 },
+    { staleTime: 30_000 },
   );
 
   return (
@@ -695,25 +898,29 @@ export default function DashboardClient() {
         <RecentAttempts />
       </Suspense>
 
-      {/* ── Bottom 2-col grid ── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* ── Bottom 3-col grid ── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* 1st: Pending Admissions */}
         <Suspense
           fallback={
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-6 w-6 rounded-md" />
-                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-36" />
               </div>
               <ColSkeleton rows={6} />
             </div>
           }
         >
-          <DraftTests />
+          <div className="min-w-0 overflow-hidden">
+            <PendingAdmissions />
+          </div>
         </Suspense>
 
+        {/* 2nd: Draft Tests */}
         <Suspense
           fallback={
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-6 w-6 rounded-md" />
                 <Skeleton className="h-4 w-28" />
@@ -722,7 +929,26 @@ export default function DashboardClient() {
             </div>
           }
         >
-          <ActiveTests />
+          <div className="min-w-0 overflow-hidden">
+            <DraftTests />
+          </div>
+        </Suspense>
+
+        {/* 3rd: Active Tests */}
+        <Suspense
+          fallback={
+            <div className="min-w-0 space-y-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-6 rounded-md" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <ColSkeleton rows={6} />
+            </div>
+          }
+        >
+          <div className="min-w-0 overflow-hidden">
+            <ActiveTests />
+          </div>
         </Suspense>
       </div>
     </div>

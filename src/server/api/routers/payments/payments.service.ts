@@ -6,6 +6,7 @@ import type {
   AdminVerifyPaymentInput,
   SubmitPaymentInput,
 } from "./payments.schema";
+import R2Service, { r2Service } from "~/server/services/r2.service";
 
 type Db = typeof db;
 
@@ -119,6 +120,10 @@ export function createPaymentService(db: Db) {
           orderBy: desc(payment.createdAt),
           limit: input.limit,
           offset: input.page * input.limit,
+
+          with: {
+            user: true,
+          },
         }),
 
         db
@@ -130,7 +135,14 @@ export function createPaymentService(db: Db) {
       const total = countRow?.count ?? 0;
 
       return {
-        data,
+        data: data.map((d) => ({
+          ...d,
+          screenshotURL: R2Service.getPublicUrl(d.screenshotKey),
+          user: {
+            ...d.user,
+            userProfilePic: R2Service.getPublicUrl(d.user.image),
+          },
+        })),
         meta: {
           total,
           page: input.page,
