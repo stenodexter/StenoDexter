@@ -34,6 +34,8 @@ export const payment = pgTable(
       onDelete: "set null",
     }),
 
+    fromUPIId: text("from_upi_id").notNull(),
+
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
 
     rejectionReason: text("rejection_reason"),

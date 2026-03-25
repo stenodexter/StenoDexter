@@ -34,27 +34,16 @@ import {
 } from "lucide-react";
 import { RejectDialog } from "./rejection-dialog";
 import { ScreenshotDialog } from "./screenshot-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import type { api } from "~/trpc/server";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
 type PaymentStatus = "pending" | "approved" | "rejected";
 
-type Payment = {
-  id: string;
-  amount: number;
-  status: PaymentStatus;
-  transactionId: string | null;
-  screenshotURL: string;
-  rejectionReason: string | null;
-  createdAt: Date;
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    userProfilePic: string | null;
-  };
-};
+type Payments = Awaited<ReturnType<typeof api.payment.list>>;
 
+type Payment = Payments["data"][0];
 // ─── status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: PaymentStatus }) {
@@ -128,16 +117,13 @@ function RowActions({
           </Button>
 
           <Button
-            variant="ghost"
+            variant="destructive"
             size="sm"
             disabled={isBusy}
             onClick={() => onReject(payment)}
-            className="gap-1.5 text-rose-600 hover:bg-rose-500/10 hover:text-rose-500"
           >
-            {isRejecting ? (
+            {isRejecting && (
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-500 border-t-transparent" />
-            ) : (
-              <XCircle className="h-3.5 w-3.5" />
             )}
             {isRejecting ? "Rejecting…" : "Reject"}
           </Button>
@@ -261,7 +247,8 @@ export function AdmissionsList() {
         action: "reject",
         rejectionReason: reason || undefined,
       });
-      const name = rejectTarget.user.name ?? rejectTarget.user.email ?? "Student";
+      const name =
+        rejectTarget.user.name ?? rejectTarget.user.email ?? "Student";
       toast.error(`${name}'s payment has been rejected`, {
         description: reason || "No reason provided.",
       });
@@ -328,7 +315,7 @@ export function AdmissionsList() {
               <TableRow>
                 <TableHead>Student</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Transaction ID</TableHead>
+                <TableHead>UPI ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead />
@@ -340,18 +327,15 @@ export function AdmissionsList() {
                   {/* Student */}
                   <TableCell>
                     <div className="flex items-center gap-2.5">
-                      {p.user.userProfilePic ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.user.userProfilePic}
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={p.user.userProfilePic ?? undefined}
                           alt={p.user.name ?? ""}
-                          className="h-8 w-8 rounded-full object-cover"
                         />
-                      ) : (
-                        <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase">
+                        <AvatarFallback className="text-xs font-semibold uppercase">
                           {(p.user.name ?? p.user.email ?? "?")[0]}
-                        </div>
-                      )}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">
                           {p.user.name ?? "—"}
@@ -365,15 +349,15 @@ export function AdmissionsList() {
 
                   {/* Amount */}
                   <TableCell>
-                    <span className="tabular-nums text-sm font-semibold">
+                    <span className="text-sm font-semibold tabular-nums">
                       ₹{p.amount.toLocaleString("en-IN")}
                     </span>
                   </TableCell>
 
-                  {/* Transaction ID */}
+                  {/* UPI ID */}
                   <TableCell>
-                    <span className="text-muted-foreground font-mono text-xs">
-                      {p.transactionId ?? "—"}
+                    <span className="font-mono text-xs font-bold tracking-wide">
+                      {p.fromUPIId}
                     </span>
                   </TableCell>
 
@@ -450,9 +434,7 @@ export function AdmissionsList() {
         open={!!rejectTarget}
         onOpenChange={(v) => !v && setRejectTarget(null)}
         userName={
-          rejectTarget?.user.name ??
-          rejectTarget?.user.email ??
-          "this student"
+          rejectTarget?.user.name ?? rejectTarget?.user.email ?? "this student"
         }
         onConfirm={handleRejectConfirm}
         isLoading={rejectingId === rejectTarget?.id}

@@ -7,6 +7,8 @@ import type {
   SubmitPaymentInput,
 } from "./payments.schema";
 import R2Service, { r2Service } from "~/server/services/r2.service";
+import { notificationsService } from "../notifications/notification.service";
+import { emailService } from "~/server/services/mail.service";
 
 type Db = typeof db;
 
@@ -26,6 +28,7 @@ export function createPaymentService(db: Db) {
         id: crypto.randomUUID(),
         userId,
         amount: data.amount,
+        fromUPIId: data.fromUPIId,
         screenshotKey: data.screenshotKey,
         transactionId: data.transactionId,
       });
@@ -36,6 +39,9 @@ export function createPaymentService(db: Db) {
     async verifyPayment(adminId: string, input: AdminVerifyPaymentInput) {
       const found = await db.query.payment.findFirst({
         where: eq(payment.id, input.paymentId),
+        with: {
+          user: true,
+        },
       });
 
       if (!found) throw new Error("Payment not found");
@@ -51,6 +57,21 @@ export function createPaymentService(db: Db) {
             verifiedAt: new Date(),
           })
           .where(eq(payment.id, input.paymentId));
+
+        await notificationsService.send({
+          title: "Payment Rejected",
+          message: input.rejectionReason
+            ? `Your payment was rejected: ${input.rejectionReason}`
+            : "Your payment was rejected. Please try again.",
+          to: found.userId,
+        });
+
+        if (found.user?.email) {
+          await emailService.sendPaymentRejected(
+            found.user.email,
+            input.rejectionReason,
+          );
+        }
 
         return { ok: true };
       }
@@ -101,6 +122,16 @@ export function createPaymentService(db: Db) {
           });
         }
       });
+
+      await notificationsService.send({
+        title: "Payment Approved 🎉",
+        message: "Your payment has been verified. Subscription is now active.",
+        to: found.userId,
+      });
+
+      if (found.user?.email) {
+        await emailService.sendPaymentApproved(found.user.email);
+      }
 
       return { ok: true };
     },

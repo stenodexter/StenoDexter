@@ -190,7 +190,9 @@ export function SolutionAudioDialog({
           {file ? (
             <div className="w-full">
               <p className="truncate px-4 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                {file.name}
+                {file.name.length > 45
+                  ? file.name.slice(0, 45) + "..."
+                  : file.name}
               </p>
               <p className="text-muted-foreground mt-0.5 text-xs">
                 {(file.size / 1024 / 1024).toFixed(1)} MB ·{" "}

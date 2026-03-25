@@ -245,7 +245,7 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
 
   return (
     <p
-      className="text-[17px] break-words"
+      className="text-[20px] break-words"
       style={{
         fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
         lineHeight: "2.2",

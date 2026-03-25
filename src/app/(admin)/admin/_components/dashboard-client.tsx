@@ -318,7 +318,6 @@ function PendingAdmissions() {
           <div className="flex flex-col items-center gap-2 py-11 text-center">
             <CheckCircle2 className="text-muted-foreground/20 h-7 w-7" />
             <p className="text-muted-foreground text-sm">All caught up!</p>
-            
           </div>
         ) : (
           <>
@@ -338,18 +337,15 @@ function PendingAdmissions() {
                   )}
                 >
                   {/* Avatar */}
-                  {p.user.userProfilePic ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.user.userProfilePic}
-                      alt={name}
-                      className="h-7 w-7 shrink-0 rounded-full object-cover"
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={p.user.userProfilePic ?? undefined}
+                      alt={p.user.name ?? ""}
                     />
-                  ) : (
-                    <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase">
-                      {initial}
-                    </div>
-                  )}
+                    <AvatarFallback className="text-xs font-semibold uppercase">
+                      {(p.user.name ?? p.user.email ?? "?")[0]}
+                    </AvatarFallback>
+                  </Avatar>
 
                   {/* Name + amount */}
                   <div className="min-w-0 flex-1">

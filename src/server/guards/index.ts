@@ -17,6 +17,7 @@ export async function requireUser() {
   return guard(() => api.user.me(), "/user/login");
 }
 
+
 export async function requireSuperAdmin() {
   const admin = await requireAdmin();
 

@@ -1,9 +1,3 @@
-// ─── server/services/scoring.service.ts ──────────────────────────────────────
-// Replaced diffArrays with a dynamic programming LCS-based alignment.
-// This gives much better results for stenography text:
-//   - "paths path" → replace (not delete+insert)
-//   - "suspended — neither" correctly identified
-
 export type DiffType = "correct" | "replace" | "insert" | "delete";
 
 export type DiffToken = {
@@ -13,52 +7,18 @@ export type DiffToken = {
 };
 
 function tokenize(text: string): string[] {
-  return text.match(/[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) ?? [];
+  return text.match(/[\p{L}\p{N}]+|\s|[^\s\p{L}\p{N}]/gu) ?? [];
 }
 
-function normalize(s: string) {
-  return s.toLowerCase();
-}
-
-// True if two tokens are the "same" word (exact or close typo)
+// Exact match only, case-sensitive.
 function isMatch(a: string, b: string): boolean {
-  if (normalize(a) === normalize(b)) return true;
-  // Allow small edit distance for word tokens only (not punctuation)
-  if (a.length < 2 || b.length < 2) return false;
-  const longer = Math.max(a.length, b.length);
-  return editDistance(a, b) <= Math.max(1, Math.floor(longer * 0.3));
+  return a === b;
 }
-
-function editDistance(a: string, b: string): number {
-  const A = a.toLowerCase(),
-    B = b.toLowerCase();
-  const m = A.length,
-    n = B.length;
-  // Use two-row DP for memory efficiency
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  let curr = new Array<number>(n + 1);
-  for (let i = 1; i <= m; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      curr[j] =
-        A[i - 1] === B[j - 1]
-          ? prev[j - 1]!
-          : 1 + Math.min(prev[j]!, curr[j - 1]!, prev[j - 1]!);
-    }
-    [prev, curr] = [curr, prev];
-  }
-  return prev[n]!;
-}
-
-// ── LCS-based alignment ───────────────────────────────────────────────────────
-// Build an LCS (longest common subsequence) table using isMatch.
-// Then trace back to produce an aligned diff.
 
 function lcsAlign(A: string[], B: string[]): DiffToken[] {
-  const m = A.length,
-    n = B.length;
+  const m = A.length;
+  const n = B.length;
 
-  // dp[i][j] = length of LCS of A[0..i-1] and B[0..j-1]
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
     new Array(n + 1).fill(0),
   );
@@ -73,23 +33,19 @@ function lcsAlign(A: string[], B: string[]): DiffToken[] {
     }
   }
 
-  // Traceback
   const result: DiffToken[] = [];
-  let i = m,
-    j = n;
+  let i = m;
+  let j = n;
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && isMatch(A[i - 1]!, B[j - 1]!)) {
-      // Matched — correct (use original text for display)
       result.push({ original: A[i - 1], typed: B[j - 1], type: "correct" });
       i--;
       j--;
     } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
-      // B has extra token — insert
       result.push({ typed: B[j - 1], type: "insert" });
       j--;
     } else {
-      // A has token not in B — delete
       result.push({ original: A[i - 1], type: "delete" });
       i--;
     }
@@ -97,12 +53,13 @@ function lcsAlign(A: string[], B: string[]): DiffToken[] {
 
   result.reverse();
 
-  // ── Post-process: merge adjacent delete+insert → replace ──────────────────
   const final: DiffToken[] = [];
   let k = 0;
+
   while (k < result.length) {
     const cur = result[k]!;
     const next = result[k + 1];
+
     if (cur.type === "delete" && next?.type === "insert") {
       final.push({
         original: cur.original,
@@ -121,12 +78,17 @@ function lcsAlign(A: string[], B: string[]): DiffToken[] {
 
 export default class ScoringEngine {
   compare(original: string, typed: string): DiffToken[] {
+    typed = typed.trim();
+    original = original.trim();
     const A = tokenize(original);
     const B = tokenize(typed);
     return lcsAlign(A, B);
   }
 
   evaluate(original: string, typed: string, durationSeconds: number) {
+    typed = typed.trim();
+    original = original.trim();
+
     const diff = this.compare(original, typed);
 
     let mistakes = 0;

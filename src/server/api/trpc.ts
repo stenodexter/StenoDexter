@@ -22,7 +22,8 @@ import R2Service from "../services/r2.service";
 // Admin session cache
 // ---------------------------------------------------------------------------
 
-const ADMIN_SESSION_CACHE_TTL_MS = 60_000; // 1 minute
+const ADMIN_SESSION_CACHE_TTL_MS = 5 * 60_000; // 5 minute
+const SUBSCRIPTION_CACHE_TTL_MS = 10 * 60_000; // 10 minutes
 
 interface CachedAdminSession {
   value: AdminSession;
@@ -36,6 +37,21 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of adminSessionCache) {
     if (entry.expiresAt <= now) adminSessionCache.delete(key);
+  }
+}, 5 * 60_000);
+
+interface CachedSubscription {
+  value: typeof subscription.$inferSelect | null;
+  expiresAt: number;
+}
+
+const subscriptionCache = new Map<string, CachedSubscription>();
+
+// cleanup (optional but good)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of subscriptionCache) {
+    if (entry.expiresAt <= now) subscriptionCache.delete(key);
   }
 }, 5 * 60_000);
 
@@ -214,37 +230,70 @@ export const systemAdminProcedure = adminProcedure.use(({ ctx, next }) => {
  * Paid user — requires active subscription.
  * Subscription check commented out; re-enable when ready.
  */
+const resolveSubscription = async (userId: string) => {
+  const nowTs = Date.now();
+
+  const cached = subscriptionCache.get(userId);
+  if (cached && cached.expiresAt > nowTs) {
+    return cached.value;
+  }
+
+  const now = new Date();
+
+  const [activeSubscription] = await db
+    .select()
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.userId, userId),
+        eq(subscription.status, "active"),
+        gt(subscription.currentPeriodEnd, now),
+      ),
+    )
+    .limit(1);
+
+  const value = activeSubscription ?? null;
+
+  subscriptionCache.set(userId, {
+    value,
+    expiresAt: nowTs + SUBSCRIPTION_CACHE_TTL_MS,
+  });
+
+  return value;
+};
+
 export const paidUserProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    // const now = new Date();
-    // const [activeSubscription] = await db
-    //   .select()
-    //   .from(subscription)
-    //   .where(
-    //     and(
-    //       eq(subscription.userId, ctx.user.id),
-    //       eq(subscription.status, "active"),
-    //       gt(subscription.currentPeriodEnd, now),
-    //     ),
-    //   )
-    //   .limit(1);
+    const sub = await resolveSubscription(ctx.user.id);
 
-    // if (!activeSubscription) {
-    //   throw new TRPCError({
-    //     code: "FORBIDDEN",
-    //     message:
-    //       "An active subscription is required to access this feature. Please subscribe and try again.",
-    //   });
-    // }
+    if (!sub) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "An active subscription is required to access this feature.",
+      });
+    }
 
     return next({
       ctx: {
         ...ctx,
-        subscription: {},
+        subscription: sub,
       },
     });
   },
 );
+
+export const safeProcedure = publicProcedure.use(async ({ ctx, next }) => {
+  if (!ctx.user && !ctx._adminToken) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "User or admin authentication required.",
+    });
+  }
+
+  return next({
+    ctx,
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Cache invalidation

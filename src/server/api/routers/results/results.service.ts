@@ -295,6 +295,72 @@ export function createResultService(db: Db) {
         mistakes: r.mistakes ?? 0,
       }));
     },
+
+    async getUsersForTest(input: {
+      testId: string;
+      page?: number;
+      limit?: number;
+      type?: "assessment" | "practice";
+      search?: string;
+    }) {
+      const { testId, page = 0, limit = 20, type, search } = input;
+      const offset = page * limit;
+
+      type Row = {
+        user_id: string;
+        user_name: string | null;
+        user_email: string;
+        attempts: number;
+        best_accuracy: number;
+        avg_accuracy: number;
+        best_wpm: number;
+        last_attempt_at: Date;
+        total_count: string;
+      };
+
+      const rows = await db.execute<Row>(sql`
+    SELECT
+      r.user_id,
+      u.name                           AS user_name,
+      u.email                          AS user_email,
+      COUNT(*)::int                    AS attempts,
+      MAX(r.accuracy)::int             AS best_accuracy,
+      ROUND(AVG(r.accuracy))::int      AS avg_accuracy,
+      MAX(r.wpm)::int                  AS best_wpm,
+      MAX(r.submitted_at)              AS last_attempt_at,
+      COUNT(*) OVER ()                 AS total_count
+    FROM results r
+    INNER JOIN test_attempts ta ON ta.id = r.attempt_id
+    INNER JOIN "user"         u  ON u.id = r.user_id
+    WHERE ta.test_id = ${testId}
+      ${type ? sql`AND r.type = ${type}` : sql``}
+      ${search ? sql`AND (u.name ILIKE ${"%" + search + "%"} OR u.email ILIKE ${"%" + search + "%"})` : sql``}
+    GROUP BY r.user_id, u.name, u.email
+    ORDER BY best_accuracy DESC, last_attempt_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+
+      const total = Number(rows[0]?.total_count ?? 0);
+
+      return {
+        data: rows.map((r) => ({
+          userId: r.user_id,
+          userName: r.user_name,
+          userEmail: r.user_email,
+          attempts: r.attempts,
+          bestAccuracy: r.best_accuracy,
+          avgAccuracy: r.avg_accuracy,
+          bestWpm: r.best_wpm,
+          lastAttemptAt: r.last_attempt_at,
+        })),
+        total,
+        totalPages: Math.ceil(total / limit),
+        page,
+      };
+    },
+
+
+    
   };
 }
 

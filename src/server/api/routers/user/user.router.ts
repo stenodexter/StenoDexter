@@ -4,6 +4,7 @@ import z from "zod";
 import {
   adminProcedure,
   createTRPCRouter,
+  paidUserProcedure,
   protectedProcedure,
 } from "../../trpc";
 import { createUserService } from "./user.service";
@@ -37,6 +38,33 @@ export const userRouter = createTRPCRouter({
     return {
       ...found,
       profilePicUrl: found?.image ? R2Service.getPublicUrl(found.image) : null,
+    };
+  }),
+
+  paidMe: paidUserProcedure.query(async ({ ctx }) => {
+    return ctx.subscription.currentPeriodEnd >= new Date();
+  }),
+
+  checkSubscription: protectedProcedure.query(async ({ ctx }) => {
+    const sub = await ctx.db.query.subscription.findFirst({
+      where: (s, { eq, and }) =>
+        and(eq(s.userId, ctx.user.id), eq(s.status, "active")),
+      orderBy: (s, { desc }) => desc(s.currentPeriodEnd),
+    });
+
+    const pendingPayment = await ctx.db.query.payment.findFirst({
+      where: (p, { eq, and }) =>
+        and(eq(p.userId, ctx.user.id), eq(p.status, "pending")),
+    });
+
+    if (!sub) return { active: false, expiresAt: null, pendingPayment };
+
+    const now = new Date();
+
+    return {
+      active: sub.currentPeriodEnd >= now,
+      expiresAt: sub.currentPeriodEnd.toISOString(),
+      pendingPayment,
     };
   }),
 
@@ -217,7 +245,7 @@ export const userRouter = createTRPCRouter({
         input.page,
         input.limit,
         input.type,
-        input.testId
+        input.testId,
       ),
     ),
 

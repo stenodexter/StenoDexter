@@ -48,7 +48,6 @@ export function RejectDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-rose-500" />
             Reject Payment
           </DialogTitle>
           <DialogDescription>
@@ -78,7 +77,7 @@ export function RejectDialog({
           <Button
             onClick={handleConfirm}
             disabled={isLoading}
-            className="bg-rose-600 text-white hover:bg-rose-500"
+            variant={"destructive"}
           >
             {isLoading ? (
               <>
@@ -86,10 +85,7 @@ export function RejectDialog({
                 Rejecting…
               </>
             ) : (
-              <>
-                <XCircle className="mr-2 h-3.5 w-3.5" />
-                Confirm Rejection
-              </>
+              <>Confirm Rejection</>
             )}
           </Button>
         </DialogFooter>

@@ -1,0 +1,1 @@
+ALTER TABLE "payment_proof" ALTER COLUMN "from_upi_id" SET NOT NULL;

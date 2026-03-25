@@ -34,4 +34,16 @@ export const resultRouter = createTRPCRouter({
   getTopPerformersByTest: publicProcedure
     .input(GetTopPerformersByTestSchema)
     .query(({ input }) => resultService.getTopPerformersByTest(input)),
+
+  getUsersForTest: adminProcedure
+    .input(
+      z.object({
+        testId: z.string(),
+        page: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(20),
+        type: z.enum(["assessment", "practice"]).optional(),
+        search: z.string().optional(),
+      }),
+    )
+    .query(({ input }) => resultService.getUsersForTest(input)),
 });

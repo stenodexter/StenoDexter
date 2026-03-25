@@ -28,6 +28,7 @@ export const env = createEnv({
     R2_BUCKET: z.string(),
     R2_PUBLIC_URL: z.string().url(),
     RESEND_API_KEY: z.string(),
+    APP_SUBSCRIPTION_PRICE: z.coerce.number().nonnegative(),
   },
 
   /**
@@ -58,6 +59,7 @@ export const env = createEnv({
     R2_BUCKET: process.env.R2_BUCKET,
     R2_PUBLIC_URL: process.env.R2_PUBLIC_URL,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    APP_SUBSCRIPTION_PRICE: process.env.APP_SUBSCRIPTION_PRICE,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

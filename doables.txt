@@ -3,31 +3,12 @@
 /admin/test/[testId]/attempts 
 displays users who attmepted that test 
 
-/admin/test/[testId]/user/[userId]/results
-each user's result
-
-/admin/admissions
-user admission's page
-
-
-
-
 /// user space
-
-/user/test/[testId]/ 
-CTA nothing else
-leaderboard, my results , attmept the test (from notif too)   DONE
-
-
 
 wiring routes
 
-pricing UPI, section 
 
-/// cron jobs 
-notifying, emailing , users for expiring accounts
-UPI jobs maybe 
-cleaning crons finalizing leaderboards etc etc maybe 
+verify email (user)
 
 
-some UI changes in login - register pages USER specially 
+view result after test - user

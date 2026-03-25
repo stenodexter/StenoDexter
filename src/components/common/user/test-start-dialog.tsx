@@ -123,8 +123,7 @@ export function TestStartDialog({
           )}
         </DialogHeader>
 
-        {/* Speed selection */}
-        {speeds.length > 1 && (
+        {speeds.length > 0 && (
           <div className="space-y-2">
             <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
               Choose speed
@@ -169,25 +168,6 @@ export function TestStartDialog({
                   </button>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Single speed — just show timing */}
-        {speeds.length === 1 && selectedSpeed && (
-          <div className="bg-muted/40 flex items-center gap-4 rounded-lg px-4 py-3">
-            <Zap className="text-primary h-4 w-4 shrink-0" />
-            <div className="flex items-center gap-4 text-sm">
-              <span className="font-bold">{selectedSpeed.wpm} WPM</span>
-              <Separator orientation="vertical" className="h-4" />
-              <span className="text-muted-foreground tabular-nums">
-                {fmtSec(
-                  selectedSpeed.dictationSeconds +
-                    selectedSpeed.breakSeconds +
-                    selectedSpeed.writtenDurationSeconds,
-                )}{" "}
-                total
-              </span>
             </div>
           </div>
         )}

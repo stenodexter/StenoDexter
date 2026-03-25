@@ -1,9 +1,14 @@
 import z from "zod";
+import { env } from "~/env";
 
 export const submitPaymentSchema = z.object({
-  amount: z.number().min(1),
+  amount: z
+    .number()
+    .gte(env.APP_SUBSCRIPTION_PRICE)
+    .lte(env.APP_SUBSCRIPTION_PRICE),
   screenshotKey: z.string(),
   transactionId: z.string().optional(),
+  fromUPIId: z.string(),
 });
 
 export const adminVerifyPaymentSchema = z.object({

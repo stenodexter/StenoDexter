@@ -1,6 +1,8 @@
 import { api } from "~/trpc/server";
 
-export async function PUT(req: Request) {
+export async function GET(req: Request) {
+  console.log("Starting Daily Cron Service.");
+
   const isCron = req.headers.get("x-vercel-cron");
 
   if (!isCron) {

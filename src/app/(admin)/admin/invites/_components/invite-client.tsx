@@ -177,8 +177,7 @@ function CreateInviteDialog({
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Link2 className="text-primary h-4 w-4" />
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             Create invite link
           </DialogTitle>
         </DialogHeader>
@@ -187,7 +186,9 @@ function CreateInviteDialog({
           <div className="space-y-4">
             <div className="bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
               <code className="text-primary min-w-0 flex-1 truncate font-mono text-xs">
-                {inviteUrl(created.token)}
+                {inviteUrl(created.token).length > 45
+                  ? inviteUrl(created.token).slice(0, 45) + "..."
+                  : inviteUrl(created.token)}
               </code>
               <CopyButton text={inviteUrl(created.token)} />
             </div>
