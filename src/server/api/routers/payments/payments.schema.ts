@@ -7,8 +7,8 @@ export const submitPaymentSchema = z.object({
     .gte(env.APP_SUBSCRIPTION_PRICE)
     .lte(env.APP_SUBSCRIPTION_PRICE),
   screenshotKey: z.string(),
-  transactionId: z.string().optional(),
   fromUPIId: z.string(),
+  type: z.enum(["renew", "fresh"]),
 });
 
 export const adminVerifyPaymentSchema = z.object({

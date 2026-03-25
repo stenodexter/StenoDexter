@@ -84,7 +84,7 @@ export class EmailService {
 
         <p>You’ll be notified once it's approved.</p>
 
-        <a href="${env.APP_URL}" 
+        <a href="${env.APP_URL}/user" 
            style="display:inline-block; margin-top:16px; padding:10px 16px; background:#000; color:#fff; text-decoration:none; border-radius:6px;">
           Go to Dashboard
         </a>
@@ -111,7 +111,7 @@ export class EmailService {
 
         <p>You now have full access to all premium features.</p>
 
-        <a href="${env.APP_URL}" 
+        <a href="${env.APP_URL}/user" 
            style="display:inline-block; margin-top:16px; padding:12px 18px; background:#16a34a; color:#fff; text-decoration:none; border-radius:6px;">
           Start Using Now →
         </a>
@@ -146,7 +146,7 @@ export class EmailService {
 
         <p>Please re-submit your payment details.</p>
 
-        <a href="${env.APP_URL}" 
+        <a href="${env.APP_URL}/user" 
            style="display:inline-block; margin-top:16px; padding:10px 16px; background:#dc2626; color:#fff; text-decoration:none; border-radius:6px;">
           Try Again
         </a>

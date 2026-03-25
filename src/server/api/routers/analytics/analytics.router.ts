@@ -1,8 +1,8 @@
 import {
   createTRPCRouter,
   adminProcedure,
-  protectedProcedure,
   publicProcedure,
+  secureProcedure,
 } from "../../trpc";
 import { analyticsService } from "./analytics.service";
 import {
@@ -27,7 +27,7 @@ export const analyticsRouter = createTRPCRouter({
     analyticsService.getEngagementMetrics(),
   ),
 
-  getTestStats: publicProcedure
+  getTestStats: secureProcedure
     .input(getTestStatsSchema)
     .query(({ input }) => analyticsService.getTestStats(input.testId)),
 

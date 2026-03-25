@@ -34,6 +34,7 @@ import {
   Gavel,
   FileText,
   Sparkles,
+  CreditCard,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -52,6 +53,7 @@ const MAIN_NAV = [
 ];
 
 const SETTINGS_NAV = [
+  { label: "Payments ", href: "/user/payments", icon: CreditCard  },
   { label: "Settings", href: "/user/settings", icon: Settings },
 ];
 

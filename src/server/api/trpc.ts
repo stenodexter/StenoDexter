@@ -282,7 +282,7 @@ export const paidUserProcedure = protectedProcedure.use(
   },
 );
 
-export const safeProcedure = publicProcedure.use(async ({ ctx, next }) => {
+export const secureProcedure = publicProcedure.use(async ({ ctx, next }) => {
   if (!ctx.user && !ctx._adminToken) {
     throw new TRPCError({
       code: "UNAUTHORIZED",

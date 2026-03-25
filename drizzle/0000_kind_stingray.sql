@@ -1,3 +1,6 @@
+CREATE TYPE "public"."payment_status" AS ENUM('pending', 'approved', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."payments_type" AS ENUM('renew', 'fresh');--> statement-breakpoint
+CREATE TYPE "public"."subscription_status" AS ENUM('active', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."invite_status" AS ENUM('active', 'invalidated', 'expired', 'limit_reached');--> statement-breakpoint
 CREATE TYPE "public"."attempt_stage" AS ENUM('audio', 'break', 'writing', 'submitted');--> statement-breakpoint
 CREATE TYPE "public"."attempt_type" AS ENUM('assessment', 'practice');--> statement-breakpoint
@@ -58,26 +61,26 @@ CREATE TABLE "payment_proof" (
 	"user_id" text NOT NULL,
 	"amount" integer NOT NULL,
 	"screenshot_key" text NOT NULL,
-	"status" text NOT NULL,
-	"transaction_id" text,
+	"status" "payment_status" DEFAULT 'pending' NOT NULL,
+	"type" "payments_type" NOT NULL,
 	"verified_by" text,
 	"from_upi_id" text NOT NULL,
 	"verified_at" timestamp with time zone,
 	"rejection_reason" text,
-	"created_at" timestamp with time zone NOT NULL,
-	"updated_at" timestamp with time zone NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "subscription" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"payment_proof_id" text,
-	"status" text NOT NULL,
-	"current_period_start" timestamp with time zone NOT NULL,
+	"status" "subscription_status" DEFAULT 'active' NOT NULL,
+	"current_period_start" timestamp with time zone DEFAULT now() NOT NULL,
 	"current_period_end" timestamp with time zone NOT NULL,
 	"last_reminder_sent_at" timestamp with time zone,
-	"created_at" timestamp with time zone NOT NULL,
-	"updated_at" timestamp with time zone NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "admin" (
@@ -254,6 +257,9 @@ CREATE INDEX "session_expires_at_idx" ON "session" USING btree ("expires_at");--
 CREATE INDEX "verification_identifier_expires_idx" ON "verification" USING btree ("identifier","expires_at");--> statement-breakpoint
 CREATE INDEX "verification_expires_at_idx" ON "verification" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "unique_pending_payment_per_user" ON "payment_proof" USING btree ("user_id") WHERE status = 'pending';--> statement-breakpoint
+CREATE INDEX "payment_user_idx" ON "payment_proof" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "subscription_user_idx" ON "subscription" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "one_active_subscription_per_user" ON "subscription" USING btree ("user_id") WHERE status = 'active';--> statement-breakpoint
 CREATE INDEX "admin_invited_by_idx" ON "admin" USING btree ("invited_by_admin_id");--> statement-breakpoint
 CREATE INDEX "admin_is_super_idx" ON "admin" USING btree ("is_super");--> statement-breakpoint
 CREATE INDEX "admin_is_system_idx" ON "admin" USING btree ("is_system");--> statement-breakpoint

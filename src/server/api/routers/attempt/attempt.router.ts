@@ -1,4 +1,4 @@
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, paidUserProcedure } from "~/server/api/trpc";
 import {
   createAttemptSchema,
   syncAttemptSchema,
@@ -8,19 +8,19 @@ import {
 import { attemptService } from "./attempt.service";
 
 export const attemptRouter = createTRPCRouter({
-  create: protectedProcedure
+  create: paidUserProcedure
     .input(createAttemptSchema)
     .mutation(({ input, ctx }) => attemptService.create(input, ctx.user.id)),
 
-  sync: protectedProcedure
+  sync: paidUserProcedure
     .input(syncAttemptSchema)
     .mutation(({ input, ctx }) => attemptService.sync(input, ctx.user.id)),
 
-  submit: protectedProcedure
+  submit: paidUserProcedure
     .input(submitAttemptSchema)
     .mutation(({ input, ctx }) => attemptService.submit(input, ctx.user.id)),
 
-  getResume: protectedProcedure
+  getResume: paidUserProcedure
     .input(getAttemptSchema)
     .query(({ input, ctx }) =>
       attemptService.getResume(input.attemptId, ctx.user.id),

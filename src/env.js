@@ -61,7 +61,7 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     APP_SUBSCRIPTION_PRICE: process.env.APP_SUBSCRIPTION_PRICE,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    APP_URL: process.env.APP_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

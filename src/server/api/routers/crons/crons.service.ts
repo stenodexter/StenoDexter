@@ -78,7 +78,7 @@ export const cronService = {
                 To avoid interruption, please renew your subscription.
               </p>
 
-              <a href="${env.APP_URL}" 
+              <a href="${env.APP_URL}/user/payments?openRenew=true" 
                 style="display:inline-block; margin-top:16px; padding:12px 18px; background:#f59e0b; color:#fff; text-decoration:none; border-radius:6px;">
                 Renew Subscription
               </a>

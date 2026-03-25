@@ -1,6 +1,11 @@
 "use client";
 
-// ─── app/user/_components/payment-dialog.tsx ─────────────────────────────────
+// ─── components/common/payment-dialog.tsx ────────────────────────────────────
+//
+// Generic payment dialog — two modes:
+//
+//   mode="gate"    → SubscriptionGate: unclosable, blocks access until paid
+//   mode="renew"   → /user/subscription page: closable, user initiates renewal
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -52,25 +57,29 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+export type PaymentDialogMode = "gate" | "renew";
+
 interface PaymentDialogProps {
   open: boolean;
-  isRenewal?: boolean;
+  mode?: PaymentDialogMode; // "gate" = unclosable, "renew" = closable
   hasPendingPayment?: boolean;
+  onOpenChange?: (open: boolean) => void; // only used in renew mode
   onSubmitted?: () => void;
 }
 
 export function PaymentDialog({
   open,
-  isRenewal = false,
+  mode = "gate",
   hasPendingPayment = false,
+  onOpenChange,
   onSubmitted,
 }: PaymentDialogProps) {
+  const isGate = mode === "gate";
+  const isRenewal = mode === "renew";
+
   const [step, setStep] = useState<Step>(
     hasPendingPayment ? "submitted" : "pay",
   );
-
-  console.log("HAS PENDING PAYMENT ", hasPendingPayment);
-
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [screenshotKey, setScreenshotKey] = useState<string | null>(null);
@@ -80,12 +89,7 @@ export function PaymentDialog({
 
   useEffect(() => {
     if (!open) return;
-
-    if (hasPendingPayment) {
-      setStep("submitted");
-    } else {
-      setStep("pay");
-    }
+    setStep(hasPendingPayment ? "submitted" : "pay");
   }, [open, hasPendingPayment]);
 
   const presign = trpc.store.generatePresignedUrl.useMutation();
@@ -100,8 +104,7 @@ export function PaymentDialog({
   const isUploading = uploadState === "uploading";
   const isBusy = isUploading || submit.isPending;
 
-  const isValidUPIId = (id: string) => {
-    if (!id.trim()) return false;
+  const isValidUPI = (id: string) => {
     const parts = id.split("@");
     return (
       parts.length === 2 &&
@@ -110,7 +113,7 @@ export function PaymentDialog({
     );
   };
 
-  const canSubmit = file && upiID.trim() && isValidUPIId(upiID) && !isBusy;
+  const canSubmit = file && upiID.trim() && isValidUPI(upiID) && !isBusy;
 
   function acceptFile(f: File) {
     const ok = f.type.startsWith("image/") || f.type === "application/pdf";
@@ -126,13 +129,12 @@ export function PaymentDialog({
 
   async function handleUploadAndSubmit() {
     if (!file || !upiID.trim()) return;
-    if (!isValidUPIId(upiID)) {
+    if (!isValidUPI(upiID)) {
       toast.error("Please enter a valid UPI ID (e.g., yourname@paytm)");
       return;
     }
 
     let key = screenshotKey;
-
     if (!key) {
       setUploadState("uploading");
       try {
@@ -147,7 +149,7 @@ export function PaymentDialog({
           body: file,
           headers: { "Content-Type": file.type },
         });
-        if (!res.ok) throw new Error("Upload failed");
+        if (!res.ok) throw new Error();
         key = newKey;
         setScreenshotKey(key);
         setUploadState("done");
@@ -160,20 +162,31 @@ export function PaymentDialog({
 
     await submit.mutateAsync({
       amount: AMOUNT,
-      screenshotKey: key,
+      screenshotKey: key!,
       fromUPIId: upiID.trim(),
+      type: isRenewal ? "renew" : "fresh",
     });
   }
 
+  const dialogProps = isGate
+    ? {
+        // Gate: prevent any close
+        onPointerDownOutside: (e: Event) => e.preventDefault(),
+        onEscapeKeyDown: (e: KeyboardEvent) => e.preventDefault(),
+        onInteractOutside: (e: Event) => e.preventDefault(),
+      }
+    : {
+        // Renew: normal closable
+        onPointerDownOutside: () => onOpenChange?.(false),
+        onEscapeKeyDown: () => onOpenChange?.(false),
+      };
+
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={isRenewal ? onOpenChange : undefined}>
       <DialogContent
-        className="sm:max-w-3xl [&>button.absolute]:hidden"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+        className={cn("sm:max-w-3xl", isGate && "[&>button.absolute]:hidden")}
+        {...dialogProps}
       >
-        {/* ── Step: submitted ─────────────────────────────────────────────── */}
         {step === "submitted" && (
           <div className="flex flex-col items-center gap-4 py-4 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
@@ -190,36 +203,50 @@ export function PaymentDialog({
               <p className="font-semibold">What happens next?</p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
                 <li>Admin reviews and approves your payment</li>
-                <li>Your account gets activated for 30 days</li>
-                <li>You'll regain full access automatically</li>
+                <li>
+                  Your{" "}
+                  {isRenewal
+                    ? "subscription extends by 30 days"
+                    : "account gets activated for 30 days"}
+                </li>
+                <li>
+                  You'll{" "}
+                  {isRenewal
+                    ? "see the updated expiry in your subscription page"
+                    : "regain full access automatically"}
+                </li>
               </ul>
             </div>
-            <p className="text-muted-foreground text-xs">
-              You can close this tab and come back later. Access will be
-              restored once your payment is verified.
-            </p>
+            {isRenewal && (
+              <Button variant="outline" onClick={() => onOpenChange?.(false)}>
+                Close
+              </Button>
+            )}
+            {isGate && (
+              <p className="text-muted-foreground text-xs">
+                You can close this tab and come back later. Access will be
+                restored once your payment is verified.
+              </p>
+            )}
           </div>
         )}
 
-        {/* ── Step: pay / upload ──────────────────────────────────────────── */}
+        {/* ── Pay / Upload state ──────────────────────────────────────────── */}
         {step !== "submitted" && (
           <div className="grid md:grid-cols-2 md:divide-x">
-            {/* Column 1 — QR & payment info */}
+            {/* Left — QR & info */}
             <div className="flex flex-col gap-4 pb-6 md:pr-6 md:pb-0">
               <DialogHeader>
-                <DialogTitle className="font-semibold">
-                  {isRenewal
-                    ? "Renew Your Subscription"
-                    : "Activate Your Account"}
+                <DialogTitle>
+                  {isRenewal ? "Renew Subscription" : "Activate Your Account"}
                 </DialogTitle>
                 <DialogDescription>
                   {isRenewal
-                    ? "Your subscription has expired. Pay ₹1,500 to continue for another 30 days."
+                    ? "Pay ₹1,500 to add 30 more days to your current subscription."
                     : "Make a payment to activate your account for 30 days."}
                 </DialogDescription>
               </DialogHeader>
 
-              {/* Amount pill */}
               <div className="flex items-baseline gap-1">
                 <span className="text-primary text-3xl font-bold tabular-nums">
                   ₹1,500
@@ -227,7 +254,6 @@ export function PaymentDialog({
                 <span className="text-muted-foreground text-xs">/ 30 days</span>
               </div>
 
-              {/* QR Code */}
               <div className="flex flex-col items-center gap-2">
                 <span className="rounded-sm border p-3">
                   <Image
@@ -243,14 +269,15 @@ export function PaymentDialog({
               </div>
 
               <p className="text-muted-foreground/60 text-xs">
-                After submitting, an admin will verify your payment. Access is
-                granted once approved — usually within a few hours.
+                After submitting, an admin will verify your payment.
+                {isRenewal
+                  ? " Days are added on top of your current expiry."
+                  : " Access is granted once approved — usually within a few hours."}
               </p>
             </div>
 
-            {/* Column 2 — UPI ID + screenshot upload */}
+            {/* Right — UPI + screenshot */}
             <div className="flex flex-col gap-4 md:pl-6">
-              {/* UPI ID Input */}
               <div>
                 <label
                   htmlFor="upi-id"
@@ -271,23 +298,21 @@ export function PaymentDialog({
                   className={cn(
                     "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
                     upiID &&
-                      !isValidUPIId(upiID) &&
+                      !isValidUPI(upiID) &&
                       "border-destructive/50 focus-visible:ring-destructive/50",
                   )}
                 />
-                {upiID && !isValidUPIId(upiID) && (
+                {upiID && !isValidUPI(upiID) && (
                   <p className="text-destructive mt-1 text-xs">
                     Please enter a valid UPI ID (e.g., yourname@paytm)
                   </p>
                 )}
               </div>
 
-              {/* Screenshot upload */}
               <div>
                 <p className="mb-1.5 text-sm font-medium">
                   Payment Screenshot <span className="text-destructive">*</span>
                 </p>
-
                 <div
                   onClick={() => !isBusy && inputRef.current?.click()}
                   onDragOver={(e) => {
@@ -327,7 +352,6 @@ export function PaymentDialog({
                       e.target.value = "";
                     }}
                   />
-
                   <div
                     className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
@@ -346,10 +370,8 @@ export function PaymentDialog({
                       <Upload className="h-4 w-4" />
                     )}
                   </div>
-
                   {file ? (
                     <div className="w-full min-w-0 px-6">
-                      {/* Fix: truncate long filenames properly */}
                       <p className="w-full truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         {file.name}
                       </p>
@@ -373,7 +395,6 @@ export function PaymentDialog({
                       </p>
                     </>
                   )}
-
                   {file && !isBusy && (
                     <button
                       type="button"
@@ -390,7 +411,6 @@ export function PaymentDialog({
                     </button>
                   )}
                 </div>
-
                 {uploadState === "error" && (
                   <p className="text-destructive mt-1 text-xs">
                     Upload failed. Please try again.
@@ -398,7 +418,6 @@ export function PaymentDialog({
                 )}
               </div>
 
-              {/* Submit */}
               <Button
                 onClick={handleUploadAndSubmit}
                 disabled={!canSubmit}

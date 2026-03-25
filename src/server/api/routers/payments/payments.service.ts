@@ -25,12 +25,11 @@ export function createPaymentService(db: Db) {
       }
 
       await db.insert(payment).values({
-        id: crypto.randomUUID(),
         userId,
+        type: data.type,
         amount: data.amount,
         fromUPIId: data.fromUPIId,
         screenshotKey: data.screenshotKey,
-        transactionId: data.transactionId,
       });
 
       return { ok: true };
@@ -201,7 +200,10 @@ export function createPaymentService(db: Db) {
       const total = countRow?.count ?? 0;
 
       return {
-        data,
+        data: data.map((d) => ({
+          ...d,
+          screenshotURL: R2Service.getPublicUrl(d.screenshotKey),
+        })),
         meta: {
           total,
           page,

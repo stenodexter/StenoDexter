@@ -3,7 +3,7 @@ import {
   adminProcedure,
   createTRPCRouter,
   paidUserProcedure,
-  publicProcedure,
+  secureProcedure,
 } from "../../trpc";
 import { resultService } from "./results.service";
 import {
@@ -21,7 +21,7 @@ export const resultRouter = createTRPCRouter({
     ),
 
   // Admin/public: all results for a test (optionally filtered by speed)
-  getTestResults: publicProcedure
+  getTestResults: secureProcedure
     .input(getTestResultsSchema)
     .query(({ input }) => resultService.getTestResults(input)),
 
@@ -35,7 +35,7 @@ export const resultRouter = createTRPCRouter({
     .query(({ input }) => resultService.getResultsAdmin(input)),
 
   // Public: leaderboard for a test (per-speed or all speeds)
-  getTopPerformersByTest: publicProcedure
+  getTopPerformersByTest: secureProcedure
     .input(GetTopPerformersByTestSchema)
     .query(({ input }) => resultService.getTopPerformersByTest(input)),
 

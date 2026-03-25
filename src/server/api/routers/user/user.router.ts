@@ -89,7 +89,7 @@ export const userRouter = createTRPCRouter({
       };
     }),
 
-  edit: protectedProcedure
+  edit: paidUserProcedure
     .input(editUserSchema)
     .mutation(async ({ input, ctx }) => {
       const patch: Partial<typeof user.$inferInsert> = {
@@ -105,7 +105,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Report ────────────────────────────────────────────────────────────────
 
-  getReport: protectedProcedure
+  getReport: paidUserProcedure
     .input(
       z
         .object({ type: z.enum(["assessment", "practice"]).optional() })
@@ -123,7 +123,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Progress ──────────────────────────────────────────────────────────────
 
-  getProgress: protectedProcedure
+  getProgress: paidUserProcedure
     .input(dateRangeSchema.optional())
     .query(({ ctx, input }) =>
       createUserService(ctx.db).getProgress(
@@ -147,7 +147,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Personal Bests ────────────────────────────────────────────────────────
 
-  getPersonalBests: protectedProcedure
+  getPersonalBests: paidUserProcedure
     .input(
       z
         .object({ type: z.enum(["assessment", "practice"]).optional() })
@@ -165,7 +165,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Test-Wise Performance ─────────────────────────────────────────────────
 
-  getTestWisePerformance: protectedProcedure
+  getTestWisePerformance: paidUserProcedure
     .input(testWiseInputSchema.optional())
     .query(({ ctx, input }) =>
       createUserService(ctx.db).getTestWisePerformance(
@@ -187,7 +187,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Progress Series ───────────────────────────────────────────────────────
 
-  getProgressSeries: protectedProcedure
+  getProgressSeries: paidUserProcedure
     .input(
       z
         .object({
@@ -216,7 +216,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Paginated Attempts ────────────────────────────────────────────────────
 
-  getAttemptsPaginated: protectedProcedure
+  getAttemptsPaginated: paidUserProcedure
     .input(
       z
         .object({
@@ -251,7 +251,7 @@ export const userRouter = createTRPCRouter({
 
   // ── Heatmap ───────────────────────────────────────────────────────────────
 
-  getHeatmap: protectedProcedure
+  getHeatmap: paidUserProcedure
     .input(heatmapSchema)
     .query(({ ctx, input }) =>
       createUserService(ctx.db).getHeatmap(

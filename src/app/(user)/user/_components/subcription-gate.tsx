@@ -57,7 +57,7 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
       {children}
       <PaymentDialog
         open={dialogOpen}
-        isRenewal={isRenewal}
+        mode="gate"
         hasPendingPayment={hasPendingPayment}
         onSubmitted={handlePaymentSubmitted}
       />

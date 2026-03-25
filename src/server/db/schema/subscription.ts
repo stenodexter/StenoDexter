@@ -1,18 +1,35 @@
 import { relations, sql } from "drizzle-orm";
 import {
   integer,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { user } from "./user";
 import { admin } from "./admin";
+import { nanoid } from "nanoid";
+
+export const paymentsTypeEnum = pgEnum("payments_type", ["renew", "fresh"]);
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "expired",
+]);
 
 export const payment = pgTable(
   "payment_proof",
   {
-    id: text("id").primaryKey(),
+    id: text("id")
+      .$defaultFn(() => nanoid(8))
+      .primaryKey(),
 
     userId: text("user_id")
       .notNull()
@@ -22,13 +39,9 @@ export const payment = pgTable(
 
     screenshotKey: text("screenshot_key").notNull(),
 
-    status: text("status", {
-      enum: ["pending", "approved", "rejected"],
-    })
-      .$defaultFn(() => "pending")
-      .notNull(),
+    status: paymentStatusEnum("status").default("pending").notNull(),
 
-    transactionId: text("transaction_id"),
+    type: paymentsTypeEnum("type").notNull(),
 
     verifiedBy: text("verified_by").references(() => admin.id, {
       onDelete: "set null",
@@ -41,57 +54,65 @@ export const payment = pgTable(
     rejectionReason: text("rejection_reason"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
-      .$defaultFn(() => new Date())
+      .defaultNow()
       .notNull(),
 
     updatedAt: timestamp("updated_at", { withTimezone: true })
-      .$defaultFn(() => new Date())
+      .defaultNow()
       .notNull(),
   },
   (t) => [
     uniqueIndex("unique_pending_payment_per_user")
       .on(t.userId)
       .where(sql`status = 'pending'`),
+
+    index("payment_user_idx").on(t.userId),
   ],
 );
 
-export const subscription = pgTable("subscription", {
-  id: text("id").primaryKey(),
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
 
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
 
-  paymentProofId: text("payment_proof_id").references(() => payment.id),
+    paymentProofId: text("payment_proof_id").references(() => payment.id),
 
-  status: text("status", {
-    enum: ["active", "expired"],
-  })
-    .$defaultFn(() => "active")
-    .notNull(),
+    status: subscriptionStatusEnum("status").default("active").notNull(),
 
-  currentPeriodStart: timestamp("current_period_start", {
-    withTimezone: true,
-  })
-    .$defaultFn(() => new Date())
-    .notNull(),
+    currentPeriodStart: timestamp("current_period_start", {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
 
-  currentPeriodEnd: timestamp("current_period_end", {
-    withTimezone: true,
-  }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", {
+      withTimezone: true,
+    }).notNull(),
 
-  lastReminderSentAt: timestamp("last_reminder_sent_at", {
-    withTimezone: true,
-  }),
+    lastReminderSentAt: timestamp("last_reminder_sent_at", {
+      withTimezone: true,
+    }),
 
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .$defaultFn(() => new Date())
-    .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
 
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .$defaultFn(() => new Date())
-    .notNull(),
-});
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("subscription_user_idx").on(t.userId),
+
+    uniqueIndex("one_active_subscription_per_user")
+      .on(t.userId)
+      .where(sql`status = 'active'`),
+  ],
+);
 
 export const paymentRelations = relations(payment, ({ one }) => ({
   user: one(user, {

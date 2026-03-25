@@ -10,6 +10,8 @@ import {
   adminGetPaymentsSchema,
   userGetPaymentsSchema,
 } from "./payments.schema";
+import { subscription } from "~/server/db/schema";
+import { desc } from "drizzle-orm";
 
 export const paymentRouter = createTRPCRouter({
   submit: protectedProcedure
@@ -44,4 +46,14 @@ export const paymentRouter = createTRPCRouter({
         limit: input?.limit ?? 20,
       }),
     ),
+
+  getMine: protectedProcedure.query(async ({ ctx }) => {
+    const active = await ctx.db.query.subscription.findFirst({
+      where: (s, { eq, and }) =>
+        and(eq(s.userId, ctx.user.id), eq(s.status, "active")),
+      orderBy: desc(subscription.currentPeriodEnd),
+    });
+
+    return { subscription: active ?? null };
+  }),
 });

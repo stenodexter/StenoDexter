@@ -5,8 +5,9 @@
 import {
   adminProcedure,
   createTRPCRouter,
-  protectedProcedure,
+  paidUserProcedure,
   publicProcedure,
+  secureProcedure,
 } from "~/server/api/trpc";
 import {
   createTestSchema,
@@ -85,12 +86,12 @@ export const testRouter = createTRPCRouter({
     .query(({ input }) => testService.list(input)),
 
   // User: active tests feed with hasAttempted flag
-  listForUser: protectedProcedure
+  listForUser: paidUserProcedure
     .input(listUserTestsSchema)
     .query(({ input, ctx }) => testService.listForUserFeed(input, ctx.user.id)),
 
   // Public: get single test with all speeds (test detail page)
-  get: publicProcedure
+  get: secureProcedure
     .input(getTestSchema)
     .query(({ input }) => testService.getById(input)),
 
@@ -100,7 +101,7 @@ export const testRouter = createTRPCRouter({
     .query(({ input }) => testService.getTests(input)),
 
   // User: search active tests
-  search: protectedProcedure
+  search: paidUserProcedure
     .input(searchTestsSchema)
     .query(({ input, ctx }) => testService.searchForUser(input, ctx.user.id)),
 
