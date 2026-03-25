@@ -1,6 +1,4 @@
 /// user space
 
-verify email (user)
-
 verify email - forget password  :: left
 notifications - fix

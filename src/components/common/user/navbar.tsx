@@ -2,7 +2,7 @@
 
 // ─── components/user/user-navbar.tsx ─────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { Separator } from "~/components/ui/separator";
@@ -178,14 +178,10 @@ function NotificationItem({
 
 // ─── notification list ────────────────────────────────────────────────────────
 
-function NotificationList({
-  onUnreadCountChange,
-  close,
-}: {
-  onUnreadCountChange: (n: number) => void;
-  close: () => void;
-}) {
+function NotificationList({ close }: { close: () => void }) {
   const utils = trpc.useUtils();
+  // FIX 2: useRef to ensure auto-mark only fires once per mount, even after data loads
+  const hasAutoMarked = useRef(false);
 
   const { data, isLoading } = trpc.notification.list.useQuery(
     { page: 1, pageSize: 50 },
@@ -228,23 +224,21 @@ function NotificationList({
 
   const notifications: Notification[] = (data?.data ??
     []) as unknown as Notification[];
-  const unread = notifications.filter((n) => !n.seen).length;
 
-  // Push unread count up for the badge
+  // FIX 2: deps array now includes `notifications` so the effect actually sees
+  // real data (not the empty array from the initial render). The ref guards
+  // against re-firing on subsequent re-renders once it has run.
   useEffect(() => {
-    onUnreadCountChange(unread);
-  }, [unread, onUnreadCountChange]);
-
-  // Auto-mark no-link notifications as read on open (800ms grace so they see the state)
-  useEffect(() => {
+    if (hasAutoMarked.current || notifications.length === 0) return;
     const noLinkUnread = notifications
       .filter((n) => !n.seen && !n.link)
       .map((n) => n.id);
     if (noLinkUnread.length === 0) return;
+    hasAutoMarked.current = true;
     const t = setTimeout(() => markSeen.mutate({ ids: noLinkUnread }), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [notifications]);
 
   const handleRead = (id: string) => {
     if (notifications.find((n) => n.id === id)?.seen) return;
@@ -287,6 +281,8 @@ function NotificationList({
     );
   }
 
+  const unread = notifications.filter((n) => !n.seen).length;
+
   return (
     <>
       {/* Mark all read — only if there are unread */}
@@ -321,14 +317,15 @@ function NotificationList({
 
 function NotificationCenter() {
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
 
-  // Badge count from lightweight endpoint — always fresh
+  // FIX 1: Badge count always comes from the server query.
+  // markSeen / markAllSeen both invalidate unreadCount, so the badge
+  // stays accurate without any local unread state or onUnreadCountChange prop.
   const { data: countData } = trpc.notification.unreadCount.useQuery(
     undefined,
     { staleTime: 20_000, refetchInterval: 60_000 },
   );
-  const badgeCount = open ? unread : (countData?.count ?? 0);
+  const badgeCount = countData?.count ?? 0;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -357,12 +354,9 @@ function NotificationCenter() {
         </SheetHeader>
 
         <ScrollArea className="flex-1">
-          {open && (
-            <NotificationList
-              onUnreadCountChange={setUnread}
-              close={() => setOpen(false)}
-            />
-          )}
+          {/* NotificationList only mounts when open; unmounts on close which
+              also resets hasAutoMarked for the next open */}
+          {open && <NotificationList close={() => setOpen(false)} />}
         </ScrollArea>
       </SheetContent>
     </Sheet>
