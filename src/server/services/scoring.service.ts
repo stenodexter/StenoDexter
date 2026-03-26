@@ -1,4 +1,4 @@
-export type DiffType = "correct" | "replace" | "insert" | "delete";
+export type DiffType = "correct" | "replace" | "insert" | "delete" | "extra_space";
 
 export type DiffToken = {
   original?: string;
@@ -6,30 +6,59 @@ export type DiffToken = {
   type: DiffType;
 };
 
+// Each character of whitespace is its own token so "   " (3 spaces) becomes
+// [" ", " ", " "] — allowing NW to align one space as correct and flag the
+// remaining two individually as extra_space.
+// Words and punctuation are still matched greedily.
 function tokenize(text: string): string[] {
   return text.match(/[\p{L}\p{N}]+|\s|[^\s\p{L}\p{N}]/gu) ?? [];
 }
 
-// Exact match only, case-sensitive.
-function isMatch(a: string, b: string): boolean {
-  return a === b;
+// An extra_space that sits immediately next to an insert or delete is just
+// the natural space that travels with that word — not an independent mistake.
+// Example: typing "fqui " before a word → the space before "fqui" is an
+// artifact of the insertion, not a separate spacing error.
+// We demote those adjacent extra_space tokens to "correct" so they don't
+// double-count the mistake and don't show a ␣ badge in the UI.
+function suppressAdjacentExtraSpaces(tokens: DiffToken[]): DiffToken[] {
+  const wordError = (t: DiffToken) => t.type === "insert" || t.type === "delete";
+  const isExtraSpace = (t: DiffToken) => t.type === "extra_space";
+
+  return tokens.map((tok, i) => {
+    if (!isExtraSpace(tok)) return tok;
+    const prev = tokens[i - 1];
+    const next = tokens[i + 1];
+    if ((prev && wordError(prev)) || (next && wordError(next))) {
+      // Demote to correct — render as a plain space, no penalty
+      return { original: " ", typed: " ", type: "correct" };
+    }
+    return tok;
+  });
 }
 
-function lcsAlign(A: string[], B: string[]): DiffToken[] {
+// Needleman-Wunsch global alignment — exact match only.
+function nwAlign(A: string[], B: string[]): DiffToken[] {
   const m = A.length;
   const n = B.length;
 
+  const MATCH    =  2;
+  const MISMATCH = -1;
+  const GAP      = -1;
+
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0),
+    new Array(n + 1).fill(0)
   );
+  for (let i = 0; i <= m; i++) dp[i]![0] = i * GAP;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j * GAP;
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      if (isMatch(A[i - 1]!, B[j - 1]!)) {
-        dp[i]![j] = dp[i - 1]![j - 1]! + 1;
-      } else {
-        dp[i]![j] = Math.max(dp[i - 1]![j]!, dp[i]![j - 1]!);
-      }
+      const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
+      dp[i]![j] = Math.max(
+        dp[i - 1]![j - 1]! + diagScore,
+        dp[i - 1]![j]!     + GAP,
+        dp[i]![j - 1]!     + GAP
+      );
     }
   }
 
@@ -38,56 +67,43 @@ function lcsAlign(A: string[], B: string[]): DiffToken[] {
   let j = n;
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && isMatch(A[i - 1]!, B[j - 1]!)) {
-      result.push({ original: A[i - 1], typed: B[j - 1], type: "correct" });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
-      result.push({ typed: B[j - 1], type: "insert" });
-      j--;
-    } else {
+    if (i > 0 && j > 0) {
+      const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
+
+      if (dp[i]![j] === dp[i - 1]![j - 1]! + diagScore) {
+        const type = A[i - 1] === B[j - 1] ? "correct" : "replace";
+        result.push({ original: A[i - 1], typed: B[j - 1], type });
+        i--;
+        j--;
+        continue;
+      }
+    }
+
+    if (i > 0 && (j === 0 || dp[i]![j] === dp[i - 1]![j]! + GAP)) {
       result.push({ original: A[i - 1], type: "delete" });
       i--;
+    } else {
+      const tok = B[j - 1]!;
+      const type = /^\s$/.test(tok) ? "extra_space" : "insert";
+      result.push({ typed: tok, type });
+      j--;
     }
   }
 
   result.reverse();
-
-  const final: DiffToken[] = [];
-  let k = 0;
-
-  while (k < result.length) {
-    const cur = result[k]!;
-    const next = result[k + 1];
-
-    if (cur.type === "delete" && next?.type === "insert") {
-      final.push({
-        original: cur.original,
-        typed: next.typed,
-        type: "replace",
-      });
-      k += 2;
-    } else {
-      final.push(cur);
-      k++;
-    }
-  }
-
-  return final;
+  return suppressAdjacentExtraSpaces(result);
 }
 
 export default class ScoringEngine {
   compare(original: string, typed: string): DiffToken[] {
-    typed = typed.trim();
-    original = original.trim();
-    const A = tokenize(original);
-    const B = tokenize(typed);
-    return lcsAlign(A, B);
+    const A = tokenize(original.trim());
+    const B = tokenize(typed.trim());
+    return nwAlign(A, B);
   }
 
   evaluate(original: string, typed: string, durationSeconds: number) {
-    typed = typed.trim();
     original = original.trim();
+    typed = typed.trim();
 
     const diff = this.compare(original, typed);
 

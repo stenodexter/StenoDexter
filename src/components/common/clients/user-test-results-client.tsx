@@ -27,7 +27,7 @@ import { format } from "date-fns";
 type DiffToken = {
   original?: string;
   typed?: string;
-  type: "correct" | "replace" | "insert" | "delete";
+  type: "correct" | "replace" | "insert" | "delete" | "extra_space";
 };
 
 type AttemptResult = {
@@ -182,32 +182,6 @@ function PdfCard({
 }
 
 // ─── Diff renderer ────────────────────────────────────────────────────────────
-
-const ATTACH_LEFT = new Set([
-  ",",
-  ".",
-  "!",
-  "?",
-  ";",
-  ":",
-  ")",
-  "]",
-  "}",
-  "'s",
-  "'",
-]);
-const ATTACH_RIGHT = new Set(["(", "[", "{"]);
-
-function needsSpaceBefore(token: DiffToken, prev: DiffToken | undefined) {
-  const text = token.type === "insert" ? token.typed : token.original;
-  if (!text) return false;
-  if (ATTACH_LEFT.has(text)) return false;
-  if (!prev) return false;
-  const prevText = prev.type === "insert" ? prev.typed : prev.original;
-  if (prevText && ATTACH_RIGHT.has(prevText)) return false;
-  return true;
-}
-
 function DiffView({ diff }: { diff: DiffToken[] }) {
   if (!diff?.length)
     return (
@@ -225,18 +199,14 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
       }}
     >
       {diff.map((token, i) => {
-        const space = needsSpaceBefore(token, diff[i - 1]) ? " " : "";
+        // correct — render as-is (includes normal spaces)
         if (token.type === "correct")
-          return (
-            <span key={i}>
-              {space}
-              {token.original}
-            </span>
-          );
+          return <span key={i}>{token.original}</span>;
+
+        // replace — show typed (struck) then original (correct)
         if (token.type === "replace")
           return (
             <span key={i}>
-              {space}
               <span className="text-red-500 line-through decoration-red-500 decoration-2">
                 {token.typed}
               </span>{" "}
@@ -245,26 +215,42 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
               </span>
             </span>
           );
+
+        // delete — present in original, missing from typed
         if (token.type === "delete")
           return (
             <span
               key={i}
-              className="font-bold text-blue-500 dark:text-blue-400"
+              className="font-extrabold text-amber-500 dark:text-amber-400"
             >
-              {space}
               {token.original}
             </span>
           );
+
+        // insert — typed something that isn't in original
         if (token.type === "insert")
           return (
             <span
               key={i}
-              className="text-amber-500 line-through decoration-amber-500 decoration-2"
+              className="text-blue-500 line-through decoration-blue-500 decoration-2"
             >
-              {space}
               {token.typed}
             </span>
           );
+
+        // extra_space — one surplus space token; render as a small visible badge.
+        // The space itself is NOT rendered so it doesn't shift surrounding words.
+        if (token.type === "extra_space")
+          return (
+            <span
+              key={i}
+              className="mx-0.5 bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400 rounded-xs"
+              title="extra space"
+            >
+              ␣
+            </span>
+          );
+
         return null;
       })}
     </p>
@@ -401,12 +387,18 @@ function AttemptCard({
               — Substitution
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-blue-500">word</span>—
+              <span className="text-sm font-bold text-amber-500">word</span>—
               Missing
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm text-amber-500 line-through">word</span>—
+              <span className="text-sm text-blue-500 line-through">word</span>—
               Extra
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="mx-0.5 bg-orange-700/50 p-0.5 rounded-xs text-sm text-orange-500 dark:text-orange-400">
+                ␣
+              </span>
+              — Extra space
             </span>
           </div>
           <Separator />
