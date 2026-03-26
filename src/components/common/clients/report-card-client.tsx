@@ -809,8 +809,16 @@ function ReportCardInner({
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span
-                    className="h-0.5 w-4 rounded-full"
-                    style={{ backgroundColor: "var(--chart-2)" }}
+                    className="inline-block h-0.5 w-4"
+                    style={{
+                      backgroundImage: `repeating-linear-gradient(
+                        to right,
+                        var(--chart-2),
+                        var(--chart-2) 4px,
+                        transparent 3px,
+                        transparent 8px
+                      )`,
+                    }}
                   />
                   Mistakes
                 </span>
