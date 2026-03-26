@@ -7,7 +7,7 @@ import {
   Inter,
   Montserrat,
   JetBrains_Mono,
-  Oxanium, Outfit } from "next/font/google";
+  Oxanium, Outfit, Figtree } from "next/font/google";
 import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -17,7 +17,7 @@ import { cn } from "~/lib/utils";
 import { ThemeProvider } from "~/providers/theme-provider";
 import localFont from "next/font/local";
 
-const outfit = Outfit({subsets:['latin'],variable:'--font-sans'});
+const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
 const calibri = localFont({
   src: [
@@ -80,7 +80,7 @@ export default function RootLayout({
               jetbrainsMono.variable,
               robotoSlab.variable,
               montserrat.variable,
-            , "font-sans", outfit.variable, robotoSlabHeading.variable)}
+            , "font-sans", figtree.variable, robotoSlabHeading.variable)}
     >
       <body suppressHydrationWarning>
         {" "}
