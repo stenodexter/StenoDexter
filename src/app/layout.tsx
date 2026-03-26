@@ -7,7 +7,10 @@ import {
   Inter,
   Montserrat,
   JetBrains_Mono,
-  Oxanium, Outfit, Figtree } from "next/font/google";
+  Oxanium,
+  Outfit,
+  Figtree,
+} from "next/font/google";
 import Script from "next/script"; // 👈 add this
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -17,7 +20,7 @@ import { cn } from "~/lib/utils";
 import { ThemeProvider } from "~/providers/theme-provider";
 import localFont from "next/font/local";
 
-const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
 const calibri = localFont({
   src: [
@@ -46,7 +49,10 @@ const calibri = localFont({
   display: "swap",
 });
 
-const robotoSlabHeading = Roboto_Slab({subsets:['latin'],variable:'--font-heading'});
+const robotoSlabHeading = Roboto_Slab({
+  subsets: ["latin"],
+  variable: "--font-heading",
+});
 
 const robotoSlab = Roboto_Slab({
   subsets: ["latin"],
@@ -76,11 +82,14 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-              calibri.variable,
-              jetbrainsMono.variable,
-              robotoSlab.variable,
-              montserrat.variable,
-            , "font-sans", figtree.variable, robotoSlabHeading.variable)}
+        calibri.variable,
+        jetbrainsMono.variable,
+        robotoSlab.variable,
+        montserrat.variable,
+        "font-sans",
+        figtree.variable,
+        robotoSlabHeading.variable,
+      )}
     >
       <body suppressHydrationWarning>
         {" "}
