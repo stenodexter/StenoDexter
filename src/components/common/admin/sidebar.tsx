@@ -27,7 +27,6 @@ import { Badge } from "~/components/ui/badge";
 import {
   LayoutDashboard,
   ClipboardList,
-  Trophy,
   BarChart2,
   MailPlus,
   Settings,
