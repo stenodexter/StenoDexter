@@ -1,11 +1,6 @@
 "use client";
 
 // ─── Shared leaderboard page ──────────────────────────────────────────────────
-// Used at:
-//   /user/test/[testId]/leaderboard  (isAdmin = false)
-//   /admin/test/[testId]/leaderboard (isAdmin = true)
-//
-// Drop this component in both routes and pass the correct props.
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -23,7 +18,16 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Trophy, Medal, Star, Zap, BarChart2, ChevronLeft } from "lucide-react";
+import {
+  Trophy,
+  Medal,
+  Zap,
+  BarChart2,
+  ChevronLeft,
+  Clock,
+  Type,
+  AlertCircle,
+} from "lucide-react";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,16 +42,21 @@ function initials(name: string | null | undefined, email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
-function displayName(name: string | null | undefined, email: string) {
-  return name ?? email;
+function formatDuration(ms: number | null) {
+  if (!ms) return "—";
+  const totalSec = Math.round(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min > 0 ? `${min}m ${sec}s` : `${sec}s`;
 }
 
-// Rank decoration: 🥇🥈🥉 for top 3, number after
+// ─── rank cell ────────────────────────────────────────────────────────────────
+
 function RankCell({ rank }: { rank: number }) {
   if (rank === 1)
     return (
       <div className="flex items-center gap-1.5">
-        <Trophy className="h-4 w-4 text-yellow-500" />
+        <Medal className="h-4 w-4 text-amber-400" />
         <span className="font-bold text-yellow-600 dark:text-yellow-400">
           1
         </span>
@@ -63,7 +72,7 @@ function RankCell({ rank }: { rank: number }) {
   if (rank === 3)
     return (
       <div className="flex items-center gap-1.5">
-        <Medal className="h-4 w-4 text-amber-600" />
+        <Medal className="h-4 w-4 text-amber-900" />
         <span className="font-bold text-amber-700 dark:text-amber-500">3</span>
       </div>
     );
@@ -87,22 +96,33 @@ function LeaderboardSkeleton() {
           <Skeleton className="h-4 flex-1" />
           <Skeleton className="h-4 w-16" />
           <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-16" />
         </div>
       ))}
     </div>
   );
 }
 
-// ─── leaderboard table ────────────────────────────────────────────────────────
+// ─── return type inferred from the query ──────────────────────────────────────
 
-type Entry = {
+type LeaderboardEntry = {
   rank: number;
-  user: { id: string; name: string | null; email: string };
-  speed: { id: string; wpm: number };
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    userCode: string | null;
+  };
+  speed: { id: string; wpm: number } | null;
+  score: number;
   accuracy: number;
   wpm: number;
   mistakes: number;
+  writingDuration: number | null;
+  totalWords: number;
 };
+
+// ─── table ────────────────────────────────────────────────────────────────────
 
 function LeaderboardTable({
   entries,
@@ -110,7 +130,7 @@ function LeaderboardTable({
   isAdmin,
   testId,
 }: {
-  entries: Entry[];
+  entries: LeaderboardEntry[];
   currentUserId: string | null;
   isAdmin: boolean;
   testId: string;
@@ -133,7 +153,7 @@ function LeaderboardTable({
 
   return (
     <div className="space-y-4">
-      {/* User's position callout — user view only, when not in top entries */}
+      {/* Current user's position callout when outside top N */}
       {!isAdmin &&
         currentUserId &&
         userEntry &&
@@ -145,13 +165,10 @@ function LeaderboardTable({
             <span className="text-primary text-sm font-bold tabular-nums">
               #{userEntry.rank}
             </span>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-muted-foreground text-xs">
-                {userEntry.accuracy}% accuracy
-              </span>
-              <span className="text-muted-foreground text-xs">
-                {userEntry.wpm} WPM
-              </span>
+            <div className="text-muted-foreground ml-auto flex items-center gap-4 text-xs">
+              <span>{userEntry.totalWords} words</span>
+              <span>{userEntry.mistakes} mistakes</span>
+              <span>{formatDuration(userEntry.writingDuration)}</span>
             </div>
           </div>
         )}
@@ -162,9 +179,21 @@ function LeaderboardTable({
             <TableRow className="bg-muted/20 hover:bg-muted/20">
               <TableHead className="w-12">Rank</TableHead>
               <TableHead>Participant</TableHead>
-              <TableHead className="w-28 text-right">Accuracy</TableHead>
-              <TableHead className="w-28 text-right">WPM</TableHead>
-              <TableHead className="w-24 text-right">Mistakes</TableHead>
+              <TableHead className="w-28 text-right">
+                <span className="flex items-center justify-end gap-1.5">
+                  Total Typed Words
+                </span>
+              </TableHead>
+              <TableHead className="w-28 text-right">
+                <span className="flex items-center justify-end gap-1.5">
+                  Mistakes
+                </span>
+              </TableHead>
+              <TableHead className="w-28 text-right">
+                <span className="flex items-center justify-end gap-1.5">
+                  Transcription Time
+                </span>
+              </TableHead>
               {!isAdmin && <TableHead className="w-16" />}
             </TableRow>
           </TableHeader>
@@ -182,14 +211,19 @@ function LeaderboardTable({
 
                   <TableCell className="py-3.5">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs font-semibold">
-                          {initials(entry.user.name, entry.user.email)}
-                        </AvatarFallback>
-                      </Avatar>
+                      {/* Avatar: only shown to admin */}
+                      {isAdmin && (
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs font-semibold">
+                            {initials(entry.user.name, entry.user.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
                       <div>
                         <p className="text-sm leading-none font-medium">
-                          {displayName(entry.user.name, entry.user.email)}
+                          {isAdmin
+                            ? (entry.user.name ?? entry.user.email)
+                            : (entry.user.userCode ?? `User ${entry.rank}`)}
                           {isMe && (
                             <Badge
                               variant="secondary"
@@ -199,6 +233,7 @@ function LeaderboardTable({
                             </Badge>
                           )}
                         </p>
+                        {/* Email only visible to admin */}
                         {isAdmin && (
                           <p className="text-muted-foreground mt-0.5 text-xs">
                             {entry.user.email}
@@ -209,31 +244,33 @@ function LeaderboardTable({
                   </TableCell>
 
                   <TableCell className="py-3.5 text-right text-sm tabular-nums">
-                    <span
-                      className={
-                        entry.accuracy >= 90
-                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                          : ""
-                      }
-                    >
-                      {entry.accuracy}%
-                    </span>
+                    {entry.totalWords > 0 ? entry.totalWords : "—"}
                   </TableCell>
 
                   <TableCell className="py-3.5 text-right text-sm tabular-nums">
-                    {entry.wpm}
+                    <span
+                      className={
+                        entry.mistakes === 0
+                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                          : entry.mistakes <= 3
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-destructive"
+                      }
+                    >
+                      {entry.mistakes}
+                    </span>
                   </TableCell>
 
                   <TableCell className="text-muted-foreground py-3.5 text-right text-sm tabular-nums">
-                    {entry.mistakes}
+                    {formatDuration(entry.writingDuration)}
                   </TableCell>
 
-                  {/* My attempts CTA — user view only */}
+                  {/* My attempts link — user view only */}
                   {!isAdmin && (
                     <TableCell className="py-3.5 text-right">
                       {isMe && (
                         <Button asChild variant="ghost" size="sm">
-                          <Link href={`/user/test/${testId}/attempts`}>
+                          <Link href={`/user/tests/${testId}/results`}>
                             <BarChart2 className="h-3.5 w-3.5" />
                           </Link>
                         </Button>
@@ -265,25 +302,19 @@ export function TestLeaderboardPage({
   const testId = params.testId;
   const router = useRouter();
 
-  // Fetch test speeds first to build the tab list
   const { data: testData } = trpc.test.get.useQuery({ id: testId });
-
   const speeds = testData?.speeds ?? [];
 
-  // Active speed tab — default to first speed
   const [activeSpeedId, setActiveSpeedId] = useState<string | null>(null);
   const resolvedSpeedId = activeSpeedId ?? speeds[0]?.id ?? null;
 
-  // Fetch leaderboard for the active speed
   const { data: leaderboardData, isLoading } =
     trpc.result.getTopPerformersByTest.useQuery(
       { testId, speedId: resolvedSpeedId ?? "", limit: 50 },
       { enabled: !!resolvedSpeedId, staleTime: 30_000 },
     );
 
-  const entries = (leaderboardData ?? []) as Entry[];
-
-  // Find current user's entry across all entries (even if not in top N)
+  const entries = (leaderboardData ?? []) as LeaderboardEntry[];
   const userEntry = currentUserId
     ? entries.find((e) => e.user.id === currentUserId)
     : null;
@@ -300,17 +331,17 @@ export function TestLeaderboardPage({
             onClick={() => router.back()}
           >
             <ChevronLeft className="h-3.5 w-3.5" />
-            {isAdmin ? "Back" : "Back"}
+            Back
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">
             {testData?.title ?? "Leaderboard"}
           </h1>
           <p className="text-muted-foreground mt-0.5 text-sm">
-            Rankings are based on accuracy · Assess once per speed
+            Ranked by score · Only assessment attempts count
           </p>
         </div>
 
-        {/* User's rank summary — only on user view */}
+        {/* User rank summary card */}
         {!isAdmin && userEntry && (
           <div className="bg-card min-w-[120px] shrink-0 rounded-xl border px-5 py-4 text-center">
             <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
@@ -320,12 +351,11 @@ export function TestLeaderboardPage({
               #{userEntry.rank}
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              {userEntry.accuracy}% accuracy
+              {userEntry.mistakes} mistakes
             </p>
           </div>
         )}
 
-        {/* My attempts CTA — user view */}
         {!isAdmin && (
           <Button
             asChild
@@ -333,7 +363,7 @@ export function TestLeaderboardPage({
             size="sm"
             className="mt-8 shrink-0 self-start"
           >
-            <Link href={`/user/test/${testId}/attempts`}>
+            <Link href={`/user/tests/${testId}/results`}>
               <BarChart2 className="h-3.5 w-3.5" />
               My Attempts
             </Link>
@@ -356,7 +386,7 @@ export function TestLeaderboardPage({
                   className={`rounded-lg border px-3.5 py-1.5 text-sm font-semibold tabular-nums transition-colors ${
                     active
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                   }`}
                 >
                   {s.wpm} WPM
@@ -367,7 +397,6 @@ export function TestLeaderboardPage({
         </div>
       )}
 
-      {/* Single speed label */}
       {speeds.length === 1 && speeds[0] && (
         <div className="flex items-center gap-2">
           <Zap className="text-muted-foreground/50 h-3.5 w-3.5" />
@@ -377,7 +406,7 @@ export function TestLeaderboardPage({
         </div>
       )}
 
-      {/* Leaderboard table */}
+      {/* Table */}
       {isLoading || !resolvedSpeedId ? (
         <LeaderboardSkeleton />
       ) : (
@@ -389,10 +418,8 @@ export function TestLeaderboardPage({
         />
       )}
 
-      {/* Footer note */}
       <p className="text-muted-foreground/50 text-center text-xs">
-        Only assessment attempts are counted · Switch speed tabs to see each
-        board
+        Switch speed tabs to see each board
       </p>
     </div>
   );

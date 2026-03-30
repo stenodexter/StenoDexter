@@ -315,8 +315,32 @@ export function createResultService(db: Db) {
       const data = await db.query.leaderboard.findMany({
         where: conditions.length > 0 ? and(...conditions) : undefined,
         with: {
-          user: { columns: { id: true, name: true, email: true } },
+          user: {
+            columns: { id: true, name: true, email: true, userCode: true },
+          },
           speed: { columns: { id: true, wpm: true } },
+          result: {
+            columns: {
+              id: true,
+            },
+            with: {
+              attempt: {
+                columns: {
+                  answerFinal: true,
+                  writingStartedAt: true,
+                  submittedAt: true,
+                },
+                with: {
+                  test: {
+                    columns: {
+                      id: true,
+                      correctAnswer: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: [
           desc(leaderboard.score),
@@ -327,15 +351,36 @@ export function createResultService(db: Db) {
         limit,
       });
 
-      return data.map((r, i) => ({
-        rank: i + 1,
-        user: r.user,
-        speed: r.speed,
-        score: r.score,
-        accuracy: r.accuracy,
-        wpm: r.wpm,
-        mistakes: r.mistakes ?? 0,
-      }));
+      return data.map((r, i) => {
+        const attempt = r.result?.attempt;
+
+        let writingDuration = null;
+        let totalWords = 0;
+
+        if (attempt?.writingStartedAt && attempt?.submittedAt) {
+          writingDuration =
+            new Date(attempt.submittedAt).getTime() -
+            new Date(attempt.writingStartedAt).getTime();
+        }
+
+        if (attempt?.answerFinal) {
+          totalWords = attempt.answerFinal.trim().length
+            ? attempt.answerFinal.trim().split(/\s+/).length
+            : 0;
+        }
+
+        return {
+          rank: i + 1,
+          user: r.user,
+          speed: r.speed,
+          score: r.score,
+          accuracy: r.accuracy,
+          wpm: r.wpm,
+          mistakes: r.mistakes ?? 0,
+          writingDuration,
+          totalWords,
+        };
+      });
     },
 
     async getUsersForTest(input: {

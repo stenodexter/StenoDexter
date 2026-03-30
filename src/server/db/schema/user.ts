@@ -1,28 +1,29 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { subscription } from "./subscription";
+import { nanoid } from "nanoid";
 
-export const user = pgTable(
-  "user",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    email: text("email").notNull().unique(),
-    emailVerified: boolean("email_verified")
-      .$defaultFn(() => false)
-      .notNull(),
-    phone: text("phone"),
-    image: text("profile_url"),
-    gender: text("gender"),
-    createdAt: timestamp("created_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-  },
-  (t) => [],
-);
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  userCode: text("user_code")
+    .$defaultFn(() => "SD" + nanoid(5))
+    .notNull()
+    .unique(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified")
+    .$defaultFn(() => false)
+    .notNull(),
+  phone: text("phone"),
+  image: text("profile_url"),
+  gender: text("gender"),
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
 
 export const session = pgTable(
   "session",

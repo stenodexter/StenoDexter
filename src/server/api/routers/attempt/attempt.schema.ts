@@ -12,6 +12,7 @@ export const syncAttemptSchema = z.object({
   stage: z.enum(["audio", "break", "writing", "submitted"]).optional(),
   breakSkipped: z.boolean().optional(),
   markAudioStarted: z.boolean().optional(),
+  audioSkipped: z.boolean().optional(),
   markWritingStarted: z.boolean().optional(), // fixed typo from original
 });
 

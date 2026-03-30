@@ -44,6 +44,10 @@ type Attempt = {
   };
 };
 
+function transformAttemptType(type: Attempt["type"]) {
+  return type === "assessment" ? "test" : "practice";
+}
+
 type GroupMode = "flat" | "grouped";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -103,7 +107,7 @@ function AttemptRow({
             variant={attempt.type === "assessment" ? "default" : "secondary"}
             className="text-[10px] capitalize"
           >
-            {attempt.type}
+            {transformAttemptType(attempt.type)}
           </Badge>
           <Badge variant="outline" className="gap-1 text-[10px] tabular-nums">
             <Zap className="h-2.5 w-2.5" />
@@ -126,17 +130,6 @@ function AttemptRow({
       {/* Stats — desktop */}
       <div className="hidden shrink-0 items-center gap-5 sm:flex">
         <div className="text-center">
-          <p
-            className={`text-base font-bold tabular-nums ${accuracyCls(attempt.result.accuracy)}`}
-          >
-            {attempt.result.accuracy}%
-          </p>
-          <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
-            Accuracy
-          </p>
-        </div>
-        <Separator orientation="vertical" className="h-7" />
-        <div className="text-center">
           <p className="text-base font-bold text-red-500 tabular-nums">
             {attempt.result.mistakes}
           </p>
@@ -145,6 +138,7 @@ function AttemptRow({
           </p>
         </div>
       </div>
+      <Separator orientation="vertical" className="h-7" />
 
       {/* Stats — mobile */}
       <div className="flex items-center gap-1.5 sm:hidden">
@@ -206,16 +200,6 @@ function TestGroup({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <div className="hidden text-right sm:block">
-            <p
-              className={`text-sm font-bold tabular-nums ${accuracyCls(best)}`}
-            >
-              {best}%
-            </p>
-            <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
-              Best
-            </p>
-          </div>
           <Button
             asChild
             variant="ghost"
@@ -364,27 +348,10 @@ export default function UserAttemptsPage() {
             label="Total attempts"
             value={Number(reportData?.totalAttempts ?? 0)}
           />
-          <StatCard
-            icon={Target}
-            label="Avg accuracy"
-            value={
-              reportData?.avgAccuracy
-                ? `${Math.round(Number(reportData.avgAccuracy))}%`
-                : "—"
-            }
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Best accuracy"
-            value={
-              bestsData?.bestAccuracy
-                ? `${Math.round(Number(bestsData.bestAccuracy))}%`
-                : "—"
-            }
-          />
+
           <StatCard
             icon={Zap}
-            label="Avg WPM"
+            label="Avg Transcription Speed"
             value={
               reportData?.avgWpm ? Math.round(Number(reportData.avgWpm)) : "—"
             }
@@ -401,13 +368,18 @@ export default function UserAttemptsPage() {
           value={type}
           onValueChange={(v) => {
             if (v) {
+              if (v === "tests") {
+                setType("assessment");
+                setPage(0);
+                return;
+              }
               setType(v as typeof type);
               setPage(0);
             }
           }}
           className="bg-muted/40 h-9 gap-0 rounded-lg border p-0.5"
         >
-          {(["all", "assessment", "practice"] as const).map((v) => (
+          {(["all", "tests", "practice"] as const).map((v) => (
             <ToggleGroupItem
               key={v}
               value={v}
@@ -454,7 +426,7 @@ export default function UserAttemptsPage() {
             className="data-[state=on]:bg-background data-[state=off]:text-muted-foreground h-8 cursor-pointer rounded-md px-3 text-xs font-medium data-[state=on]:shadow-sm"
           >
             <Layers className="h-1 w-1" />
-            Group By test
+            Group by test
           </ToggleGroupItem>
         </ToggleGroup>
       </div>

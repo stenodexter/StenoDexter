@@ -56,10 +56,7 @@ const warnings = [
     icon: Maximize,
     text: "The test runs in fullscreen. Stay in fullscreen throughout for best results.",
   },
-  {
-    icon: RefreshCw,
-    text: "You can reload the page — your progress is saved and you'll resume where you left off.",
-  },
+
   {
     icon: Wifi,
     text: "Make sure you're on a stable internet connection before starting.",
@@ -101,7 +98,7 @@ export function TestStartDialog({
         <DialogHeader>
           <div className="mb-1 flex items-center gap-2">
             <Badge variant={isPractice ? "secondary" : "default"}>
-              {isPractice ? "Practice" : "Assessment"}
+              {isPractice ? "Practice" : "Test"}
             </Badge>
             {!isPractice && (
               <Badge
@@ -117,7 +114,7 @@ export function TestStartDialog({
           </DialogTitle>
           {!isPractice && (
             <p className="text-muted-foreground text-sm">
-              Your first attempt at this speed counts as an assessment. You can
+              Your first attempt at this speed counts as a test. You can
               practice freely after.
             </p>
           )}
@@ -211,7 +208,7 @@ export function TestStartDialog({
                 Start Practice
               </>
             ) : (
-              <>Start Assessment</>
+              <>Start Test</>
             )}
           </Button>
         </div>

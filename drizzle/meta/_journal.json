@@ -8,6 +8,20 @@
       "when": 1774457358278,
       "tag": "0000_kind_stingray",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774884863659,
+      "tag": "0001_spooky_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774890817405,
+      "tag": "0002_chief_butterfly",
+      "breakpoints": true
     }
   ]
 }

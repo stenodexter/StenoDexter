@@ -75,6 +75,8 @@ export const leaderboard = pgTable(
     wpm: integer("wpm").notNull(),
     accuracy: integer("accuracy").notNull(),
     mistakes: integer("mistakes"),
+    transcriptionTime: integer("transcription_time").notNull(),
+    totalWordsTyped: integer("total_words_typed").notNull(),
 
     attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

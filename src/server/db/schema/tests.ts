@@ -125,6 +125,7 @@ export const testAttempts = pgTable(
 
     writingStartedAt: timestamp("writing_started_at", { withTimezone: true }),
     breakSkipped: boolean("break_skipped").default(false),
+    audioSkipped: boolean("audio_skipped").default(false),
 
     score: integer("score"),
     skippedAt: timestamp("skipped_at", { withTimezone: true }),

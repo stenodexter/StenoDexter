@@ -146,7 +146,7 @@ function ActionButton({
   return (
     <Button
       size="xs"
-      variant={"default"}
+      variant={eligible ? "default" : "outline"}
       onClick={(e) => {
         e.stopPropagation();
         onSelect({ test });

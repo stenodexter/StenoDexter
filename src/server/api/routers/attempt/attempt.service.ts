@@ -106,12 +106,27 @@ export function createAttemptService(db: Db) {
         patch.stage = input.stage;
         patch.stageStartedAt = new Date();
       }
+      if (input.audioSkipped !== undefined)
+        patch.audioSkipped = input.audioSkipped;
       if (input.breakSkipped !== undefined)
         patch.breakSkipped = input.breakSkipped;
       if (input.markAudioStarted && !attempt.stageStartedAt)
         patch.stageStartedAt = new Date();
       if (input.markWritingStarted && !attempt.writingStartedAt)
         patch.writingStartedAt = new Date();
+
+      if (input.audioSkipped !== undefined) {
+        patch.audioSkipped = input.audioSkipped;
+
+        if (input.audioSkipped) {
+          patch.skippedAt = new Date();
+
+          if (attempt.stage === "audio") {
+            patch.stage = "break";
+            patch.stageStartedAt = new Date();
+          }
+        }
+      }
 
       await db
         .update(testAttempts)
@@ -204,6 +219,8 @@ export function createAttemptService(db: Db) {
               accuracy: evaluation.accuracy,
               mistakes: evaluation.mistakes,
               attemptedAt: now,
+              totalWordsTyped: input.answerFinal.split(" ").length ?? 0,
+              transcriptionTime: durationSeconds * 1000,
             })
             .onConflictDoNothing(); // safety net — uniqueIndex handles it
         }

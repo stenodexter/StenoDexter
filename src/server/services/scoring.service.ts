@@ -1,4 +1,9 @@
-export type DiffType = "correct" | "replace" | "insert" | "delete" | "extra_space";
+export type DiffType =
+  | "correct"
+  | "replace"
+  | "insert"
+  | "delete"
+  | "extra_space";
 
 export type DiffToken = {
   original?: string;
@@ -6,47 +11,79 @@ export type DiffToken = {
   type: DiffType;
 };
 
-// Each character of whitespace is its own token so "   " (3 spaces) becomes
-// [" ", " ", " "] — allowing NW to align one space as correct and flag the
-// remaining two individually as extra_space.
-// Words and punctuation are still matched greedily.
+// ─── tokenizer ────────────────────────────────────────────────────────────────
+//
+// A "word unit" is ANY unbroken run of non-whitespace characters.
+// This naturally handles every punctuation pattern:
+//
+//   F.I.R.        → ["F.I.R."]          (≠ "F.I.R"  → replace)
+//   F.I.R         → ["F.I.R"]           (≠ "F.I.R." → replace)
+//   maybe,        → ["maybe,"]          (≠ "maybe"  → replace)
+//   it's          → ["it's"]
+//   Rs.500        → ["Rs.500"]
+//   U.S.A.,       → ["U.S.A.,"]
+//   "hello"       → ['"hello"']
+//   (section)     → ["(section)"]
+//   --            → ["--"]              (pure-punctuation, still one token)
+//
+// Each whitespace character is its own token so NW can flag extra spaces.
+//
 function tokenize(text: string): string[] {
-  return text.match(/[\p{L}\p{N}]+|\s|[^\s\p{L}\p{N}]/gu) ?? [];
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i]!;
+    if (/\s/.test(ch)) {
+      tokens.push(ch);
+      i++;
+      continue;
+    }
+    // Consume everything until the next whitespace
+    let j = i + 1;
+    while (j < text.length && !/\s/.test(text[j]!)) j++;
+    tokens.push(text.slice(i, j));
+    i = j;
+  }
+  return tokens;
 }
 
-// An extra_space that sits immediately next to an insert or delete is just
-// the natural space that travels with that word — not an independent mistake.
-// Example: typing "fqui " before a word → the space before "fqui" is an
-// artifact of the insertion, not a separate spacing error.
-// We demote those adjacent extra_space tokens to "correct" so they don't
-// double-count the mistake and don't show a ␣ badge in the UI.
+// ─── suppress adjacent extra spaces ──────────────────────────────────────────
+//
+// An extra_space immediately beside an insert/delete is just the space that
+// travels with the inserted/deleted word. Demote it to "correct" so it
+// doesn't double-count the mistake.
+//
 function suppressAdjacentExtraSpaces(tokens: DiffToken[]): DiffToken[] {
-  const wordError = (t: DiffToken) => t.type === "insert" || t.type === "delete";
+  const isWordError = (t: DiffToken) =>
+    t.type === "insert" || t.type === "delete";
   const isExtraSpace = (t: DiffToken) => t.type === "extra_space";
 
   return tokens.map((tok, i) => {
     if (!isExtraSpace(tok)) return tok;
     const prev = tokens[i - 1];
     const next = tokens[i + 1];
-    if ((prev && wordError(prev)) || (next && wordError(next))) {
-      // Demote to correct — render as a plain space, no penalty
+    if ((prev && isWordError(prev)) || (next && isWordError(next))) {
       return { original: " ", typed: " ", type: "correct" };
     }
     return tok;
   });
 }
 
-// Needleman-Wunsch global alignment — exact match only.
+// ─── Needleman-Wunsch global alignment ───────────────────────────────────────
+//
+// Exact-match only (case-sensitive). Each token is atomic — no partial credit
+// within a token.
+//
 function nwAlign(A: string[], B: string[]): DiffToken[] {
   const m = A.length;
   const n = B.length;
 
-  const MATCH    =  2;
+  const MATCH = 2;
   const MISMATCH = -1;
-  const GAP      = -1;
+  const GAP = -1;
 
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0)
+    new Array(n + 1).fill(0),
   );
   for (let i = 0; i <= m; i++) dp[i]![0] = i * GAP;
   for (let j = 0; j <= n; j++) dp[0]![j] = j * GAP;
@@ -56,8 +93,8 @@ function nwAlign(A: string[], B: string[]): DiffToken[] {
       const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
       dp[i]![j] = Math.max(
         dp[i - 1]![j - 1]! + diagScore,
-        dp[i - 1]![j]!     + GAP,
-        dp[i]![j - 1]!     + GAP
+        dp[i - 1]![j]! + GAP,
+        dp[i]![j - 1]! + GAP,
       );
     }
   }
@@ -69,7 +106,6 @@ function nwAlign(A: string[], B: string[]): DiffToken[] {
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
       const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
-
       if (dp[i]![j] === dp[i - 1]![j - 1]! + diagScore) {
         const type = A[i - 1] === B[j - 1] ? "correct" : "replace";
         result.push({ original: A[i - 1], typed: B[j - 1], type });
@@ -84,7 +120,7 @@ function nwAlign(A: string[], B: string[]): DiffToken[] {
       i--;
     } else {
       const tok = B[j - 1]!;
-      const type = /^\s$/.test(tok) ? "extra_space" : "insert";
+      const type: DiffType = /^\s$/.test(tok) ? "extra_space" : "insert";
       result.push({ typed: tok, type });
       j--;
     }
@@ -93,6 +129,8 @@ function nwAlign(A: string[], B: string[]): DiffToken[] {
   result.reverse();
   return suppressAdjacentExtraSpaces(result);
 }
+
+// ─── public API ───────────────────────────────────────────────────────────────
 
 export default class ScoringEngine {
   compare(original: string, typed: string): DiffToken[] {

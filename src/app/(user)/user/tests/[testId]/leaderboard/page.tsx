@@ -8,11 +8,3 @@ export default async function UserLeaderboardPage() {
     <TestLeaderboardPage isAdmin={false} currentUserId={user.id ?? null} />
   );
 }
-
-// // ─── app/admin/test/[testId]/leaderboard/page.tsx ────────────────────────────
-
-// import { TestLeaderboardPage } from "~/components/common/test-leaderboard-page";
-
-// export default function AdminLeaderboardPage() {
-//   return <TestLeaderboardPage isAdmin={true} />;
-// }
