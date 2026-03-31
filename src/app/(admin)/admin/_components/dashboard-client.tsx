@@ -482,11 +482,7 @@ function RecentAttempts() {
   if (data.length === 0) {
     return (
       <div>
-        <SectionHeader
-          icon={TrendingUp}
-          title="Recent Attempts"
-          href="/admin/attempts"
-        />
+        <SectionHeader icon={TrendingUp} title="Recent Attempts" />
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border py-14 text-center">
           <Activity className="text-muted-foreground/20 h-8 w-8" />
           <p className="text-muted-foreground text-sm">No submissions yet</p>
@@ -497,12 +493,7 @@ function RecentAttempts() {
 
   return (
     <div>
-      <SectionHeader
-        icon={TrendingUp}
-        title="Recent Attempts"
-        href="/admin/attempts"
-        hrefLabel="Explore all"
-      />
+      <SectionHeader icon={TrendingUp} title="Recent Attempts" />
       <div className="overflow-hidden rounded-2xl border">
         {/* Table header */}
         <div className="bg-muted/30 grid grid-cols-[1fr_1.4fr_80px_52px_52px_64px_80px_28px] items-center gap-3 border-b px-5 py-2.5">

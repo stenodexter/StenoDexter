@@ -1,7 +1,7 @@
 // ─── app/admin/test/[testId]/page.tsx ────────────────────────────────────────
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { trpc } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -9,6 +9,7 @@ import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { SolutionAudioDialog } from "~/components/common/admin/add-explanation-audio-dialog";
+import { DeleteTestDialog } from "~/components/common/admin/delete-test-dialog";
 import {
   Trophy,
   Users,
@@ -16,6 +17,7 @@ import {
   Zap,
   CalendarDays,
   FileAudio,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -26,6 +28,8 @@ export default function TestPage({
 }) {
   const { testId } = use(params);
   const utils = trpc.useUtils();
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: test, isLoading } = trpc.test.get.useQuery({ id: testId });
 
@@ -179,7 +183,27 @@ export default function TestPage({
             onSuccess={() => utils.test.get.invalidate({ id: testId })}
           />
         )}
+
+        {/* Delete — always visible for admin, pushed to the right */}
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-500"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </div>
       </div>
+
+      <DeleteTestDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        testId={testId}
+        testTitle={test.title}
+      />
     </div>
   );
 }

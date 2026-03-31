@@ -1,30 +1,20 @@
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { Separator } from "~/components/ui/separator";
 import {
   ArrowRight,
-  CheckCircle2,
   Clock,
-  Users,
   Zap,
   Target,
   BarChart3,
   CalendarCheck,
-  Award,
-  ShieldCheck,
   TrendingUp,
   BookOpen,
 } from "lucide-react";
@@ -34,8 +24,6 @@ export const metadata = {
   description:
     "India's most trusted stenography platform. Master shorthand for SSC, High Court & government exams.",
 };
-
-/* ─────────────────── DATA ─────────────────── */
 
 const features = [
   {
@@ -50,82 +38,13 @@ const features = [
   },
   {
     icon: CalendarCheck,
-    title: "Weekly Sunday Tests",
+    title: "Daily Tests",
     desc: "Consistent assessment every week with detailed score breakdowns.",
   },
   {
     icon: TrendingUp,
     title: "Guaranteed Progress",
-    desc: "Visible improvement in 15 days or your money back — no questions.",
-  },
-];
-
-const courses = [
-  {
-    id: 1,
-    title: "Beginner Speed Build",
-    category: "Fundamentals",
-    price: 1499,
-    originalPrice: 2499,
-    duration: "30 Days",
-    students: 2500,
-    desc: "Start from zero. Build speed, accuracy and confidence step by step.",
-    highlight: false,
-  },
-  {
-    id: 2,
-    title: "SSC Court Shorthand",
-    category: "Govt Exams",
-    price: 399,
-    originalPrice: 699,
-    duration: "15 Days",
-    students: 3200,
-    desc: "Fast-track prep for SSC shorthand exams by certified professionals.",
-    highlight: true,
-  },
-  {
-    id: 3,
-    title: "Advanced Dictation Pack",
-    category: "Advanced",
-    price: 999,
-    originalPrice: 1999,
-    duration: "30 Days",
-    students: 1800,
-    desc: "6 months of real exam-style dictations for serious speed acceleration.",
-    highlight: false,
-  },
-  {
-    id: 4,
-    title: "High Court Mastery",
-    category: "Govt Exams",
-    price: 1500,
-    originalPrice: 2500,
-    duration: "Monthly",
-    students: 1200,
-    desc: "Comprehensive training mapped to High Court stenographer requirements.",
-    highlight: false,
-  },
-  {
-    id: 5,
-    title: "1 Year Dictation Bundle",
-    category: "Complete Pack",
-    price: 1900,
-    originalPrice: 2900,
-    duration: "12 Months",
-    students: 900,
-    desc: "Full year of structured dictation materials and practice exercises.",
-    highlight: false,
-  },
-  {
-    id: 6,
-    title: "Interview Prep Intensive",
-    category: "Job Ready",
-    price: 999,
-    originalPrice: 1499,
-    duration: "14 Days",
-    students: 1100,
-    desc: "Mock tests, expert tips and real scenarios to get you hired faster.",
-    highlight: false,
+    desc: "Visible improvement in 15 days.",
   },
 ];
 
@@ -145,16 +64,6 @@ const benefits = [
     icon: CalendarCheck,
     title: "Weekly Tests",
     desc: "Every Sunday — stay consistent.",
-  },
-  {
-    icon: Award,
-    title: "Verified Certificate",
-    desc: "Issued on course completion.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "7-Day Money Back",
-    desc: "Risk-free enrollment, always.",
   },
 ];
 
@@ -208,10 +117,8 @@ export default function LandingHome() {
       <Hero />
       <LogoStrip />
       <Features />
-      <Courses />
       <Benefits />
       <FAQ />
-      <CTABanner />
     </main>
   );
 }
@@ -219,16 +126,50 @@ export default function LandingHome() {
 /* ─── HERO ─── */
 function Hero() {
   return (
-    <section className="relative isolate flex min-h-screen flex-col items-center justify-center px-4 pt-24 pb-20 text-center">
-      {/* subtle top glow */}
+    <section className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-24 pb-20 text-center">
+      {/* ─── BACKGROUND ─── */}
+
+      {/* base */}
+      <div className="bg-background absolute inset-0 -z-20" />
+
+      {/* primary (LEFT focused) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[500px] bg-[radial-gradient(ellipse_80%_55%_at_50%_-5%,hsl(var(--primary)/0.13),transparent)]"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] animate-[driftGlow_12s_ease-in-out_infinite] bg-[radial-gradient(ellipse_80%_60%_at_25%_-10%,hsl(var(--primary)/0.28),transparent)]"
       />
+
+      {/* secondary (soft balance on right) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] animate-[driftGlow_16s_ease-in-out_infinite] bg-[radial-gradient(ellipse_70%_50%_at_70%_0%,hsl(var(--secondary)/0.18),transparent)]"
+      />
+
+      {/* bottom ambient glow */}
+      <div
+        aria-hidden
+        className="bg-primary/10 pointer-events-none absolute bottom-[-120px] left-1/2 -z-10 h-[320px] w-[700px] -translate-x-1/2 animate-[driftGlow_18s_ease-in-out_infinite] blur-3xl"
+      />
+
+      {/* subtle grid (very shadcn vibe) */}
+      <div
+        className="absolute inset-0 -z-10 opacity-[0.06]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--foreground)) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+          maskImage:
+            "radial-gradient(circle at center, black 30%, transparent 80%)",
+        }}
+      />
+
+      {/* vignette */}
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_60%,hsl(var(--background))_100%)]" />
+
+      {/* ─── CONTENT ─── */}
 
       <Badge
         variant="outline"
-        className="mb-6 gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
+        className="mb-6 gap-2 rounded-full px-4 py-3 text-xs font-semibold tracking-widest uppercase backdrop-blur-sm"
       >
         <span className="bg-primary h-1.5 w-1.5 animate-pulse rounded-full" />
         India&apos;s #1 Stenography Platform
@@ -236,10 +177,11 @@ function Hero() {
 
       <h1 className="max-w-4xl text-5xl leading-[1.06] font-extrabold tracking-tight sm:text-6xl md:text-[72px]">
         Master Stenography.{" "}
-        <span className="text-primary">Land Your Dream Job.</span>
+        <span className="from-primary via-primary to-secondary bg-gradient-to-r bg-clip-text text-transparent">
+          Land Your Dream Job.
+        </span>
       </h1>
 
-      {/* motto */}
       <p className="text-muted-foreground mt-5 text-sm font-semibold tracking-[0.3em] uppercase">
         Speed &nbsp;&middot;&nbsp; Precision &nbsp;&middot;&nbsp; Success
       </p>
@@ -253,19 +195,20 @@ function Hero() {
         <Button
           size="lg"
           asChild
-          className="gap-2 px-7 text-base font-semibold"
+          className="shadow-primary/20 gap-2 px-7 text-base font-semibold shadow-lg"
         >
           <Link href="/user">
-            Start Free Today <ArrowRight className="h-4 w-4" />
+            Start Today <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
+
         <Button size="lg" variant="outline" asChild className="px-7 text-base">
-          <Link href="#courses">Browse Courses</Link>
+          <Link href="/courses">Browse Courses</Link>
         </Button>
       </div>
 
-      {/* stats strip */}
-      <div className="border-border divide-border mt-16 grid grid-cols-3 divide-x overflow-hidden rounded-2xl border">
+      {/* stats */}
+      <div className="border-border/70 bg-background/50 divide-border mt-16 grid grid-cols-3 divide-x overflow-hidden rounded-2xl border shadow-lg shadow-black/5 backdrop-blur-md">
         {[
           { value: "900K+", label: "Active Learners" },
           { value: "98%", label: "Success Rate" },
@@ -273,7 +216,7 @@ function Hero() {
         ].map((s) => (
           <div
             key={s.label}
-            className="bg-muted/30 px-8 py-5 text-center sm:px-12"
+            className="bg-muted/20 px-8 py-5 text-center sm:px-12"
           >
             <p className="text-primary text-3xl font-extrabold">{s.value}</p>
             <p className="text-muted-foreground mt-1 text-xs">{s.label}</p>
@@ -343,93 +286,6 @@ function Features() {
   );
 }
 
-/* ─── COURSES ─── */
-function Courses() {
-  return (
-    <section id="courses" className="bg-muted/30 px-4 py-24">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <SectionHead
-            tag="Courses"
-            title="Pick your path"
-            sub="Choose a course matched to your current level and target exam."
-          />
-          <p className="text-muted-foreground shrink-0 pb-1 text-xs">
-            All prices include lifetime access
-          </p>
-        </div>
-
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c) => (
-            <Card
-              key={c.id}
-              className={`flex flex-col transition-shadow hover:shadow-md ${
-                c.highlight
-                  ? "border-primary ring-primary/30 ring-1"
-                  : "border-border"
-              }`}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <Badge
-                    variant={c.highlight ? "default" : "secondary"}
-                    className="text-xs"
-                  >
-                    {c.category}
-                  </Badge>
-                  {c.highlight && (
-                    <Badge className="border-primary/20 bg-primary/10 text-primary text-[10px] font-semibold">
-                      Most Popular
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-2 text-[17px] leading-snug font-bold">
-                  {c.title}
-                </p>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {c.desc}
-                </p>
-              </CardHeader>
-
-              <CardContent className="flex-1 pb-0">
-                <div className="text-muted-foreground flex items-center gap-5 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" /> {c.duration}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5" />{" "}
-                    {c.students.toLocaleString()} students
-                  </span>
-                </div>
-              </CardContent>
-
-              <Separator className="mt-5" />
-
-              <CardFooter className="flex items-center justify-between pt-4">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-extrabold">
-                    ₹{c.price.toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground text-sm line-through">
-                    ₹{c.originalPrice.toLocaleString()}
-                  </span>
-                </div>
-                <Button
-                  size="sm"
-                  variant={c.highlight ? "default" : "outline"}
-                  asChild
-                >
-                  <Link href="/user">Enroll Now</Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ─── BENEFITS ─── */
 function Benefits() {
   return (
@@ -450,12 +306,12 @@ function Benefits() {
             />
             <Button className="mt-8 gap-2" asChild>
               <Link href="/user">
-                Start Learning Free <ArrowRight className="h-4 w-4" />
+                Start Learning <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
             {benefits.map((b) => {
               const Icon = b.icon;
               return (
@@ -501,54 +357,6 @@ function FAQ() {
             </AccordionItem>
           ))}
         </Accordion>
-      </div>
-    </section>
-  );
-}
-
-/* ─── CTA BANNER ─── */
-function CTABanner() {
-  return (
-    <section className="border-border relative isolate overflow-hidden border-t px-4 py-24 text-center">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[400px] bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,hsl(var(--primary)/0.1),transparent)]"
-      />
-      <div className="mx-auto max-w-xl">
-        <p className="text-primary mb-3 text-xs font-semibold tracking-widest uppercase">
-          Speed &nbsp;&middot;&nbsp; Precision &nbsp;&middot;&nbsp; Success
-        </p>
-        <h2 className="text-4xl leading-tight font-extrabold tracking-tight sm:text-5xl">
-          Your selection starts
-          <br />
-          here, today.
-        </h2>
-        <p className="text-muted-foreground mt-4">
-          Join 900,000+ learners who chose Steno Dexter to clear their exams.
-        </p>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Button size="lg" asChild className="gap-2 px-7 font-semibold">
-            <Link href="/user">
-              Get Started Free <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button size="lg" variant="outline" asChild className="px-7">
-            <Link href="#courses">See All Courses</Link>
-          </Button>
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
-          {trustPoints.map((t) => (
-            <span
-              key={t}
-              className="text-muted-foreground flex items-center gap-1.5 text-sm"
-            >
-              <CheckCircle2 className="text-primary h-4 w-4 shrink-0" />
-              {t}
-            </span>
-          ))}
-        </div>
       </div>
     </section>
   );

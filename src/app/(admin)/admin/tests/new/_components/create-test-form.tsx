@@ -945,13 +945,13 @@ export function CreateTestForm() {
           {(field) => (
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <Label>Type the Transcription</Label>
+                <Label>Transcription</Label>
                 <span className="text-muted-foreground text-xs tabular-nums">
                   {field.state.value.length} chars
                 </span>
               </div>
               <Textarea
-                placeholder="Type the exact correct transcription here — student answers are scored against this."
+                placeholder="Type the Transcription here"
                 rows={12}
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}

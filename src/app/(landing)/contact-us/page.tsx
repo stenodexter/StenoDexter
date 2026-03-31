@@ -1,28 +1,12 @@
-"use client";
-
-import { useState } from "react";
-import { Mail, Phone, MapPin, Send, CheckCircle } from "lucide-react";
-
-interface FormState {
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-}
-
-interface SubmitState {
-  isLoading: boolean;
-  isSuccess: boolean;
-  error: string | null;
-}
+import { Mail, Phone, MapPin } from "lucide-react";
 
 export default function ContactUs() {
   return (
     <div className="space-y-16 py-12 md:py-20">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 mt-[60px]">
+      <section className="container mx-auto mt-[60px] px-4">
         <div className="mx-auto max-w-3xl space-y-6 text-center">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl text-logo">
+          <h1 className="text-logo text-4xl font-bold tracking-tight sm:text-5xl">
             Get In Touch
           </h1>
           <p className="text-muted-foreground text-lg">
@@ -32,7 +16,6 @@ export default function ContactUs() {
         </div>
       </section>
 
-      {/* Contact Info Cards */}
       <section className="container mx-auto px-4">
         <div className="grid gap-6 md:grid-cols-3">
           {[
@@ -45,13 +28,13 @@ export default function ContactUs() {
             {
               icon: Phone,
               title: "Phone",
-              value: "+1 (555) 123-4567",
+              value: "+91 xxx-xxxx-xxx",
               description: "Mon-Fri, 9 AM - 6 PM EST",
             },
             {
               icon: MapPin,
               title: "Office",
-              value: "San Francisco, CA",
+              value: "Jaipur, Rajasthan, India",
               description: "Head office location",
             },
           ].map((contact, idx) => {
