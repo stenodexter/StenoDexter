@@ -16,28 +16,28 @@ export function Navbar() {
 
         <div className="hidden gap-8 md:flex">
           <Link
-            href="#features"
+            href="/about-us"
             className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
           >
-            Features
+            About
           </Link>
           <Link
-            href="#benefits"
-            className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
-          >
-            Why Us
-          </Link>
-          <Link
-            href="#courses"
+            href="/courses"
             className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
           >
             Courses
           </Link>
           <Link
-            href="#faq"
+            href="/hall-of-fame"
             className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
           >
-            FAQ
+            Hall of Fame
+          </Link>
+          <Link
+            href="/contact-us"
+            className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
+          >
+            Contact
           </Link>
         </div>
 
