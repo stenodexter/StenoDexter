@@ -3,9 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Document, Page, pdfjs } from "react-pdf";
-import { IconSun, IconMoon, IconChevronUp, IconChevronDown, IconMinus, IconPlus } from "@tabler/icons-react";
+import {
+  IconSun,
+  IconMoon,
+  IconChevronUp,
+  IconChevronDown,
+  IconMinus,
+  IconPlus,
+} from "@tabler/icons-react";
 import { useThemeContext } from "~/providers/theme-provider";
+
+// @ts-ignore
 import "react-pdf/dist/Page/AnnotationLayer.css";
+
+// @ts-ignore
 import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -73,7 +84,10 @@ export default function SecurePdfViewer() {
 
   useEffect(() => {
     const blockKeys = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && ["c","s","p","a","u"].includes(e.key.toLowerCase()))
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        ["c", "s", "p", "a", "u"].includes(e.key.toLowerCase())
+      )
         e.preventDefault();
       if (e.key === "PrintScreen") e.preventDefault();
     };
@@ -94,19 +108,24 @@ export default function SecurePdfViewer() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const idx = pageRefs.current.indexOf(entry.target as HTMLDivElement);
+            const idx = pageRefs.current.indexOf(
+              entry.target as HTMLDivElement,
+            );
             if (idx !== -1) setCurrentPage(idx + 1);
           }
         });
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
     pageRefs.current.forEach((ref) => ref && observer.observe(ref));
     return () => observer.disconnect();
   }, [numPages]);
 
   const scrollToPage = (p: number) =>
-    pageRefs.current[p - 1]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    pageRefs.current[p - 1]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
 
   return (
     <>
@@ -183,38 +202,82 @@ export default function SecurePdfViewer() {
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", background: t.bg, display: "flex", flexDirection: "column", fontFamily: "'DM Mono', monospace", transition: "background 0.3s" }}>
-
+      <div
+        style={{
+          minHeight: "100vh",
+          background: t.bg,
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: "'DM Mono', monospace",
+          transition: "background 0.3s",
+        }}
+      >
         {/* ── Toolbar ─────────────────────────────────────────────────── */}
-        <div style={{
-          position: "sticky", top: 0, zIndex: 100,
-          background: t.toolbar,
-          backdropFilter: "blur(20px)",
-          borderBottom: `1px solid ${t.border}`,
-          padding: "0 20px", height: 56,
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-          transition: "background 0.3s, border-color 0.3s",
-        }}>
-
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 100,
+            background: t.toolbar,
+            backdropFilter: "blur(20px)",
+            borderBottom: `1px solid ${t.border}`,
+            padding: "0 20px",
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            transition: "background 0.3s, border-color 0.3s",
+          }}
+        >
           {/* Left: icon + title + page count */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <div style={{
-              width: 28, height: 28, flexShrink: 0,
-              background: isDark ? "#4444ff18" : "#4444ff12",
-              border: `1px solid ${isDark ? "#3333aa44" : "#3333aa22"}`,
-              borderRadius: 8,
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
-            }}>📄</div>
-            <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 19, color: t.text, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                flexShrink: 0,
+                background: isDark ? "#4444ff18" : "#4444ff12",
+                border: `1px solid ${isDark ? "#3333aa44" : "#3333aa22"}`,
+                borderRadius: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+              }}
+            >
+              📄
+            </div>
+            <span
+              style={{
+                fontFamily: "'DM Serif Display', serif",
+                fontSize: 19,
+                color: t.text,
+                letterSpacing: "-0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
               Document Viewer
             </span>
             {!loading && numPages > 0 && (
-              <span style={{
-                fontSize: 11, color: t.faint,
-                background: isDark ? "#16161e" : "#e8e8e2",
-                border: `1px solid ${t.border}`,
-                borderRadius: 20, padding: "2px 10px", flexShrink: 0,
-              }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: t.faint,
+                  background: isDark ? "#16161e" : "#e8e8e2",
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 20,
+                  padding: "2px 10px",
+                  flexShrink: 0,
+                }}
+              >
                 {numPages} pages
               </span>
             )}
@@ -223,13 +286,30 @@ export default function SecurePdfViewer() {
           {/* Center: page nav */}
           {!loading && numPages > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button className="tb-btn" onClick={() => scrollToPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}>
+              <button
+                className="tb-btn"
+                onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+              >
                 <IconChevronUp size={14} />
               </button>
-              <span style={{ color: t.muted, fontSize: 12, minWidth: 60, textAlign: "center" }}>
+              <span
+                style={{
+                  color: t.muted,
+                  fontSize: 12,
+                  minWidth: 60,
+                  textAlign: "center",
+                }}
+              >
                 {currentPage} / {numPages}
               </span>
-              <button className="tb-btn" onClick={() => scrollToPage(Math.min(numPages, currentPage + 1))} disabled={currentPage >= numPages}>
+              <button
+                className="tb-btn"
+                onClick={() =>
+                  scrollToPage(Math.min(numPages, currentPage + 1))
+                }
+                disabled={currentPage >= numPages}
+              >
                 <IconChevronDown size={14} />
               </button>
             </div>
@@ -238,35 +318,67 @@ export default function SecurePdfViewer() {
           {/* Right: zoom + theme toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {!loading && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 2,
-                background: isDark ? "#13131a" : "#eaeae4",
-                border: `1px solid ${t.border}`,
-                borderRadius: 10, padding: "3px 6px",
-              }}>
-                <button className="tb-btn" style={{ border: "none", padding: "4px 6px", borderRadius: 6 }}
-                  onClick={() => setScale(s => Math.max(0.6, s - 0.2))}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  background: isDark ? "#13131a" : "#eaeae4",
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 10,
+                  padding: "3px 6px",
+                }}
+              >
+                <button
+                  className="tb-btn"
+                  style={{
+                    border: "none",
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                  }}
+                  onClick={() => setScale((s) => Math.max(0.6, s - 0.2))}
+                >
                   <IconMinus size={13} />
                 </button>
-                <span style={{ color: t.faint, fontSize: 11, minWidth: 36, textAlign: "center" }}>
+                <span
+                  style={{
+                    color: t.faint,
+                    fontSize: 11,
+                    minWidth: 36,
+                    textAlign: "center",
+                  }}
+                >
                   {Math.round(scale * 100)}%
                 </span>
-                <button className="tb-btn" style={{ border: "none", padding: "4px 6px", borderRadius: 6 }}
-                  onClick={() => setScale(s => Math.min(2.5, s + 0.2))}>
+                <button
+                  className="tb-btn"
+                  style={{
+                    border: "none",
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                  }}
+                  onClick={() => setScale((s) => Math.min(2.5, s + 0.2))}
+                >
                   <IconPlus size={13} />
                 </button>
               </div>
             )}
 
             {/* Theme toggle — syncs with app theme */}
-            <button className="theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
+            <button
+              className="theme-btn"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
               <IconSun
                 size={16}
                 style={{
                   position: "absolute",
                   transition: "opacity 0.25s, transform 0.25s",
                   opacity: isDark ? 0 : 1,
-                  transform: isDark ? "rotate(90deg) scale(0.4)" : "rotate(0deg) scale(1)",
+                  transform: isDark
+                    ? "rotate(90deg) scale(0.4)"
+                    : "rotate(0deg) scale(1)",
                 }}
               />
               <IconMoon
@@ -275,7 +387,9 @@ export default function SecurePdfViewer() {
                   position: "absolute",
                   transition: "opacity 0.25s, transform 0.25s",
                   opacity: isDark ? 1 : 0,
-                  transform: isDark ? "rotate(0deg) scale(1)" : "rotate(-90deg) scale(0.4)",
+                  transform: isDark
+                    ? "rotate(0deg) scale(1)"
+                    : "rotate(-90deg) scale(0.4)",
                 }}
               />
             </button>
@@ -286,10 +400,26 @@ export default function SecurePdfViewer() {
         <div
           ref={containerRef}
           onContextMenu={(e) => e.preventDefault()}
-          style={{ flex: 1, overflowY: "auto", padding: "32px 24px 64px", display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "32px 24px 64px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 20,
+          }}
         >
           {loading && (
-            <div style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 900,
+                display: "flex",
+                flexDirection: "column",
+                gap: 20,
+              }}
+            >
               <div className="skeleton" style={{ height: 560 }} />
               <div className="skeleton" style={{ height: 420 }} />
             </div>
@@ -308,12 +438,15 @@ export default function SecurePdfViewer() {
             {Array.from({ length: numPages }, (_, i) => (
               <div
                 key={i}
-                ref={(el) => { pageRefs.current[i] = el; }}
+                ref={(el) => {
+                  pageRefs.current[i] = el;
+                }}
                 className="page-wrapper"
                 style={{
                   animationDelay: `${i * 60}ms`,
                   position: "relative",
-                  borderRadius: 12, overflow: "hidden",
+                  borderRadius: 12,
+                  overflow: "hidden",
                   boxShadow: t.shadow,
                   border: `1px solid ${t.pageBorder}`,
                   width: containerWidth * scale,
@@ -322,14 +455,22 @@ export default function SecurePdfViewer() {
                 }}
               >
                 {/* Page badge */}
-                <div style={{
-                  position: "absolute", top: 12, right: 12, zIndex: 10,
-                  background: t.badgeBg, backdropFilter: "blur(8px)",
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 6, padding: "2px 8px",
-                  fontSize: 10, color: t.faint,
-                  fontFamily: "'DM Mono', monospace",
-                }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    right: 12,
+                    zIndex: 10,
+                    background: t.badgeBg,
+                    backdropFilter: "blur(8px)",
+                    border: `1px solid ${t.border}`,
+                    borderRadius: 6,
+                    padding: "2px 8px",
+                    fontSize: 10,
+                    color: t.faint,
+                    fontFamily: "'DM Mono', monospace",
+                  }}
+                >
                   {i + 1}
                 </div>
 
@@ -341,7 +482,14 @@ export default function SecurePdfViewer() {
                 />
 
                 {/* Interaction shield */}
-                <div style={{ position: "absolute", inset: 0, zIndex: 5, cursor: "default" }} />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 5,
+                    cursor: "default",
+                  }}
+                />
               </div>
             ))}
           </Document>
@@ -349,14 +497,39 @@ export default function SecurePdfViewer() {
 
         {/* ── Status bar ───────────────────────────────────────────────── */}
         {!loading && (
-          <div style={{
-            position: "fixed", bottom: 0, left: 0, right: 0, height: 32,
-            background: t.toolbar, borderTop: `1px solid ${t.border}`,
-            display: "flex", alignItems: "center", padding: "0 24px", gap: 10, zIndex: 100,
-            transition: "background 0.3s",
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.statusDot, boxShadow: `0 0 8px ${t.statusDotGlow}` }} />
-            <span style={{ fontSize: 10, color: t.statusText, letterSpacing: "0.08em" }}>
+          <div
+            style={{
+              position: "fixed",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 32,
+              background: t.toolbar,
+              borderTop: `1px solid ${t.border}`,
+              display: "flex",
+              alignItems: "center",
+              padding: "0 24px",
+              gap: 10,
+              zIndex: 100,
+              transition: "background 0.3s",
+            }}
+          >
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: t.statusDot,
+                boxShadow: `0 0 8px ${t.statusDotGlow}`,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                color: t.statusText,
+                letterSpacing: "0.08em",
+              }}
+            >
               PROTECTED · READ ONLY · COPYING DISABLED
             </span>
           </div>
