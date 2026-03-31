@@ -32,7 +32,6 @@ export const hallOfFame = pgTable(
   (t) => [
     index("hof_department_idx").on(t.department),
     index("hof_created_at_idx").on(t.createdAt),
-    index("hof_batch_idx").on(t.batch),
   ],
 );
 
