@@ -343,10 +343,9 @@ export function createResultService(db: Db) {
           },
         },
         orderBy: [
-          desc(leaderboard.score),
-          desc(leaderboard.accuracy),
-          desc(leaderboard.wpm),
-          asc(leaderboard.attemptedAt),
+          asc(leaderboard.mistakes), // 🔥 primary priority
+          asc(leaderboard.transcriptionTime), // 🔥 secondary
+          asc(leaderboard.attemptedAt), // tie-breaker
         ],
         limit,
       });
@@ -373,10 +372,8 @@ export function createResultService(db: Db) {
           rank: i + 1,
           user: r.user,
           speed: r.speed,
-          score: r.score,
-          accuracy: r.accuracy,
-          wpm: r.wpm,
           mistakes: r.mistakes ?? 0,
+          transcriptionTime: r.transcriptionTime,
           writingDuration,
           totalWords,
         };

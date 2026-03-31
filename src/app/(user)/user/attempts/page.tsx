@@ -11,11 +11,15 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Separator } from "~/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import { Calendar } from "~/components/ui/calendar";
+import {
   ChevronLeft,
   ChevronRight,
   BarChart2,
-  Target,
-  TrendingUp,
   Hash,
   Zap,
   ChevronDown,
@@ -23,8 +27,10 @@ import {
   FileText,
   Layers,
   TextAlignJustify,
+  CalendarIcon,
+  X,
 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { format, isToday } from "date-fns";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +64,12 @@ function accuracyCls(a: number) {
     : a >= 70
       ? "text-amber-500"
       : "text-red-500";
+}
+
+/** Convert a Date to "YYYY-MM-DD" local string, or undefined if today/null */
+function toDateParam(d: Date | undefined): string | undefined {
+  if (!d || isToday(d)) return undefined;
+  return format(d, "yyyy-MM-dd");
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────
@@ -122,7 +134,7 @@ function AttemptRow({
         </div>
       </div>
 
-      {/* Stats — desktop */}
+      {/* Mistakes — desktop */}
       <div className="hidden shrink-0 items-center gap-5 sm:flex">
         <div className="text-center">
           <p className="text-base font-bold text-red-500 tabular-nums">
@@ -135,7 +147,7 @@ function AttemptRow({
       </div>
       <Separator orientation="vertical" className="h-7" />
 
-      {/* Stats — mobile */}
+      {/* Accuracy + mistakes — mobile */}
       <div className="flex items-center gap-1.5 sm:hidden">
         <span
           className={`text-sm font-bold tabular-nums ${accuracyCls(attempt.result.accuracy)}`}
@@ -175,11 +187,9 @@ function TestGroup({
   attempts: Attempt[];
 }) {
   const [open, setOpen] = useState(true);
-  const best = Math.max(...attempts.map((a) => a.result.accuracy));
 
   return (
     <div className="overflow-hidden rounded-xl border">
-      {/* Group header */}
       <div
         className="bg-card hover:bg-muted/20 flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors"
         onClick={() => setOpen((v) => !v)}
@@ -188,7 +198,7 @@ function TestGroup({
           <FileText className="text-muted-foreground h-3.5 w-3.5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="mb-1 line-clamp-3 text-sm font-semibold">{testTitle}</p>{" "}
+          <p className="mb-1 line-clamp-3 text-sm font-semibold">{testTitle}</p>
           <p className="text-muted-foreground text-xs capitalize">
             {testType} · {attempts.length} attempt
             {attempts.length !== 1 ? "s" : ""}
@@ -213,7 +223,6 @@ function TestGroup({
         </div>
       </div>
 
-      {/* Attempts under this test */}
       {open && (
         <div className="bg-muted/5 divide-y border-t">
           {attempts.map((a) => (
@@ -275,6 +284,7 @@ export default function UserAttemptsPage() {
   const [type, setType] = useState<"all" | "assessment" | "practice">("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [groupMode, setGroupMode] = useState<GroupMode>("flat");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined); // undefined = no filter
 
   const { data: reportData, isLoading: reportLoading } =
     trpc.user.getReport.useQuery(undefined, { staleTime: 60_000 });
@@ -283,8 +293,15 @@ export default function UserAttemptsPage() {
     staleTime: 60_000,
   });
 
+  const dateParam = toDateParam(dateFilter); // undefined when today or unset → no filter sent
+
   const { data, isLoading } = trpc.user.getAttemptsPaginated.useQuery(
-    { page, limit: 20, type: type === "all" ? undefined : type },
+    {
+      page,
+      limit: 20,
+      type: type === "all" ? undefined : type,
+      date: dateParam,
+    },
     { staleTime: 30_000 },
   );
 
@@ -293,7 +310,6 @@ export default function UserAttemptsPage() {
   const total = data?.meta.total ?? 0;
   const totalPages = data?.meta.totalPages ?? 1;
 
-  // Group by test for grouped view
   const grouped = sorted.reduce<
     Record<
       string,
@@ -305,16 +321,35 @@ export default function UserAttemptsPage() {
       }
     >
   >((acc, a) => {
-    if (!acc[a.testId])
+    if (!acc[a.testId]) {
       acc[a.testId] = {
         testId: a.testId,
         testTitle: a.testTitle,
         testType: a.testType,
         attempts: [],
       };
+    }
+
     acc[a.testId]!.attempts.push(a);
     return acc;
   }, {});
+
+  const dateBtnLabel =
+    dateFilter && !isToday(dateFilter)
+      ? format(dateFilter, "dd MMM yyyy")
+      : "Filter by date";
+
+  const hasDateFilter = !!dateFilter && !isToday(dateFilter);
+
+  function handleDateSelect(d: Date | undefined) {
+    // Selecting today or undefined clears the filter
+    if (!d || isToday(d)) {
+      setDateFilter(undefined);
+    } else {
+      setDateFilter(d);
+    }
+    setPage(0);
+  }
 
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -343,7 +378,6 @@ export default function UserAttemptsPage() {
             label="Total attempts"
             value={Number(reportData?.totalAttempts ?? 0)}
           />
-
           <StatCard
             icon={Zap}
             label="Avg Transcription Speed"
@@ -356,19 +390,15 @@ export default function UserAttemptsPage() {
 
       <Separator />
 
-      {/* Filters + view toggle */}
+      {/* ── Filters row ── */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Type filter */}
         <ToggleGroup
           type="single"
           value={type}
           onValueChange={(v) => {
             if (v) {
-              if (v === "tests") {
-                setType("assessment");
-                setPage(0);
-                return;
-              }
-              setType(v as typeof type);
+              setType(v === "tests" ? "assessment" : (v as typeof type));
               setPage(0);
             }
           }}
@@ -385,6 +415,7 @@ export default function UserAttemptsPage() {
           ))}
         </ToggleGroup>
 
+        {/* Sort filter */}
         <ToggleGroup
           type="single"
           value={sort}
@@ -402,7 +433,7 @@ export default function UserAttemptsPage() {
           ))}
         </ToggleGroup>
 
-        {/* Group toggle */}
+        {/* Group mode toggle */}
         <ToggleGroup
           type="single"
           value={groupMode}
@@ -413,17 +444,75 @@ export default function UserAttemptsPage() {
             value="flat"
             className="data-[state=on]:bg-background data-[state=off]:text-muted-foreground h-8 cursor-pointer rounded-md px-3 text-xs font-medium data-[state=on]:shadow-sm"
           >
-            <TextAlignJustify className="h-1 w-1" />
+            <TextAlignJustify className="h-3.5 w-3.5" />
             List
           </ToggleGroupItem>
           <ToggleGroupItem
             value="grouped"
             className="data-[state=on]:bg-background data-[state=off]:text-muted-foreground h-8 cursor-pointer rounded-md px-3 text-xs font-medium data-[state=on]:shadow-sm"
           >
-            <Layers className="h-1 w-1" />
+            <Layers className="h-3.5 w-3.5" />
             Group by test
           </ToggleGroupItem>
         </ToggleGroup>
+
+        {/* ── Date filter ── */}
+        <div className="flex items-center gap-1 ml-auto">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-9 gap-1.5 rounded-lg px-3 text-xs font-medium ${
+                  hasDateFilter
+                    ? "border-primary/50 bg-primary/5 text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {dateBtnLabel}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateFilter}
+                onSelect={handleDateSelect}
+                disabled={(d) => d > new Date()} // no future dates
+                initialFocus
+              />
+              {hasDateFilter && (
+                <div className="border-t p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground w-full text-xs"
+                    onClick={() => {
+                      setDateFilter(undefined);
+                      setPage(0);
+                    }}
+                  >
+                    Clear date filter
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Quick-clear pill shown when a date is active */}
+          {hasDateFilter && (
+            <button
+              onClick={() => {
+                setDateFilter(undefined);
+                setPage(0);
+              }}
+              className="text-primary/80 hover:text-primary flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs transition-colors"
+              aria-label="Clear date filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Content */}
@@ -433,14 +522,29 @@ export default function UserAttemptsPage() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-20 text-center">
           <BarChart2 className="text-muted-foreground/30 mb-3 h-7 w-7" />
           <p className="text-muted-foreground text-sm font-medium">
-            No attempts yet
+            {hasDateFilter
+              ? `No attempts on ${format(dateFilter!, "dd MMM yyyy")}`
+              : "No attempts yet"}
           </p>
           <p className="text-muted-foreground/60 mt-1 text-xs">
-            Complete a test to see your history here.
+            {hasDateFilter
+              ? "Try a different date or clear the filter."
+              : "Complete a test to see your history here."}
           </p>
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href="/user">Find a test</Link>
-          </Button>
+          {hasDateFilter ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setDateFilter(undefined)}
+            >
+              Clear date filter
+            </Button>
+          ) : (
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <Link href="/user">Find a test</Link>
+            </Button>
+          )}
         </div>
       ) : groupMode === "grouped" ? (
         <div className="space-y-3">

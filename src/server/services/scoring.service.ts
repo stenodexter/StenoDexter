@@ -147,7 +147,9 @@ export default class ScoringEngine {
 
     let mistakes = 0;
     for (const d of diff) {
-      if (d.type !== "correct") mistakes++;
+      if (d.type === "replace" || d.type === "insert" || d.type === "delete") {
+        mistakes++;
+      }
     }
 
     const total = tokenize(original).length;

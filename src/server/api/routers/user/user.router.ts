@@ -296,6 +296,7 @@ export const userRouter = createTRPCRouter({
           limit: z.number().min(1).max(100).default(15),
           testId: z.string().optional(),
           type: z.enum(["assessment", "practice"]).optional(),
+          date: z.string().optional(), // ISO date string "YYYY-MM-DD"
         })
         .optional(),
     )
@@ -306,6 +307,7 @@ export const userRouter = createTRPCRouter({
         input?.limit,
         input?.type,
         input?.testId,
+        input?.date,
       ),
     ),
 

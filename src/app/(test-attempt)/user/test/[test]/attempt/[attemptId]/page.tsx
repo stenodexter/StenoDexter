@@ -560,7 +560,7 @@ function SubmittedScreen({
       <div className="space-y-1.5 text-center">
         <h2 className="text-xl font-semibold">Submitted</h2>
         <p className="text-muted-foreground text-sm">
-          Your answer has been recorded. Results will be available shortly.
+          Your transcription has been recorded. Click on view result.
         </p>
       </div>
       <div className="flex items-center gap-3">

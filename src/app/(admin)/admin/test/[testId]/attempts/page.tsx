@@ -185,27 +185,23 @@ export default function AdminTestAttemptsPage() {
       ) : (
         <>
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_80px_80px_80px_80px_120px] items-center gap-3 px-5 pb-1">
-            {["Student", "Attempts", "Best Acc", "Avg Acc", "Best WPM", ""].map(
-              (h, i) => (
-                <p
-                  key={i}
-                  className={`text-muted-foreground text-[10px] font-semibold tracking-widest uppercase ${i > 0 ? "text-right" : ""}`}
-                >
-                  {h}
-                </p>
-              ),
-            )}
+          <div className="flex justify-between items-center gap-3 px-5 pb-1">
+            {["Student", "Attempts", ""].map((h, i) => (
+              <p
+                key={i}
+                className={`text-muted-foreground text-[10px] font-semibold tracking-widest uppercase ${i > 0 ? "text-right" : ""}`}
+              >
+                {h}
+              </p>
+            ))}
           </div>
 
           <div className="space-y-2">
             {rows.map((row: any) => {
-              const bestAcc = Math.round(Number(row.bestAccuracy));
-              const avgAcc = Math.round(Number(row.avgAccuracy));
               return (
                 <div
                   key={row.userId}
-                  className="bg-card hover:bg-muted/20 grid grid-cols-[1fr_80px_80px_80px_80px_120px] items-center gap-3 rounded-xl border px-5 py-3.5 transition-colors"
+                  className="bg-card hover:bg-muted/20 flex items-center justify-between gap-3 rounded-xl border px-5 py-3.5 transition-colors"
                 >
                   {/* User */}
                   <div className="flex min-w-0 items-center gap-3">
@@ -235,25 +231,6 @@ export default function AdminTestAttemptsPage() {
                   {/* Attempts */}
                   <p className="text-muted-foreground text-right text-sm tabular-nums">
                     {row.attempts}
-                  </p>
-
-                  {/* Best accuracy */}
-                  <p
-                    className={`text-right text-sm font-bold tabular-nums ${accColor(bestAcc)}`}
-                  >
-                    {bestAcc}%
-                  </p>
-
-                  {/* Avg accuracy */}
-                  <p
-                    className={`text-right text-sm tabular-nums ${accColor(avgAcc)}`}
-                  >
-                    {avgAcc}%
-                  </p>
-
-                  {/* Best WPM */}
-                  <p className="text-right text-sm font-medium tabular-nums">
-                    {row.bestWpm}
                   </p>
 
                   {/* CTA */}

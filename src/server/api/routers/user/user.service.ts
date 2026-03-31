@@ -137,10 +137,20 @@ export function createUserService(db: Db) {
       limit = 15,
       type?: AttemptType,
       testId?: string,
+      date?: string,
     ) {
       const conditions = [eq(results.userId, userId)];
       if (type) conditions.push(eq(results.type, type));
       if (testId) conditions.push(eq(testAttempts.testId, testId));
+
+      if (date) {
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+        conditions.push(gte(results.submittedAt, dayStart));
+        conditions.push(lte(results.submittedAt, dayEnd));
+      }
 
       const where = and(...conditions);
 

@@ -86,7 +86,7 @@ export function createTestService(db: Db) {
 
       await notificationsService.send({
         title: "New test available",
-        message: `"${result.title}" has just been published. Attempt now!`,
+        message: `"${result.title}" has been published. Attempt now!`,
         to: "everyone",
         link: `/user/tests/${result.id}`,
         isLinkExternal: false,
