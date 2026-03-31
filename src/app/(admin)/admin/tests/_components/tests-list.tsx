@@ -56,9 +56,9 @@ function TestCard({ test }: { test: Test }) {
       <div className="flex flex-1 flex-col gap-3">
         {/* Title */}
         <div className="flex items-start justify-between gap-3">
-          <h3 className="flex-1 text-sm leading-snug font-semibold">
+          <p className="line-clamp-2 text-sm leading-snug font-semibold break-words">
             {test.title}
-          </h3>
+          </p>
           <div className="flex shrink-0 items-center gap-1.5">
             <Badge variant="outline">
               {test.type.charAt(0).toUpperCase() + test.type.slice(1)}
@@ -155,7 +155,9 @@ function TestRow({ test }: { test: Test }) {
     >
       {/* Title + badges */}
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <p className="truncate text-sm font-semibold">{test.title}</p>
+        <p className="line-clamp-2 text-sm leading-snug font-semibold break-words">
+          {test.title}
+        </p>{" "}
         <Badge variant="outline" className="shrink-0">
           {test.type.charAt(0).toUpperCase() + test.type.slice(1)}
         </Badge>

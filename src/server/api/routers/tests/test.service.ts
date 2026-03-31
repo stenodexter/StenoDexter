@@ -325,26 +325,25 @@ export function createTestService(db: Db) {
     // ── listForUserFeed ───────────────────────────────────────────────────────
 
     async listForUserFeed(input: ListUserTestsInput, userId: string) {
-      const { page, pageSize = PAGE_SIZE } = input;
+      const { page, pageSize = PAGE_SIZE, sort, type, q } = input;
       const offset = (page - 1) * pageSize;
+
+      const conditions: SQL[] = [eq(tests.status, "active")];
+      if (type !== "all") conditions.push(eq(tests.type, type));
+      if (q?.trim()) conditions.push(ilike(tests.title, `%${q.trim()}%`));
+      const where = and(...conditions);
+      const orderBy =
+        sort === "oldest" ? asc(tests.createdAt) : desc(tests.createdAt);
 
       const [rows, [countRow], assessedRows] = await Promise.all([
         db.query.tests.findMany({
-          where: eq(tests.status, "active"),
-          orderBy: desc(tests.createdAt),
+          where,
+          orderBy,
           limit: pageSize,
           offset,
-          with: {
-            attempts: { columns: { id: true } },
-          },
+          with: { attempts: { columns: { id: true } } },
         }),
-
-        db
-          .select({ count: count() })
-          .from(tests)
-          .where(eq(tests.status, "active")),
-
-        // Which tests has this user submitted any result on (any speed)
+        db.select({ count: count() }).from(tests).where(where),
         db
           .selectDistinct({ testId: testAttempts.testId })
           .from(results)
@@ -353,15 +352,12 @@ export function createTestService(db: Db) {
       ]);
 
       const total = countRow?.count ?? 0;
-
-      if (rows.length === 0) {
+      if (rows.length === 0)
         return { data: [], page, pageSize, total: 0, totalPages: 0 };
-      }
 
       const testIds = rows.map((r) => r.id);
       const hasAttemptedSet = new Set(assessedRows.map((r) => r.testId));
 
-      // Second batch: speeds + per-speed assessed status, now that we have testIds
       const [speedRows, assessedSpeedRows] = await Promise.all([
         db
           .select({
@@ -376,8 +372,6 @@ export function createTestService(db: Db) {
           .from(testSpeeds)
           .where(inArray(testSpeeds.testId, testIds))
           .orderBy(asc(testSpeeds.sortOrder)),
-
-        // Which (testId, speedId) combos has this user assessed on
         db
           .selectDistinct({
             testId: testAttempts.testId,
@@ -396,7 +390,6 @@ export function createTestService(db: Db) {
       const assessedSpeedSet = new Set(
         assessedSpeedRows.map((r) => `${r.testId}:${r.speedId}`),
       );
-
       const speedsByTest = speedRows.reduce<Record<string, typeof speedRows>>(
         (acc, s) => {
           (acc[s.testId] ??= []).push(s);
@@ -421,7 +414,6 @@ export function createTestService(db: Db) {
         totalPages: Math.ceil(total / pageSize),
       };
     },
-
     // ── getById ───────────────────────────────────────────────────────────────
 
     async getById(input: GetTestInput) {

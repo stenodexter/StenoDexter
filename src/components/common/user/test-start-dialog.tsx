@@ -151,7 +151,7 @@ export function TestStartDialog({
                           variant="secondary"
                           className="px-1 py-0 text-[9px]"
                         >
-                          Practiced
+                          Practice
                         </Badge>
                       )}
                     </div>

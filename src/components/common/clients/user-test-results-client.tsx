@@ -19,8 +19,10 @@ import {
   RotateCcw,
   FastForward,
   AlignLeft,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
+import { env } from "~/env";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -70,34 +72,45 @@ function SolutionAudio({ url }: { url: string }) {
     if (!el) return;
     el.paused ? void el.play() : el.pause();
   };
+
   const seek = (val: number[]) => {
     const el = audioRef.current;
     if (!el) return;
     el.currentTime = val[0] ?? 0;
     setCurrent(val[0] ?? 0);
   };
+
+  const forward = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = Math.min(el.currentTime + 5, duration);
+    setCurrent(el.currentTime);
+  };
+
+  const backward = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = Math.max(el.currentTime - 5, 0);
+    setCurrent(el.currentTime);
+  };
+
   const cycleSpeed = () => {
     const el = audioRef.current;
     const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
     setSpeed(next);
     if (el) el.playbackRate = next;
   };
-  const replay = () => {
-    const el = audioRef.current;
-    if (!el) return;
-    el.currentTime = 0;
-    void el.play();
-  };
 
   return (
     <div className="bg-card space-y-3 rounded-xl border px-5 py-4">
       <div className="flex items-center gap-2">
         <Volume2 className="text-primary h-4 w-4" />
-        <p className="text-sm font-semibold">Explanation Audio</p>
+        <p className="text-sm font-semibold">Explanation Session Audio</p>
         <Badge variant="secondary" className="ml-auto text-[10px]">
           {fmtTime(current)} / {fmtTime(duration)}
         </Badge>
       </div>
+
       <Slider
         min={0}
         max={duration || 1}
@@ -106,15 +119,21 @@ function SolutionAudio({ url }: { url: string }) {
         onValueChange={seek}
         className="w-full"
       />
+
       <div className="flex items-center gap-2">
+        {/* -5 sec */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
-          onClick={replay}
+          className="text-muted-foreground h-8 w-8 p-2 text-xs"
+          onClick={backward}
+          title="-5 seconds"
         >
-          <RotateCcw className="h-4 w-4" />
+          <ChevronLeft className="h-4 w-4" />
+          <span className="text-xs">-5</span>
         </Button>
+
+        {/* Play / Pause */}
         <Button
           variant="default"
           size="icon"
@@ -127,16 +146,30 @@ function SolutionAudio({ url }: { url: string }) {
             <Play className="h-4 w-4" />
           )}
         </Button>
+
+        {/* +5 sec */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground h-8 w-8 p-2 text-xs"
+          onClick={forward}
+          title="+5 seconds"
+        >
+          +5
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
+        {/* Speed */}
         <Button
           variant="ghost"
           size="sm"
           className="gap-1.5 text-xs tabular-nums"
           onClick={cycleSpeed}
         >
-          <FastForward className="h-3.5 w-3.5" />
           {speed}×
         </Button>
       </div>
+
       <audio
         ref={audioRef}
         src={url}
@@ -169,9 +202,8 @@ function PdfCard({
       : "border-blue-400/40 hover:bg-blue-500/5 text-blue-600 dark:text-blue-400";
   return (
     <a
-      href={url}
+      href={`${env.NEXT_PUBLIC_APP_URL}/viewer?file=${encodeURIComponent(url)}`}
       target="_blank"
-      rel="noopener noreferrer"
       className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 transition-colors ${cls}`}
     >
       <Icon className="h-5 w-5 shrink-0" />
@@ -192,18 +224,17 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
 
   return (
     <p
-      className="text-[20px] break-words"
+      className="text-[20px] break-words select-none"
       style={{
         fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
         lineHeight: "2.2",
+        userSelect: "none", // fallback for safety
       }}
     >
       {diff.map((token, i) => {
-        // correct — render as-is (includes normal spaces)
         if (token.type === "correct")
           return <span key={i}>{token.original}</span>;
 
-        // replace — show typed (struck) then original (correct)
         if (token.type === "replace")
           return (
             <span key={i}>
@@ -216,35 +247,31 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
             </span>
           );
 
-        // delete — present in original, missing from typed
         if (token.type === "delete")
           return (
             <span
               key={i}
-              className="font-extrabold text-amber-500 dark:text-amber-400"
+              className="font-extrabold text-red-500 dark:text-red-500"
             >
               {token.original}
             </span>
           );
 
-        // insert — typed something that isn't in original
         if (token.type === "insert")
           return (
             <span
               key={i}
-              className="text-blue-500 line-through decoration-blue-500 decoration-2"
+              className="text-red-500 line-through decoration-red-500 decoration-2"
             >
               {token.typed}
             </span>
           );
 
-        // extra_space — one surplus space token; render as a small visible badge.
-        // The space itself is NOT rendered so it doesn't shift surrounding words.
         if (token.type === "extra_space")
           return (
             <span
               key={i}
-              className="mx-0.5 bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400 rounded-xs"
+              className="mx-0.5 rounded-xs bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400"
               title="extra space"
             >
               ␣
@@ -322,7 +349,7 @@ function AttemptCard({
               }
               className="text-[10px] capitalize"
             >
-              {entry.attempt.type}
+              {entry.attempt.type === "assessment" ? "test" : "practise"}
             </Badge>
             <Badge variant="outline" className="text-[10px] tabular-nums">
               {entry.speed.wpm} WPM
@@ -387,15 +414,15 @@ function AttemptCard({
               — Substitution
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-amber-500">word</span>—
+              <span className="text-sm font-bold text-red-500">word</span>—
               Missing
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm text-blue-500 line-through">word</span>—
+              <span className="text-sm text-red-500 line-through">word</span>—
               Extra
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="mx-0.5 bg-orange-700/50 p-0.5 rounded-xs text-sm text-orange-500 dark:text-orange-400">
+              <span className="mx-0.5 rounded-xs bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400">
                 ␣
               </span>
               — Extra space
@@ -553,7 +580,7 @@ function ResultsBody({
 
   return (
     <>
-      {hasResources && (
+      {results.length > 0 && hasResources && (
         <section className="space-y-3">
           {hasSolutionAudio && (
             <SolutionAudio url={testData.solutionAudioUrl!} />
@@ -564,7 +591,7 @@ function ResultsBody({
             >
               {hasMatter && (
                 <PdfCard
-                  label="Matter PDF"
+                  label="Matter"
                   url={testData.matterPdfUrl!}
                   icon={FileText}
                   accent="violet"
@@ -572,7 +599,7 @@ function ResultsBody({
               )}
               {hasOutline && (
                 <PdfCard
-                  label="Outline PDF"
+                  label="Outlines"
                   url={testData.outlinePdfUrl!}
                   icon={FilePlus}
                   accent="blue"
@@ -654,7 +681,7 @@ export function TestResultsPage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
       <div>
         <Button
           variant="ghost"
@@ -674,8 +701,8 @@ export function TestResultsPage({
             </h1>
             <p className="text-muted-foreground mt-0.5 text-sm">
               {isAdmin
-                ? "Viewing student attempt history"
-                : "Your attempt history"}
+                ? "Viewing student attempts"
+                : "Your attempts"}
             </p>
           </>
         )}

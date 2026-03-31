@@ -179,20 +179,12 @@ function LeaderboardTable({
             <TableRow className="bg-muted/20 hover:bg-muted/20">
               <TableHead className="w-12">Rank</TableHead>
               <TableHead>Participant</TableHead>
-              <TableHead className="w-28 text-right">
-                <span className="flex items-center justify-end gap-1.5">
-                  Total Typed Words
-                </span>
+              <TableHead className="w-36 text-center">
+                Total Typed Words
               </TableHead>
-              <TableHead className="w-28 text-right">
-                <span className="flex items-center justify-end gap-1.5">
-                  Mistakes
-                </span>
-              </TableHead>
-              <TableHead className="w-28 text-right">
-                <span className="flex items-center justify-end gap-1.5">
-                  Transcription Time
-                </span>
+              <TableHead className="w-28 text-center">Mistakes</TableHead>
+              <TableHead className="w-36 text-center">
+                Transcription Time
               </TableHead>
               {!isAdmin && <TableHead className="w-16" />}
             </TableRow>
@@ -243,11 +235,11 @@ function LeaderboardTable({
                     </div>
                   </TableCell>
 
-                  <TableCell className="py-3.5 text-right text-sm tabular-nums">
+                  <TableCell className="py-3.5 text-center text-sm tabular-nums">
                     {entry.totalWords > 0 ? entry.totalWords : "—"}
                   </TableCell>
 
-                  <TableCell className="py-3.5 text-right text-sm tabular-nums">
+                  <TableCell className="py-3.5 text-center text-sm tabular-nums">
                     <span
                       className={
                         entry.mistakes === 0
@@ -261,7 +253,7 @@ function LeaderboardTable({
                     </span>
                   </TableCell>
 
-                  <TableCell className="text-muted-foreground py-3.5 text-right text-sm tabular-nums">
+                  <TableCell className="text-muted-foreground py-3.5 text-center text-sm tabular-nums">
                     {formatDuration(entry.writingDuration)}
                   </TableCell>
 

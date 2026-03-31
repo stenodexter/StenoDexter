@@ -142,7 +142,6 @@ function Err({ msg }: { msg?: string }) {
 
 function PdfDropzone({
   label,
-  hint,
   value,
   fileName,
   uploading,
@@ -152,7 +151,6 @@ function PdfDropzone({
   accent,
 }: {
   label: string;
-  hint: string;
   value: string;
   fileName: string;
   uploading: boolean;
@@ -223,7 +221,6 @@ function PdfDropzone({
           <>
             <FileText className="text-muted-foreground h-6 w-6" />
             <p className="text-sm font-medium">{label}</p>
-            <p className="text-muted-foreground text-xs">{hint}</p>
           </>
         )}
       </div>
@@ -864,14 +861,14 @@ export function CreateTestForm() {
           className="border-border text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 text-sm font-medium transition-all"
         >
           <Plus className="h-4 w-4" />
-          Add another speed level
+          Add another dictation
         </button>
       </Section>
       {/* ── 3. Materials ────────────────────────────────────────────────────── */}
       <Section
         step="3"
-        title="Test Materials"
-        description="Upload the matter and outline PDFs, then type the correct answer."
+        title="Test Material"
+        description="Upload the matter and outline PDFs, then Transcribe."
       >
         <div className="mb-5 grid grid-cols-2 gap-4">
           <form.Field name="matterPdfKey">
@@ -879,11 +876,10 @@ export function CreateTestForm() {
               <div>
                 <Label>
                   <FileText className="h-3.5 w-3.5" />
-                  Matter PDF
+                  Matter
                 </Label>
                 <PdfDropzone
-                  label="Upload matter PDF"
-                  hint="The source material students transcribe"
+                  label="Upload matter"
                   value={field.state.value}
                   fileName={matterFileName}
                   uploading={matterUploading}
@@ -912,11 +908,10 @@ export function CreateTestForm() {
               <div>
                 <Label optional>
                   <FilePlus className="h-3.5 w-3.5" />
-                  Outline PDF
+                  Outlines
                 </Label>
                 <PdfDropzone
-                  label="Upload outline PDF"
-                  hint="Shorthand notes for graders"
+                  label="Upload outlines"
                   value={field.state.value ?? ""}
                   fileName={outlineFileName}
                   uploading={outlineUploading}
@@ -950,7 +945,7 @@ export function CreateTestForm() {
           {(field) => (
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <Label>Correct Answer</Label>
+                <Label>Type the Transcription</Label>
                 <span className="text-muted-foreground text-xs tabular-nums">
                   {field.state.value.length} chars
                 </span>
@@ -1004,12 +999,9 @@ export function CreateTestForm() {
               <div className="mt-5">
                 <Label optional>
                   <Music2 className="h-3.5 w-3.5 text-violet-500" />
-                  Explanation Audio
+                  Explanation Session Audio
                 </Label>
-                <Hint>
-                  An audio walkthrough of the correct answer — played back to
-                  students after they submit. Can be uploaded later.
-                </Hint>
+
                 <div
                   onClick={() =>
                     !solutionAudioUploading && solutionAudioRef.current?.click()
@@ -1164,7 +1156,7 @@ export function CreateTestForm() {
                   className="bg-emerald-600 text-white hover:bg-emerald-500"
                 >
                   <Rocket className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Publishing…" : "Publish Test"}
+                  {isSubmitting ? "Uploading…" : "Upload Test"}
                 </Button>
               </div>
             );

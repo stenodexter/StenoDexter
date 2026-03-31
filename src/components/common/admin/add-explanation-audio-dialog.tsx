@@ -42,7 +42,7 @@ export function SolutionAudioDialog({
   const presign = trpc.store.generatePresignedUrl.useMutation();
   const saveAudio = trpc.test.uploadExplanationAudioForTest.useMutation({
     onSuccess: () => {
-      toast.success("Solution audio saved!");
+      toast.success("Explanations audio saved!");
       onSuccess?.();
       handleClose();
     },
@@ -64,10 +64,28 @@ export function SolutionAudioDialog({
   }
 
   function acceptFile(f: File) {
-    if (!f.type.startsWith("audio/")) {
-      toast.error("Please select an audio file (MP3, WAV, MP4…)");
+    const validMimeTypes = [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/x-wav",
+      "audio/mp4",
+      "audio/x-m4a",
+    ];
+
+    const validExtensions = ["mp3", "wav", "mpeg", "mpg", "m4a", "mp4"];
+
+    const ext = f.name.split(".").pop()?.toLowerCase();
+
+    if (
+      !f.type.startsWith("audio/") &&
+      !validMimeTypes.includes(f.type) &&
+      !validExtensions.includes(ext || "")
+    ) {
+      toast.error("Please select a valid audio file (MP3, WAV, MPEG, M4A…)");
       return;
     }
+
     setFile(f);
     setUploadState("idle");
   }
@@ -79,7 +97,7 @@ export function SolutionAudioDialog({
       // 1. Get presigned URL
       setUploadState("uploading");
       const { uploadUrl, key } = await presign.mutateAsync({
-        folder: "solutions",
+        folder: "explanations",
         contentType: file.type,
         ext: file.name.split(".").pop() ?? "mp3",
       });
@@ -124,7 +142,9 @@ export function SolutionAudioDialog({
           className="ml-auto border-amber-500/40 text-amber-600 hover:bg-amber-500/10 hover:text-amber-500"
         >
           <FileAudio className="h-3.5 w-3.5" />
-          {existingAudioUrl ? "Replace solution audio" : "Add solution audio"}
+          {existingAudioUrl
+            ? "Replace explanation audio"
+            : "Add explanation audio"}
         </Button>
       </DialogTrigger>
 
@@ -133,8 +153,8 @@ export function SolutionAudioDialog({
           <DialogTitle className="flex items-center gap-2">
             <FileAudio className="h-4 w-4 text-violet-500" />
             {existingAudioUrl
-              ? "Replace Solution Audio"
-              : "Upload Solution Audio"}
+              ? "Replace Explanation Audio"
+              : "Upload Explanation Audio"}
           </DialogTitle>
           <DialogDescription>
             This audio walkthrough plays for students after they submit. MP3,
@@ -161,7 +181,7 @@ export function SolutionAudioDialog({
           <input
             ref={inputRef}
             type="file"
-            accept="audio/*"
+            accept=".mp3,.wav,.mpeg,.mpg,.m4a,.mp4,audio/*"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -233,7 +253,7 @@ export function SolutionAudioDialog({
 
         {existingAudioUrl && !file && (
           <p className="text-muted-foreground text-center text-xs">
-            A solution audio is already attached. Uploading will replace it.
+            An explanation audio is already attached. Uploading will replace it.
           </p>
         )}
 

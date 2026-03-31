@@ -72,22 +72,22 @@ export function UserSidebar() {
     <Sidebar>
       {/* ── Brand ── */}
       <SidebarHeader className="px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-white shadow-sm">
+        <div className="flex flex-col items-center gap-2.5">
+          <div className="flex h-13.5 w-13.5 items-center justify-center rounded-sm bg-white shadow-sm">
             <Image
               src="/icon.png"
               alt="Logo"
-              width={200}
-              height={200}
+              width={300}
+              height={300}
               className="h-full w-full"
             />
           </div>
-          <div className="flex flex-col leading-none">
-            <span className="font-logo text-base font-bold tracking-tight">
+          <div className="flex flex-col justify-center items-center leading-none">
+            <span className="font-logo text-xl font-bold tracking-tight">
               STENO<span className="text-primary"> DEXTER</span>
             </span>
             <span className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
-              Dashboard
+              Speed. Precision. Success.
             </span>
           </div>
         </div>

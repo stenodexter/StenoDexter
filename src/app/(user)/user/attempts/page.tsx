@@ -98,7 +98,7 @@ function AttemptRow({
       {/* Left */}
       <div className="min-w-0 flex-1">
         {showTitle && (
-          <p className="mb-1 truncate text-sm font-semibold">
+          <p className="mb-1 line-clamp-3 text-sm font-semibold">
             {attempt.testTitle}
           </p>
         )}
@@ -116,13 +116,8 @@ function AttemptRow({
           <span className="text-muted-foreground text-xs tabular-nums">
             {format(
               new Date(attempt.result.submittedAt),
-              "dd MMM yyyy, hh:mm a",
+              "do MMM yyyy, hh:mm a",
             )}
-          </span>
-          <span className="text-muted-foreground/50 text-xs">
-            {formatDistanceToNow(new Date(attempt.result.submittedAt), {
-              addSuffix: true,
-            })}
           </span>
         </div>
       </div>
@@ -193,7 +188,7 @@ function TestGroup({
           <FileText className="text-muted-foreground h-3.5 w-3.5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{testTitle}</p>
+          <p className="mb-1 line-clamp-3 text-sm font-semibold">{testTitle}</p>{" "}
           <p className="text-muted-foreground text-xs capitalize">
             {testType} · {attempts.length} attempt
             {attempts.length !== 1 ? "s" : ""}

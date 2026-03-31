@@ -14,7 +14,7 @@ export default function TestsPage() {
         <div>
           <h1 className="text-lg font-bold tracking-tight">Tests</h1>
           <p className="text-muted-foreground mt-0.5 text-sm">
-            Manage stenography assessments and dictation sessions.
+            Manage stenography dictations here.
           </p>
         </div>
         <Button asChild size="sm">

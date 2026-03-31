@@ -1,7 +1,5 @@
 "use client";
 
-// ─── app/(user)/page.tsx  (default user home = /user/) ───────────────────────
-
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { trpc } from "~/trpc/react";
@@ -9,7 +7,6 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
 import { Skeleton } from "~/components/ui/skeleton";
-import { Separator } from "~/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -23,6 +20,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "~/components/ui/dropdown-menu";
 import { Calendar } from "~/components/ui/calendar";
 import {
   Search,
@@ -34,12 +39,12 @@ import {
   Star,
   Trophy,
   BarChart2,
-  Zap,
-  Flame,
   RotateCcw,
   CalendarIcon,
+  ArrowUpDown,
+  SlidersHorizontal,
 } from "lucide-react";
-import { isAfter, subHours, isSameDay, format } from "date-fns";
+import { isSameDay, format } from "date-fns";
 import { TestStartDialog } from "~/components/common/user/test-start-dialog";
 import Link from "next/link";
 import {
@@ -48,6 +53,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { isAfter, subHours } from "date-fns";
+import { cn } from "~/lib/utils";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +77,8 @@ type TestItem = {
   speeds: Speed[];
 };
 
+type SortOrder = "newest" | "oldest";
+type TypeFilter = "all" | "legal" | "general" | "special";
 type Selected = { test: TestItem };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -92,7 +101,7 @@ function canAssess(test: TestItem) {
   return isWithin24h(test.createdAt) && test.speeds.some((s) => !s.hasAssessed);
 }
 
-function useDebounce<T>(val: T, ms = 350) {
+function useDebounce<T>(val: T, ms = 400) {
   const [v, setV] = useState(val);
   useEffect(() => {
     const t = setTimeout(() => setV(val), ms);
@@ -118,7 +127,7 @@ const TYPE_LABEL = { legal: "Legal", general: "General", special: "Special" };
 function TypeBadge({ type }: { type: TestItem["type"] }) {
   const Icon = TYPE_ICON[type];
   return (
-    <Badge variant={"default"} className="gap-1 text-[10px]">
+    <Badge variant="default" className="gap-1 text-[10px]">
       <Icon className="h-2.5 w-2.5" />
       {TYPE_LABEL[type]}
     </Badge>
@@ -153,7 +162,7 @@ function ActionButton({
       }}
     >
       {eligible ? (
-        <>Give Test</>
+        "Give Test"
       ) : (
         <>
           <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
@@ -174,17 +183,18 @@ function TestRow({
   onSelect: (s: Selected) => void;
 }) {
   const within24h = isWithin24h(test.createdAt);
-  const router = useRouter();
-
-  // Aggregate transcription time across speeds (show all unique values)
-  const writtenTimes = test.speeds.map((s) => s.writtenDurationSeconds);
-  const uniqueTimes = [...new Set(writtenTimes)];
+  const uniqueTimes = [
+    ...new Set(test.speeds.map((s) => s.writtenDurationSeconds)),
+  ];
 
   return (
     <TableRow className="cursor-pointer">
       <TableCell className="py-3.5">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">{test.title}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Title with truncation + wrap */}
+          <p className="line-clamp-2 max-w-[280px] text-sm leading-snug font-semibold sm:max-w-xs md:max-w-lg">
+            {test.title}
+          </p>
           {within24h && !test.hasAttempted && <NewBadge />}
           <TypeBadge type={test.type} />
         </div>
@@ -192,8 +202,9 @@ function TestRow({
           {formatDate(new Date(test.createdAt))}
         </p>
       </TableCell>
-      <TableCell className="py-3.5">
-        <div className="flex flex-wrap items-center gap-1">
+      {/* Speeds — center-aligned to header */}
+      <TableCell className="py-3.5 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-1">
           {test.speeds.map((s) => (
             <Badge
               key={s.id}
@@ -207,17 +218,28 @@ function TestRow({
           <span className="text-muted-foreground ml-0.5 text-[10px]">WPM</span>
         </div>
       </TableCell>
-      <TableCell className="py-3.5">
-        <div className="flex flex-wrap items-center gap-1">
-          {uniqueTimes.map((t, i) => (
-            <span
-              key={i}
-              className="text-muted-foreground text-xs tabular-nums"
-            >
-              {formatWrittenDuration(t)}
+      {/* Transcription time — center-aligned to header */}
+      <TableCell className="py-3.5 text-center">
+        {(() => {
+          const times = test.speeds
+            .map((s) => s.writtenDurationSeconds)
+            .filter(Boolean);
+          if (times.length === 0)
+            return <span className="text-muted-foreground text-xs">—</span>;
+          const min = Math.min(...times);
+          const max = Math.max(...times);
+          return min === max ? (
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {formatWrittenDuration(min)}
             </span>
-          ))}
-        </div>
+          ) : (
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {formatWrittenDuration(min)}
+              <span className="text-muted-foreground/40 mx-1">–</span>
+              {formatWrittenDuration(max)}
+            </span>
+          );
+        })()}
       </TableCell>
       <TableCell
         className="py-3.5 text-right"
@@ -255,29 +277,52 @@ function TestRow({
   );
 }
 
-// ─── skeletons ────────────────────────────────────────────────────────────────
+// ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function TodaySkeleton() {
+function TableSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="bg-card space-y-3 rounded-xl border p-5">
-          <div className="flex justify-between gap-2">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-5 w-14" />
-          </div>
-          <Skeleton className="h-5 w-28" />
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-8 w-24" />
-          </div>
-        </div>
-      ))}
+    <div className="overflow-hidden rounded-xl border">
+      <Table>
+        <TableBody>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <TableRow key={i}>
+              <TableCell>
+                <Skeleton className="h-4 w-48" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="mx-auto h-5 w-20" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="mx-auto h-4 w-16" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="ml-auto h-8 w-28" />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
 
 // ─── main page ────────────────────────────────────────────────────────────────
+
+const TYPE_OPTIONS: {
+  value: TypeFilter;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { value: "all", label: "All types", icon: SlidersHorizontal },
+  { value: "legal", label: "Legal", icon: Gavel },
+  { value: "general", label: "General", icon: FileText },
+  { value: "special", label: "Special", icon: Star },
+];
+
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+];
 
 export default function UserTestsPage() {
   const router = useRouter();
@@ -285,6 +330,8 @@ export default function UserTestsPage() {
   const searchParams = useSearchParams();
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const sort = (searchParams.get("sort") ?? "newest") as SortOrder;
+  const typeFilter = (searchParams.get("type") ?? "all") as TypeFilter;
 
   const dateParam = searchParams.get("date");
   const selectedDate = dateParam ? new Date(dateParam) : null;
@@ -292,104 +339,88 @@ export default function UserTestsPage() {
 
   const [queryInput, setQueryInput] = useState(searchParams.get("q") ?? "");
   const debouncedQuery = useDebounce(queryInput);
-  const isSearching = debouncedQuery.trim().length > 0;
 
   const [selected, setSelected] = useState<Selected | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const setParam = (key: string, value: string | null) => {
-    const p = new URLSearchParams(searchParams.toString());
-    if (value === null) {
-      p.delete(key);
-    } else {
-      p.set(key, value);
-    }
-    if (key !== "page") p.set("page", "1");
-    router.push(`${pathname}?${p.toString()}`);
-  };
-
-  useEffect(() => {
-    const p = new URLSearchParams(searchParams.toString());
-    if (debouncedQuery) {
-      p.set("q", debouncedQuery);
-    } else {
-      p.delete("q");
-    }
-    p.set("page", "1");
-    router.push(`${pathname}?${p.toString()}`);
-  }, [debouncedQuery]);
-
+  // Sync URL → input when back/forward
   useEffect(() => {
     const urlQ = searchParams.get("q") ?? "";
     if (urlQ !== queryInput) setQueryInput(urlQ);
   }, [searchParams.get("q")]);
 
-  const { data, isLoading } = trpc.test.listForUser.useQuery(
-    { page, pageSize: 12 },
-    { staleTime: 30_000 },
-  );
-
-  const allTests = (data?.data ?? []) as unknown as TestItem[];
-  const filtered = allTests.filter((t) => {
-    const matchQuery =
-      !isSearching ||
-      t.title.toLowerCase().includes(debouncedQuery.toLowerCase());
-
-    const matchDate =
-      isToday ||
-      (selectedDate && isSameDay(new Date(t.createdAt), selectedDate));
-
-    return matchQuery && matchDate;
-  });
-
-  const clearSearch = () => {
-    setQueryInput("");
+  // Push debounced search to URL
+  useEffect(() => {
     const p = new URLSearchParams(searchParams.toString());
-    p.delete("q");
+    if (debouncedQuery) p.set("q", debouncedQuery);
+    else p.delete("q");
+    p.set("page", "1");
+    router.push(`${pathname}?${p.toString()}`);
+  }, [debouncedQuery]);
+
+  const setParam = (updates: Record<string, string | null>) => {
+    const p = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) p.delete(key);
+      else p.set(key, value);
+    }
     p.set("page", "1");
     router.push(`${pathname}?${p.toString()}`);
   };
 
-  const clearDate = () => {
-    setParam("date", null);
-  };
+  // ── Query — all filters server-side ───────────────────────────────────────
+  const { data, isLoading } = trpc.test.listForUser.useQuery(
+    {
+      page,
+      pageSize: 12,
+      sort,
+      type: typeFilter,
+      q: debouncedQuery || undefined,
+    },
+    { staleTime: 30_000 },
+  );
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return;
-    if (isSameDay(date, new Date())) {
-      setParam("date", null); // today = no filter
-    } else {
-      setParam("date", format(date, "yyyy-MM-dd"));
-    }
-    setCalendarOpen(false);
+  const tests = (data?.data ?? []) as unknown as TestItem[];
+
+  // Client-side date filter only (date isn't a server param)
+  const filtered = isToday
+    ? tests
+    : tests.filter((t) =>
+        selectedDate ? isSameDay(new Date(t.createdAt), selectedDate) : true,
+      );
+
+  const clearAll = () => {
+    setQueryInput("");
+    router.push(pathname);
   };
 
   const today = new Date();
-  const headerDay = format(today, "EEEE");
-  const headerDate = formatDate(today);
+  const activeFilterCount = [
+    sort !== "newest",
+    typeFilter !== "all",
+    selectedDate && !isToday,
+    debouncedQuery,
+  ].filter(Boolean).length;
 
   return (
     <TooltipProvider>
       <div className="w-full space-y-8 px-6 py-8">
         {/* Header */}
         <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Tests</h1>
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tests</h1>
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-semibold">{headerDay}</p>
+            <p className="text-sm font-semibold">{format(today, "EEEE")}</p>
             <p className="text-muted-foreground text-sm tabular-nums">
-              {headerDate}
+              {formatDate(today)}
             </p>
           </div>
         </div>
 
-        {/* All tests */}
         <section>
-          {/* Toolbar */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* ── Toolbar ───────────────────────────────────────────────── */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             {/* Search */}
-            <div className="relative min-w-[200px] flex-1">
+            <div className="relative min-w-[180px] flex-1">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
                 placeholder="Search tests…"
@@ -399,7 +430,7 @@ export default function UserTestsPage() {
               />
               {queryInput && (
                 <button
-                  onClick={clearSearch}
+                  onClick={() => setQueryInput("")}
                   className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
                 >
                   <X className="h-4 w-4" />
@@ -407,41 +438,82 @@ export default function UserTestsPage() {
               )}
             </div>
 
+            {/* Sort */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={sort !== "newest" ? "default" : "outline"}
+                  size="sm"
+                  className="h-9 gap-2 text-xs"
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {SORT_OPTIONS.find((o) => o.value === sort)?.label}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel className="text-xs">
+                  Sort order
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {SORT_OPTIONS.map((o) => (
+                  <DropdownMenuItem
+                    key={o.value}
+                    className={cn(
+                      "text-xs",
+                      sort === o.value && "font-semibold",
+                    )}
+                    onClick={() => setParam({ sort: o.value })}
+                  >
+                    {o.label}
+                    {sort === o.value && <span className="ml-auto">✓</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Date picker */}
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant={selectedDate && !isToday ? "default" : "outline"}
                   size="sm"
-                  className="h-9 gap-2 px-3 text-xs"
+                  className="h-9 gap-2 text-xs"
                 >
                   <CalendarIcon className="h-3.5 w-3.5" />
                   {selectedDate && !isToday
                     ? formatDate(selectedDate)
-                    : "Pick date"}
+                    : "Filter by date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar
                   mode="single"
                   selected={selectedDate ?? new Date()}
-                  onSelect={handleDateSelect}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    if (isSameDay(date, new Date())) setParam({ date: null });
+                    else setParam({ date: format(date, "yyyy-MM-dd") });
+                    setCalendarOpen(false);
+                  }}
                   disabled={(date) => date > new Date()}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
 
-            {/* Clear date filter */}
-            {selectedDate && !isToday && (
+            {/* Clear all filters */}
+            {activeFilterCount > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-9 gap-1.5 px-2 text-xs"
-                onClick={clearDate}
+                onClick={clearAll}
               >
                 <X className="h-3.5 w-3.5" />
-                Clear date
+                Clear all
+                <Badge variant="secondary" className="ml-0.5 text-[10px]">
+                  {activeFilterCount}
+                </Badge>
               </Button>
             )}
           </div>
@@ -449,66 +521,34 @@ export default function UserTestsPage() {
           {/* Result count */}
           {!isLoading && (
             <p className="text-muted-foreground mb-3 text-xs tabular-nums">
-              {isSearching
-                ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""} for "${debouncedQuery}"`
-                : selectedDate && !isToday
-                  ? `${filtered.length} test${filtered.length !== 1 ? "s" : ""} on ${formatDate(selectedDate)}`
-                  : `${data?.total ?? 0} tests`}
+              {data?.total ?? 0} test{(data?.total ?? 0) !== 1 ? "s" : ""}
+              {debouncedQuery && ` matching "${debouncedQuery}"`}
+              {typeFilter !== "all" &&
+                ` · ${TYPE_LABEL[typeFilter as keyof typeof TYPE_LABEL]}`}
+              {selectedDate && !isToday && ` · ${formatDate(selectedDate)}`}
             </p>
           )}
 
-          {/* Content */}
+          {/* Table */}
           {isLoading ? (
-            <div className="overflow-hidden rounded-xl border">
-              <Table>
-                <TableBody>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-48" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="ml-auto h-8 w-28" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <TableSkeleton />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-20 text-center">
               <Search className="text-muted-foreground/30 mb-3 h-7 w-7" />
               <p className="text-muted-foreground text-sm font-medium">
-                {isSearching
-                  ? "No tests found"
-                  : selectedDate && !isToday
-                    ? "No tests on this date"
-                    : "No tests available"}
+                No tests found
               </p>
               <p className="text-muted-foreground/60 mt-1 text-xs">
-                {isSearching
-                  ? "Try a different search"
-                  : selectedDate && !isToday
-                    ? "Try a different date"
-                    : "Check back soon"}
+                Try adjusting your filters
               </p>
-              {(isSearching || (selectedDate && !isToday)) && (
+              {activeFilterCount > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="mt-4"
-                  onClick={() => {
-                    clearSearch();
-                    clearDate();
-                  }}
+                  onClick={clearAll}
                 >
-                  Clear filters
+                  Clear all filters
                 </Button>
               )}
             </div>
@@ -518,8 +558,10 @@ export default function UserTestsPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/20 hover:bg-muted/20">
                     <TableHead>Test</TableHead>
-                    <TableHead>Speeds</TableHead>
-                    <TableHead>Transcription Time</TableHead>
+                    <TableHead className="text-center">Speeds</TableHead>
+                    <TableHead className="text-center">
+                      Transcription Time
+                    </TableHead>
                     <TableHead className="w-48" />
                   </TableRow>
                 </TableHeader>
@@ -532,8 +574,8 @@ export default function UserTestsPage() {
             </div>
           )}
 
-          {/* Pagination — only when not filtering by a specific date */}
-          {!isSearching && isToday && (data?.totalPages ?? 1) > 1 && (
+          {/* Pagination */}
+          {(data?.totalPages ?? 1) > 1 && (
             <div className="mt-5 flex items-center justify-between border-t pt-4">
               <p className="text-muted-foreground/60 text-xs tabular-nums">
                 Page {page} of {data?.totalPages}
@@ -543,7 +585,7 @@ export default function UserTestsPage() {
                   variant="outline"
                   size="sm"
                   disabled={page <= 1}
-                  onClick={() => setParam("page", String(page - 1))}
+                  onClick={() => setParam({ page: String(page - 1) })}
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                   Prev
@@ -552,7 +594,7 @@ export default function UserTestsPage() {
                   variant="outline"
                   size="sm"
                   disabled={page >= (data?.totalPages ?? 1)}
-                  onClick={() => setParam("page", String(page + 1))}
+                  onClick={() => setParam({ page: String(page + 1) })}
                 >
                   Next
                   <ChevronRight className="h-3.5 w-3.5" />

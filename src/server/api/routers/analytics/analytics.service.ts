@@ -400,28 +400,43 @@ export function createAnalyticsService(db: Db) {
     // CTE updated: score/accuracy/wpm column names, partition by (test_id, speed_id).
 
     async getUsers(input: GetUsersInput) {
-      const { query, page, pageSize, sortField, sortOrder } = input;
+      const { query, page, pageSize, sortField, sortOrder, filter } = input;
       const offset = (page - 1) * pageSize;
 
-      const searchFilter = query
-        ? or(ilike(user.name, `%${query}%`), ilike(user.email, `%${query}%`))
-        : undefined;
+      // 🔹 Active users subquery (last 30 days attempts)
+      const activeUsersSubquery = db
+        .select({ id: testAttempts.userId })
+        .from(testAttempts)
+        .where(sql`${testAttempts.createdAt} >= now() - interval '30 days'`)
+        .groupBy(testAttempts.userId);
 
-      const needsLeaderboardSort =
-        sortField === "rank" || sortField === "points";
+      // 🔹 WHERE conditions
+      const searchConditions = [
+        query
+          ? or(ilike(user.name, `%${query}%`), ilike(user.email, `%${query}%`))
+          : undefined,
 
-      const dbOrderBy = needsLeaderboardSort
-        ? [asc(user.createdAt)]
-        : sortField === "name"
+        filter === "active" ? inArray(user.id, activeUsersSubquery) : undefined,
+      ];
+
+      const whereClause = and(...searchConditions.filter(Boolean));
+
+      // 🔹 Base sorting (DB level)
+      let dbOrderBy =
+        sortField === "name"
           ? sortOrder === "asc"
             ? [asc(user.name)]
             : [desc(user.name)]
-          : sortOrder === "asc"
-            ? [asc(user.createdAt)]
-            : [desc(user.createdAt)];
+          : sortField === "joined"
+            ? sortOrder === "asc"
+              ? [asc(user.createdAt)]
+              : [desc(user.createdAt)]
+            : [desc(user.createdAt)]; // fallback (renew handled later)
 
+      // 🔹 Fetch users + count
       const [[countRow], rows] = await Promise.all([
-        db.select({ count: count() }).from(user).where(searchFilter),
+        db.select({ count: count() }).from(user).where(whereClause),
+
         db.query.user.findMany({
           columns: {
             id: true,
@@ -430,9 +445,10 @@ export function createAnalyticsService(db: Db) {
             image: true,
             createdAt: true,
           },
-          where: searchFilter,
+          where: whereClause,
           orderBy: dbOrderBy,
-          ...(needsLeaderboardSort ? {} : { limit: pageSize, offset }),
+          limit: pageSize,
+          offset,
         }),
       ]);
 
@@ -445,62 +461,24 @@ export function createAnalyticsService(db: Db) {
 
       const userIds = rows.map((u) => u.id);
 
-      // Rank CTE — updated column names (score/accuracy/wpm), partition by speed too
-      const rankResult = await db.execute<{
+      // 🔹 Renew counts
+      const renewCounts = await db.execute<{
         user_id: string;
-        rank: number;
-        total_points: number;
+        renew_count: string;
       }>(sql`
-        WITH ranked AS (
-          SELECT
-            l.user_id,
-            l.test_id,
-            l.speed_id,
-            RANK() OVER (
-              PARTITION BY l.test_id, l.speed_id
-              ORDER BY l.score DESC, l.accuracy DESC, l.wpm DESC
-            ) AS rank,
-            COUNT(*) OVER (PARTITION BY l.test_id, l.speed_id) AS total
-          FROM leaderboard l
-        ),
-        scored AS (
-          SELECT
-            user_id,
-            CASE
-              WHEN total <= 1 THEN 100
-              ELSE 100.0 * (total - rank) / (total - 1)
-            END AS points,
-            (rank = 1) AS is_first
-          FROM ranked
-        ),
-        aggregated AS (
-          SELECT
-            user_id,
-            SUM(points)                                AS total_points,
-            SUM(CASE WHEN is_first THEN 1 ELSE 0 END) AS first_places
-          FROM scored
-          GROUP BY user_id
-        ),
-        global_rank AS (
-          SELECT
-            user_id,
-            total_points,
-            RANK() OVER (ORDER BY total_points DESC, first_places DESC) AS rank
-          FROM aggregated
-        )
-        SELECT user_id, rank, total_points
-        FROM global_rank
-        WHERE user_id = ANY(ARRAY[${sql.join(
-          userIds.map((id) => sql`${id}`),
-          sql`, `,
-        )}])
-      `);
+    SELECT user_id, COUNT(*) as renew_count
+    FROM payment_proof
+    WHERE user_id = ANY(ARRAY[${sql.join(
+      userIds.map((id) => sql`${id}`),
+      sql`, `,
+    )}])
+      AND type = 'renew'
+      AND status = 'approved'
+    GROUP BY user_id
+  `);
 
-      const rankMap = Object.fromEntries(
-        rankResult.map((r) => [
-          String(r.user_id),
-          { rank: Number(r.rank), totalPoints: Number(r.total_points) },
-        ]),
+      const renewMap = Object.fromEntries(
+        renewCounts.map((r) => [String(r.user_id), Number(r.renew_count)]),
       );
 
       let shaped = rows.map((u) => ({
@@ -509,29 +487,22 @@ export function createAnalyticsService(db: Db) {
         email: u.email,
         profilePicUrl: u.image ? R2Service.getPublicUrl(u.image) : null,
         createdAt: u.createdAt,
-        rank: rankMap[u.id]?.rank ?? null,
-        totalPoints: rankMap[u.id]?.totalPoints ?? null,
+        renewCount: renewMap[u.id] ?? 0,
       }));
 
-      if (needsLeaderboardSort) {
-        shaped.sort((a, b) => {
-          const getVal = (r: typeof a) =>
-            sortField === "rank"
-              ? (r.rank ?? Infinity)
-              : (r.totalPoints ?? -Infinity);
-          const diff = getVal(a) - getVal(b);
-          return sortField === "rank"
-            ? sortOrder === "asc"
-              ? diff
-              : -diff
-            : sortOrder === "asc"
-              ? diff
-              : -diff;
-        });
-        shaped = shaped.slice(offset, offset + pageSize);
+      // 🔹 In-memory sorting for renew
+      if (sortField === "renew") {
+        shaped.sort((a, b) =>
+          sortOrder === "asc"
+            ? a.renewCount - b.renewCount
+            : b.renewCount - a.renewCount,
+        );
       }
 
-      return { data: shaped, meta: { page, pageSize, total, totalPages } };
+      return {
+        data: shaped,
+        meta: { page, pageSize, total, totalPages },
+      };
     },
   };
 }

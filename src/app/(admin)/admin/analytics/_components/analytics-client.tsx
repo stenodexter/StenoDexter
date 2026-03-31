@@ -557,23 +557,6 @@ function AnalyticsInner() {
                 : "down"
           }
         />
-      </div>
-
-      {/* ── Engagement KPIs ── */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard
-          label="DAU"
-          value={engagement.dau}
-          sub="24h"
-          icon={Activity}
-        />
-        <StatCard label="WAU" value={engagement.wau} sub="7d" icon={Activity} />
-        <StatCard
-          label="MAU"
-          value={engagement.mau}
-          sub="30d"
-          icon={Activity}
-        />
         <StatCard
           label="Stickiness"
           value={`${stickiness}%`}

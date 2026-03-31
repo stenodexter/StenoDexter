@@ -28,7 +28,7 @@ const DRAFT_KEY = (attemptId: string) => `attempt_draft_${attemptId}`;
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type Stage = "countdown" | "audio" | "break" | "writing" | "submitted";
+type Stage = "countdown" | "audio" | "break" | "transcription" | "submitted";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -325,11 +325,9 @@ function BreakStage({
       />
 
       <div className="space-y-1 text-center">
-        <p className="text-sm font-medium">
-          Use this time to gather your thoughts
-        </p>
+        <p className="text-sm font-medium">As time gets over,</p>
         <p className="text-muted-foreground text-xs">
-          Writing begins automatically when break ends
+          your transcription will start automatically.
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={onSkip} className="gap-2">
@@ -439,10 +437,6 @@ function WritingStage({
 
         {/* Zoom controls + stats + submit */}
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground hidden text-xs tabular-nums sm:block">
-            {wordCount}w · {charCount}c
-          </span>
-
           {/* ── Zoom: +/- buttons, 2px steps, 14–48px ── */}
           <div className="bg-muted/40 flex items-center gap-0.5 rounded-md border p-0.5">
             <Button
@@ -705,7 +699,7 @@ export default function AttemptPage() {
       setStage("break");
       setTimeLeft(secondsLeft);
     } else if (attempt.stage === "writing") {
-      setStage("writing");
+      setStage("transcription");
       setTimeLeft(secondsLeft);
       startSyncIntervals();
     }
@@ -742,7 +736,7 @@ export default function AttemptPage() {
       syncMutation.mutate({ attemptId: params.attemptId, stage: "break" });
     } else if (stage === "break") {
       const writingTotal = data?.speed.writtenDurationSeconds ?? 0;
-      setStage("writing");
+      setStage("transcription");
       setTimeLeft(writingTotal);
       startSyncIntervals();
       syncMutation.mutate({
@@ -750,7 +744,7 @@ export default function AttemptPage() {
         stage: "writing",
         markWritingStarted: true,
       });
-    } else if (stage === "writing") {
+    } else if (stage === "transcription") {
       stopSyncIntervals();
       saveLocal();
       submitMutation.mutate({
@@ -797,7 +791,7 @@ export default function AttemptPage() {
 
   const handleSkipBreak = useCallback(() => {
     const writingTotal = data?.speed.writtenDurationSeconds ?? 0;
-    setStage("writing");
+    setStage("transcription");
     setTimeLeft(writingTotal);
     startSyncIntervals();
     syncMutation.mutate({
@@ -845,7 +839,7 @@ export default function AttemptPage() {
               }
               className="capitalize"
             >
-              {data.attempt.type}
+              {data.attempt.type === "assessment" ? "test" : "practise"}
             </Badge>
             <span className="text-muted-foreground text-xs capitalize">
               {stage}
@@ -890,7 +884,7 @@ export default function AttemptPage() {
           />
         )}
 
-        {stage === "writing" && (
+        {stage === "transcription" && (
           <WritingStage
             secondsLeft={timeLeft}
             totalSeconds={data.speed.writtenDurationSeconds}

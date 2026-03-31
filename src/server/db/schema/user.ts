@@ -1,13 +1,15 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { subscription } from "./subscription";
-import { nanoid } from "nanoid";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   userCode: text("user_code")
-    .$defaultFn(() => "SD" + nanoid(5))
+    .$defaultFn(() => {
+      const num = Math.floor(10000 + Math.random() * 90000);
+      return "SD" + num;
+    })
     .notNull()
     .unique(),
   email: text("email").notNull().unique(),

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -17,7 +17,6 @@ import {
 } from "~/components/ui/table";
 import {
   Bell,
-  MessageSquare,
   Search,
   X,
   ChevronLeft,
@@ -27,7 +26,12 @@ import {
   ArrowUp,
   ArrowDown,
   FileText,
+  Activity,
+  RefreshCw,
 } from "lucide-react";
+import { format } from "date-fns";
+import Link from "next/link";
+import { cn } from "~/lib/utils";
 import SendNotificationDialog from "~/components/common/admin/send-notification";
 import type { InitialRecipient } from "~/components/common/admin/send-notification";
 
@@ -39,30 +43,17 @@ type UserRow = {
   email: string;
   profilePicUrl: string | null;
   createdAt: Date;
-  rank: number | null;
-  totalPoints: number | null;
+  renewCount: number;
 };
 
-type SortField = "rank" | "name" | "joined" | "points";
+type SortField = "name" | "joined" | "renew";
 type SortOrder = "asc" | "desc";
+type Filter = "all" | "active";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function initials(u: Pick<UserRow, "name" | "email">) {
   return (u.name ?? u.email ?? "?")[0]?.toUpperCase() ?? "?";
-}
-
-const MEDALS = ["🥇", "🥈", "🥉"];
-
-function RankCell({ rank }: { rank: number | null }) {
-  if (rank === null)
-    return <span className="text-muted-foreground/40 text-sm">—</span>;
-  if (rank <= 3) return <span className="text-base">{MEDALS[rank - 1]}</span>;
-  return (
-    <span className="text-muted-foreground text-sm font-semibold tabular-nums">
-      #{rank}
-    </span>
-  );
 }
 
 function SortHead({
@@ -95,6 +86,104 @@ function SortHead({
   );
 }
 
+// ─── KPI cards ────────────────────────────────────────────────────────────────
+
+function UserKpiCards({
+  activeFilter,
+  onFilterChange,
+}: {
+  activeFilter: Filter;
+  onFilterChange: (f: Filter) => void;
+}) {
+  const [overview] = trpc.analytics.getPlatformOverview.useSuspenseQuery();
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {/* Total registered */}
+      <button
+        onClick={() => onFilterChange("all")}
+        className={cn(
+          "group relative flex flex-col justify-between gap-3 overflow-hidden rounded-2xl border px-6 py-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg",
+          activeFilter === "all"
+            ? "border-primary/30 ring-primary/20 ring-2"
+            : "hover:border-primary/20",
+        )}
+        style={{
+          background:
+            "radial-gradient(ellipse at top right, color-mix(in oklch, var(--chart-1) 8%, var(--card)), var(--card))",
+        }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-muted-foreground text-xs font-medium leading-none">
+            Registered users
+          </p>
+          <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold">
+            All
+          </span>
+        </div>
+        <p className="text-4xl leading-none font-bold tracking-tight tabular-nums">
+          {overview.totalUsers.toLocaleString("en-IN")}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <Users className="text-muted-foreground h-3.5 w-3.5" />
+          <p className="text-muted-foreground text-xs">On the platform</p>
+        </div>
+      </button>
+
+      {/* Active users */}
+      <button
+        onClick={() => onFilterChange("active")}
+        className={cn(
+          "group relative flex flex-col justify-between gap-3 overflow-hidden rounded-2xl border px-6 py-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg",
+          activeFilter === "active"
+            ? "border-emerald-500/30 ring-2 ring-emerald-500/20"
+            : "hover:border-emerald-500/20",
+        )}
+        style={{
+          background:
+            "radial-gradient(ellipse at top right, color-mix(in oklch, var(--chart-2) 8%, var(--card)), var(--card))",
+        }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-muted-foreground text-xs font-medium leading-none">
+            Active users
+          </p>
+          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            30d
+          </span>
+        </div>
+        <p className="text-4xl leading-none font-bold tracking-tight tabular-nums">
+          {overview.activeUsers.last30d.toLocaleString("en-IN")}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <Activity className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-muted-foreground text-xs">
+            1d: {overview.activeUsers.last1d} · 7d: {overview.activeUsers.last7d}
+          </p>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function KpiSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          className="rounded-2xl border px-6 py-5"
+          style={{ background: "var(--card)" }}
+        >
+          <Skeleton className="mb-4 h-2.5 w-24" />
+          <Skeleton className="h-10 w-20" />
+          <Skeleton className="mt-3 h-2.5 w-32" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── table skeleton ───────────────────────────────────────────────────────────
 
 function TableSkeleton({ rows = 10 }: { rows?: number }) {
@@ -105,10 +194,9 @@ function TableSkeleton({ rows = 10 }: { rows?: number }) {
           <TableRow className="bg-muted/20 hover:bg-muted/20">
             <TableHead className="w-10" />
             <TableHead>User</TableHead>
-            <TableHead className="w-24 text-center">Rank</TableHead>
-            <TableHead className="w-28 text-right">Points</TableHead>
             <TableHead className="w-40 text-right">Joined</TableHead>
-            <TableHead className="w-28 text-right" />
+            <TableHead className="w-28 text-right">Renewals</TableHead>
+            <TableHead className="w-28" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -123,14 +211,11 @@ function TableSkeleton({ rows = 10 }: { rows?: number }) {
                   <Skeleton className="h-3 w-48" />
                 </div>
               </TableCell>
-              <TableCell className="py-3 text-center">
-                <Skeleton className="mx-auto h-3.5 w-8" />
+              <TableCell className="py-3 text-right">
+                <Skeleton className="ml-auto h-3 w-24" />
               </TableCell>
               <TableCell className="py-3 text-right">
-                <Skeleton className="ml-auto h-3.5 w-14" />
-              </TableCell>
-              <TableCell className="py-3 text-right">
-                <Skeleton className="ml-auto h-3 w-20" />
+                <Skeleton className="ml-auto h-3.5 w-8" />
               </TableCell>
               <TableCell className="py-3">
                 <div className="flex justify-end gap-1.5">
@@ -154,6 +239,7 @@ function UsersTable({
   pageSize,
   sortField,
   sortOrder,
+  filter,
   onPageChange,
   onTotalChange,
   onSort,
@@ -163,6 +249,7 @@ function UsersTable({
   pageSize: number;
   sortField: SortField;
   sortOrder: SortOrder;
+  filter: Filter;
   onPageChange: (p: number) => void;
   onTotalChange: (n: number) => void;
   onSort: (field: SortField) => void;
@@ -171,16 +258,15 @@ function UsersTable({
   const [notify, setNotify] = useState<InitialRecipient | null>(null);
 
   const { data, isLoading, isFetching } = trpc.analytics.getUsers.useQuery(
-    { query, page, pageSize, sortField, sortOrder },
+    { query, page, pageSize, sortField: sortField , sortOrder, filter },
     { staleTime: 30_000 },
   );
 
-  const users = data?.data ?? [];
+  const users: UserRow[] = data?.data ?? [];
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
   const total = meta?.total ?? 0;
 
-  // Propagate total to parent for the header count
   useEffect(() => {
     onTotalChange(total);
   }, [total, onTotalChange]);
@@ -196,9 +282,7 @@ function UsersTable({
 
   return (
     <>
-      <div
-        className={`transition-opacity duration-150 ${dim ? "opacity-60" : ""}`}
-      >
+      <div className={`transition-opacity duration-150 ${dim ? "opacity-60" : ""}`}>
         {isLoading ? (
           <TableSkeleton rows={pageSize} />
         ) : users.length === 0 ? (
@@ -221,29 +305,7 @@ function UsersTable({
                       onClick={() => onSort("name")}
                     />
                   </TableHead>
-                  <TableHead className="w-24 text-center">
-                    <div className="flex justify-center">
-                      <SortHead
-                        label="Rank"
-                        field="rank"
-                        active={sortField === "rank"}
-                        order={sortOrder}
-                        onClick={() => onSort("rank")}
-                      />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-28 text-right">
-                    <div className="flex justify-end">
-                      <SortHead
-                        label="Points"
-                        field="points"
-                        active={sortField === "points"}
-                        order={sortOrder}
-                        onClick={() => onSort("points")}
-                      />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-40 text-right">
+                  <TableHead className="w-44 text-right">
                     <div className="flex justify-end">
                       <SortHead
                         label="Joined"
@@ -254,11 +316,22 @@ function UsersTable({
                       />
                     </div>
                   </TableHead>
+                  <TableHead className="w-28 text-right">
+                    <div className="flex justify-end">
+                      <SortHead
+                        label="Renewals"
+                        field="renew"
+                        active={sortField === "renew"}
+                        order={sortOrder}
+                        onClick={() => onSort("renew")}
+                      />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((u, idx) => (
+                {users.map((u) => (
                   <TableRow
                     key={u.id}
                     className="group cursor-pointer"
@@ -286,33 +359,23 @@ function UsersTable({
                       )}
                     </TableCell>
 
-                    {/* Rank */}
-                    <TableCell className="py-3 text-center">
-                      <RankCell rank={u.rank} />
-                    </TableCell>
-
-                    {/* Points */}
-                    <TableCell className="py-3 text-right">
-                      {u.totalPoints !== null ? (
-                        <span className="text-sm font-semibold tabular-nums">
-                          {Math.round(u.totalPoints)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-sm">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-
                     {/* Joined */}
                     <TableCell className="py-3 text-right">
                       <span className="text-muted-foreground text-xs tabular-nums">
-                        {new Date(u.createdAt).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {format(new Date(u.createdAt), "do MMMM yyyy")}
                       </span>
+                    </TableCell>
+
+                    {/* Renewals */}
+                    <TableCell className="py-3 text-right">
+                      {u.renewCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-sky-600 dark:text-sky-400">
+                          <RefreshCw className="h-2.5 w-2.5" />
+                          {u.renewCount}×
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">—</span>
+                      )}
                     </TableCell>
 
                     {/* Actions */}
@@ -413,13 +476,28 @@ function UsersTable({
 const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState<number | null>(null);
-  const [sortField, setSortField] = useState<SortField>("rank");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [sortField, setSortField] = useState<SortField>("joined");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [filter, setFilter] = useState<Filter>(
+    (searchParams.get("filter") as Filter) ?? "all",
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync filter to URL
+  const handleFilterChange = (f: Filter) => {
+    setFilter(f);
+    setPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("filter", f);
+    router.replace(`?${params.toString()}`);
+  };
 
   const handleSearch = (val: string) => {
     setRawQuery(val);
@@ -441,7 +519,7 @@ export default function AdminUsersPage() {
       setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortOrder(field === "rank" || field === "points" ? "asc" : "asc");
+      setSortOrder("desc");
     }
     setPage(1);
   };
@@ -460,7 +538,8 @@ export default function AdminUsersPage() {
               <span className="text-foreground font-semibold tabular-nums">
                 {total}
               </span>{" "}
-              registered user{total !== 1 ? "s" : ""}
+              {filter === "active" ? "active" : "registered"} user
+              {total !== 1 ? "s" : ""}
             </>
           ) : (
             "Manage your platform users"
@@ -468,8 +547,13 @@ export default function AdminUsersPage() {
         </p>
       </div>
 
-      {/* Search bar — full width, prominent */}
-      <div className="relative mb-5">
+      {/* KPI cards — clicking sets filter */}
+      <Suspense fallback={<KpiSkeleton />}>
+        <UserKpiCards activeFilter={filter} onFilterChange={handleFilterChange} />
+      </Suspense>
+
+      {/* Search bar */}
+      <div className="relative my-5">
         <Search className="text-muted-foreground absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2" />
         <Input
           placeholder="Search by name or email…"
@@ -495,6 +579,7 @@ export default function AdminUsersPage() {
           pageSize={PAGE_SIZE}
           sortField={sortField}
           sortOrder={sortOrder}
+          filter={filter}
           onPageChange={setPage}
           onTotalChange={setTotal}
           onSort={handleSort}

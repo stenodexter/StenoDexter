@@ -22,8 +22,9 @@ export const getUsersSchema = z.object({
   query: z.string().optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
-  sortField: z.enum(["rank", "name", "joined", "points"]).default("rank"),
+  sortField: z.enum(["name", "joined", "renew"]).default("joined"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
+  filter: z.enum(["all", "active"]).default("all"), // ← add this
 });
 
 export const getTestStatsSchema = z.object({

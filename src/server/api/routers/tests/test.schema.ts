@@ -69,6 +69,9 @@ export const listTestsSchema = z.object({
 export const listUserTestsSchema = z.object({
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().optional().default(12),
+  sort: z.enum(["newest", "oldest"]).default("newest"),
+  type: z.union([TestTypeEnum, z.literal("all")]).default("all"),
+  q: z.string().optional(),
 });
 
 export const getTestsAdminSchema = z.object({

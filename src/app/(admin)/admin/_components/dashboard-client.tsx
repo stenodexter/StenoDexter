@@ -84,6 +84,7 @@ export function StatCard({
   icon: Icon,
   trend,
   trendDir = "neutral",
+  href,
 }: {
   label: string;
   value: string | number;
@@ -92,6 +93,7 @@ export function StatCard({
   icon: React.ElementType;
   trend?: string;
   trendDir?: TrendDir;
+  href?: string;
 }) {
   const trendStyles =
     trendDir === "up"
@@ -102,7 +104,7 @@ export function StatCard({
 
   const trendArrow = trendDir === "up" ? "▲" : trendDir === "down" ? "▼" : "•";
 
-  return (
+  const CardContent = (
     <div
       className="group relative flex flex-col justify-between gap-4 overflow-hidden rounded-2xl border px-6 py-5 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       style={{
@@ -140,6 +142,17 @@ export function StatCard({
       )}
     </div>
   );
+
+  // 👇 Conditional wrapper
+  if (href) {
+    return (
+      <Link href={href} className="block focus:outline-none">
+        {CardContent}
+      </Link>
+    );
+  }
+
+  return CardContent;
 }
 
 function KpiRow() {
@@ -148,14 +161,16 @@ function KpiRow() {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
-        label="Total Users"
-        value={fmtNum(overview.totalUsers)}
-        story="Registered users"
-        sub="On the platform"
-        icon={Users}
-        trend={`+${overview.activeUsers.last7d}`}
-        trendDir="up"
+        label="Active Users"
+        value={fmtNum(overview.activeUsers.last30d)}
+        story="Last 30 days"
+        sub={`1d: ${overview.activeUsers.last1d} • 7d: ${overview.activeUsers.last7d}`}
+        icon={TrendingUp}
+        trend="Engagement"
+        trendDir="neutral"
+        href="/admin/users?filter=active"
       />
+
       <StatCard
         label="Total Tests"
         value={fmtNum(overview.totalTests)}
@@ -173,13 +188,14 @@ function KpiRow() {
         trendDir="up"
       />
       <StatCard
-        label="Active Users"
-        value={fmtNum(overview.activeUsers.last30d)}
-        story="Last 30 days"
-        sub={`1d: ${overview.activeUsers.last1d} • 7d: ${overview.activeUsers.last7d}`}
-        icon={TrendingUp}
-        trend="Engagement"
-        trendDir="neutral"
+        label="Total Users"
+        value={fmtNum(overview.totalUsers)}
+        story="Registered users"
+        sub="On the platform"
+        icon={Users}
+        trend={`+${overview.activeUsers.last7d}`}
+        trendDir="up"
+        href="/admin/users"
       />
     </div>
   );
@@ -831,7 +847,7 @@ function ColSkeleton({ rows = 5 }: { rows?: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardClient() {
-  const today = format(new Date(), "EEEE, MMM d");
+  const today = format(new Date(), "EEEE, do MMMM yyyy");
 
   // Preload before Suspense boundaries
   trpc.analytics.getPlatformOverview.useQuery(undefined, { staleTime: 60_000 });
