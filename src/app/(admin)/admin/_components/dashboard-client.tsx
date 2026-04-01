@@ -177,6 +177,7 @@ function KpiRow() {
         story="Available tests"
         sub="Across all categories"
         icon={ClipboardList}
+        href="/admin/tests"
       />
       <StatCard
         label="Total Attempts"
@@ -479,6 +480,8 @@ function RecentAttempts() {
     sortOrder: "desc",
   });
 
+  const gridCols = "grid-cols-[1fr_1.4fr_80px_80px_100px_40px]";
+
   if (data.length === 0) {
     return (
       <div>
@@ -494,15 +497,21 @@ function RecentAttempts() {
   return (
     <div>
       <SectionHeader icon={TrendingUp} title="Recent Attempts" />
+
       <div className="overflow-hidden rounded-2xl border">
-        {/* Table header */}
-        <div className="bg-muted/30 grid grid-cols-[1fr_1.4fr_80px_52px_52px_64px_80px_28px] items-center gap-3 border-b px-5 py-2.5">
-          {["User", "Test", "Type", "WPM", "Acc", "When", ""].map((h, i) => (
+        {/* Header */}
+        <div
+          className={cn(
+            "bg-muted/30 grid items-center gap-3 border-b px-5 py-2.5",
+            gridCols,
+          )}
+        >
+          {["User", "Test", "Type", "WPM", "When", ""].map((h, i) => (
             <span
               key={i}
               className={cn(
                 "text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase",
-                i >= 3 && i <= 6 && "text-right",
+                i >= 3 && i <= 4 && "text-right",
               )}
             >
               {h}
@@ -510,11 +519,13 @@ function RecentAttempts() {
           ))}
         </div>
 
+        {/* Rows */}
         {data.map((row, idx) => (
           <div
             key={row.attemptId}
             className={cn(
-              "group hover:bg-muted/30 grid grid-cols-[1fr_1.4fr_80px_52px_52px_64px_80px_28px] items-center gap-3 px-5 py-3 transition-colors",
+              "group hover:bg-muted/30 grid items-center gap-3 px-5 py-3 transition-colors",
+              gridCols,
               idx !== data.length - 1 && "border-b",
             )}
           >
@@ -526,6 +537,7 @@ function RecentAttempts() {
                   {(row.user.name ?? row.user.email ?? "?")[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
+
               <div className="min-w-0">
                 <p className="truncate text-sm leading-none font-medium">
                   {row.user.name ?? row.user.email}
@@ -556,7 +568,7 @@ function RecentAttempts() {
                     : "text-muted-foreground",
                 )}
               >
-                {row.type}
+                {row.type === "assessment" ? "test" : "practice"}
               </span>
             </div>
 
@@ -565,15 +577,11 @@ function RecentAttempts() {
               {row.speed.wpm}
             </p>
 
-            {/* Accuracy */}
-            <div className="flex justify-end">
-              <AccuracyBadge v={row.result.accuracy} />
-            </div>
-
             {/* When */}
             <p className="text-muted-foreground text-right text-[11px] tabular-nums">
               {formatDistanceToNow(new Date(row.result.submittedAt), {
                 addSuffix: true,
+                
               })}
             </p>
 
@@ -597,7 +605,6 @@ function RecentAttempts() {
     </div>
   );
 }
-
 // ─── Active Tests ─────────────────────────────────────────────────────────────
 
 function ActiveTests() {

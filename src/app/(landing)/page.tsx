@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
@@ -94,12 +95,6 @@ const faqs = [
   },
 ];
 
-const trustPoints = [
-  "7-day money-back guarantee",
-  "No credit card required to start",
-  "Cancel anytime",
-];
-
 const govtBodies = [
   "SSC Stenographer",
   "High Court",
@@ -117,7 +112,10 @@ export default function LandingHome() {
       <Hero />
       <LogoStrip />
       <Features />
+      <StudyMoment />
       <Benefits />
+      <ShorthandGallery />
+      <Motivation />
       <FAQ />
     </main>
   );
@@ -128,29 +126,38 @@ function Hero() {
   return (
     <section className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-24 pb-20 text-center">
       {/* ─── BACKGROUND ─── */}
-
-      {/* base */}
       <div className="bg-background absolute inset-0 -z-20" />
 
-      {/* primary (LEFT focused) */}
+      {/* Hero image — faded into background on right */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[48%] lg:block">
+        <div className="relative h-full w-full">
+          <Image
+            src="/landing/5.jpeg"
+            alt=""
+            fill
+            className="object-cover object-left opacity-[0.12]"
+            priority
+          />
+          {/* fade to left */}
+          <div className="from-background absolute inset-0 bg-gradient-to-r via-transparent to-transparent" />
+        </div>
+      </div>
+
+      {/* primary glow */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] animate-[driftGlow_12s_ease-in-out_infinite] bg-[radial-gradient(ellipse_80%_60%_at_25%_-10%,hsl(var(--primary)/0.28),transparent)]"
       />
-
-      {/* secondary (soft balance on right) */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] animate-[driftGlow_16s_ease-in-out_infinite] bg-[radial-gradient(ellipse_70%_50%_at_70%_0%,hsl(var(--secondary)/0.18),transparent)]"
       />
-
-      {/* bottom ambient glow */}
       <div
         aria-hidden
         className="bg-primary/10 pointer-events-none absolute bottom-[-120px] left-1/2 -z-10 h-[320px] w-[700px] -translate-x-1/2 animate-[driftGlow_18s_ease-in-out_infinite] blur-3xl"
       />
 
-      {/* subtle grid (very shadcn vibe) */}
+      {/* subtle grid */}
       <div
         className="absolute inset-0 -z-10 opacity-[0.06]"
         style={{
@@ -161,12 +168,9 @@ function Hero() {
             "radial-gradient(circle at center, black 30%, transparent 80%)",
         }}
       />
-
-      {/* vignette */}
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_60%,hsl(var(--background))_100%)]" />
 
       {/* ─── CONTENT ─── */}
-
       <Badge
         variant="outline"
         className="mb-6 gap-2 rounded-full px-4 py-3 text-xs font-semibold tracking-widest uppercase backdrop-blur-sm"
@@ -287,6 +291,62 @@ function Features() {
   );
 }
 
+/* ─── STUDY MOMENT — image 1 (laptop + notebook) & image 3 (typewriter) ─── */
+function StudyMoment() {
+  return (
+    <section className="px-4 py-10 pb-24">
+      <div className="mx-auto max-w-6xl">
+        {/* Bento-style image row */}
+        <div className="grid grid-cols-12 gap-4">
+          {/* Large: notebook + laptop */}
+          <div className="relative col-span-12 overflow-hidden rounded-2xl md:col-span-7">
+            <div className="relative h-72 w-full md:h-96">
+              <Image
+                src="/landing/1.jpeg"
+                alt="Student studying stenography with laptop and notebook"
+                fill
+                className="object-cover object-center"
+              />
+              <div className="from-background/80 absolute inset-0 bg-gradient-to-t via-transparent to-transparent" />
+              <div className="absolute bottom-0 left-0 p-6">
+                <p className="text-foreground text-sm font-semibold tracking-widest uppercase opacity-80">
+                  Study on your terms
+                </p>
+                <p className="text-muted-foreground mt-1 max-w-xs text-xs leading-relaxed">
+                  Combine digital lessons with handwritten shorthand practice —
+                  the proven formula for retention.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tall: vintage typewriter */}
+          <div className="relative col-span-12 overflow-hidden rounded-2xl md:col-span-5">
+            <div className="relative h-72 w-full md:h-96">
+              <Image
+                src="/landing/3.jpeg"
+                alt="Hands on a vintage typewriter — the art of stenography"
+                fill
+                className="object-cover object-center"
+              />
+              <div className="from-background/70 absolute inset-0 bg-gradient-to-t via-transparent to-transparent" />
+              <div className="absolute bottom-0 left-0 p-6">
+                <p className="text-foreground text-sm font-semibold tracking-widest uppercase opacity-80">
+                  A timeless craft
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  Stenography has powered courts and offices for 150 years.
+                  Master it today.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── BENEFITS ─── */
 function Benefits() {
   return (
@@ -312,7 +372,7 @@ function Benefits() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3">
             {benefits.map((b) => {
               const Icon = b.icon;
               return (
@@ -328,6 +388,115 @@ function Benefits() {
                 </Card>
               );
             })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── SHORTHAND GALLERY — images 2, 4 (shorthand notes) ─── */
+function ShorthandGallery() {
+  return (
+    <section className="px-4 py-10 pb-24">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-10 text-center">
+          <p className="text-primary mb-2 text-xs font-semibold tracking-widest uppercase">
+            The Craft
+          </p>
+          <h2 className="text-3xl font-extrabold tracking-tight">
+            Shorthand in action
+          </h2>
+          <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
+            Every curved symbol is a word. Every line is precision. Our
+            exercises take you from alphabet to fluency.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-12 gap-4">
+          {/* Shorthand notes handwritten */}
+          <div className="col-span-12 md:col-span-5">
+            <div className="relative h-80 w-full overflow-hidden rounded-2xl">
+              <Image
+                src="/landing/2.jpeg"
+                alt="Handwritten shorthand notes"
+                fill
+                className="object-cover object-top"
+              />
+              <div className="from-background/60 absolute inset-0 bg-gradient-to-t" />
+              <div className="absolute bottom-0 left-0 p-5">
+                <Badge variant="outline" className="text-[10px] tracking-wider">
+                  Handwritten Practice
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Shorthand textbook exercises */}
+          <div className="col-span-12 md:col-span-7">
+            <div className="relative h-80 w-full overflow-hidden rounded-2xl">
+              <Image
+                src="/landing/4.jpeg"
+                alt="Shorthand exercise book — Exercise 115 and 116"
+                fill
+                className="object-cover object-center"
+              />
+              <div className="from-background/70 absolute inset-0 bg-gradient-to-t" />
+              <div className="absolute bottom-0 left-0 p-5">
+                <Badge variant="outline" className="text-[10px] tracking-wider">
+                  Structured Exercises
+                </Badge>
+                <p className="text-muted-foreground mt-2 max-w-xs text-xs leading-relaxed">
+                  Hundreds of graded exercises, mirroring real exam passages
+                  from SSC & High Court papers.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── MOTIVATION BANNER — image 6 (Now or Never study desk) ─── */
+function Motivation() {
+  return (
+    <section className="px-4 py-10 pb-24">
+      <div className="mx-auto max-w-6xl">
+        <div className="relative overflow-hidden rounded-3xl">
+          {/* Background image */}
+          <div className="relative h-[420px] w-full md:h-[500px]">
+            <Image
+              src="/landing/6.jpeg"
+              alt="Dedicated study desk — Now or Never"
+              fill
+              className="object-cover object-center"
+            />
+            {/* Overlay */}
+            <div className="from-background/95 via-background/70 absolute inset-0 bg-gradient-to-r to-transparent" />
+          </div>
+
+          {/* Text content */}
+          <div className="absolute inset-0 flex flex-col items-start justify-center px-8 md:px-16">
+            <p className="text-primary mb-3 text-xs font-semibold tracking-widest uppercase">
+              The Mindset
+            </p>
+            <h2 className="max-w-sm text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
+              Now or{" "}
+              <span className="from-primary to-secondary bg-gradient-to-r bg-clip-text text-transparent">
+                Never.
+              </span>
+            </h2>
+            <p className="text-muted-foreground mt-4 max-w-xs text-sm leading-relaxed">
+              Every topper you admire was once where you are now. The difference
+              is daily practice — and the decision to start today.
+            </p>
+            <Button className="mt-8 gap-2 px-6" asChild>
+              <Link href="/user">
+                Begin Your Journey <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
