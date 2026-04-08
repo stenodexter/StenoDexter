@@ -8,6 +8,7 @@ import type {
 } from "./dus.schema";
 import type { db as dbInstance } from "~/server/db";
 import { hashPassword } from "~/server/lib/hash";
+import { invalidateSubscriptionCache } from "../../trpc";
 
 type Db = typeof dbInstance;
 
@@ -204,6 +205,8 @@ export function createDusService(db: Db) {
           .set({ demoRevoked: true, updatedAt: new Date() })
           .where(eq(user.id, id));
       });
+
+      await invalidateSubscriptionCache(existing.id);
 
       return { ok: true };
     },

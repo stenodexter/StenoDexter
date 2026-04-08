@@ -3,9 +3,6 @@ priority
 admin can approve multiple IPS
 1 Device login
 
-___
-scoring engine
-
 #################################################################
 
 DONE ->
@@ -73,3 +70,6 @@ logo  -> circle , zoom
 favicon
 img is small logo
 
+
+___
+scoring engine

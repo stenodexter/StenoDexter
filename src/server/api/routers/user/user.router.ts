@@ -5,6 +5,7 @@ import {
   adminProcedure,
   createTRPCRouter,
   demoOrPaidUserProcedure,
+  invalidateSubscriptionCache,
   paidUserProcedure,
   protectedProcedure,
 } from "../../trpc";
@@ -65,21 +66,29 @@ export const userRouter = createTRPCRouter({
     const now = new Date();
 
     if (ctx.user.isDemo) {
-      const expires = ctx.user.demoExpiresAt;
+      const user = await ctx.db.query.user.findFirst({
+        where: (u, { eq }) => eq(u.id, ctx.user.id),
+      });
+
+      const expires = user?.demoExpiresAt;
+
       if (
+        !expires ||
         (expires && now > new Date(expires)) ||
-        ctx.user.demoRevoked ||
-        !expires
+        user?.demoRevoked
       ) {
         return {
           active: false,
-        };
-      } else {
-        return {
-          active: true,
-          expiresAt: expires.toISOString,
+          isRevoked: true,
+          isDemo: true,
         };
       }
+
+      return {
+        active: true,
+        expiresAt: expires.toISOString(),
+        isDemo: true,
+      };
     }
 
     const sub = await ctx.db.query.subscription.findFirst({
@@ -98,6 +107,7 @@ export const userRouter = createTRPCRouter({
         expiresAt: null,
         pendingPayment,
         isRevoked: false,
+        isDemo: false,
       };
 
     const isRevoked = sub.status === "revoked";
@@ -108,6 +118,7 @@ export const userRouter = createTRPCRouter({
       expiresAt: sub.currentPeriodEnd.toISOString(),
       pendingPayment,
       isRevoked,
+      isDemo: false,
     };
   }),
 
@@ -146,6 +157,8 @@ export const userRouter = createTRPCRouter({
         message: input.note,
         to: input.userId,
       });
+
+      await invalidateSubscriptionCache(input.userId);
 
       if (sub.user?.email) {
         await emailService.sendEmail({
