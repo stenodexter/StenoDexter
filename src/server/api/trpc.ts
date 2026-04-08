@@ -67,33 +67,25 @@ export const createCallerFactory = t.createCallerFactory;
 export const createTRPCRouter = t.router;
 
 // ---------------------------------------------------------------------------
-// Timing middleware
+// Rate Limit Middleware
 // ---------------------------------------------------------------------------
 
-const timingMiddleware = t.middleware(async ({ next, path }) => {
-  const start = Date.now();
-  const result = await next();
-  console.log(`[TRPC] ${path} took ${Date.now() - start}ms to execute`);
-  return result;
-});
-
-const rateLimitMiddleware = t.middleware(async ({ ctx, next, path }) => {
-  await redisService.rateLimitOrThrow(
-    { headers: ctx.headers, route: path },
-    60,
-    60,
-  );
-  return next({ ctx });
-});
+// const rateLimitMiddleware = t.middleware(async ({ ctx, next, path }) => {
+//   await redisService.rateLimitOrThrow(
+//     { headers: ctx.headers, route: path },
+//     60,
+//     60,
+//   );
+//   return next({ ctx });
+// });
 
 // ---------------------------------------------------------------------------
 // 3. PROCEDURES
 // ---------------------------------------------------------------------------
 
 /** Public — no auth required */
-export const publicProcedure = t.procedure
-  .use(timingMiddleware)
-  .use(rateLimitMiddleware);
+export const publicProcedure = t.procedure;
+// .use(rateLimitMiddleware);
 
 /** Protected user — better-auth session already resolved in context */
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {

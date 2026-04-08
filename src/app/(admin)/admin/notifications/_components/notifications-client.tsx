@@ -31,9 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Textarea } from "~/components/ui/textarea";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import {
   Search,
   Plus,
@@ -41,18 +38,17 @@ import {
   Pencil,
   Trash2,
   Eye,
-  Send,
   Globe,
   User,
   Link as LinkIcon,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { _nullable } from "better-auth";
+import type { EditNotification } from "~/components/common/admin/send-notification";
+import SendNotificationDialog from "~/components/common/admin/send-notification";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +62,9 @@ type Notification = {
   isLinkExternal: boolean | null;
   createdAt: Date;
   userEmail: string | null;
+  userName: string | null;
+  userProfilePicUrl: string | null;
+  userCode: string;
 };
 
 type DialogMode = "create" | "edit" | "view" | "delete" | "deleteMany" | null;
@@ -102,150 +101,6 @@ function RecipientBadge({
   );
 }
 
-// ─── send / edit form ─────────────────────────────────────────────────────────
-
-type FormState = {
-  title: string;
-  message: string;
-  to: string;
-  toType: "everyone" | "user";
-  link: string;
-  isLinkExternal: boolean;
-};
-
-const EMPTY_FORM: FormState = {
-  title: "",
-  message: "",
-  to: "",
-  toType: "everyone",
-  link: "",
-  isLinkExternal: false,
-};
-
-function notifToForm(n: Notification): FormState {
-  return {
-    title: n.title,
-    message: n.message,
-    to: n.to === "everyone" ? "" : n.to,
-    toType: n.to === "everyone" ? "everyone" : "user",
-    link: n.link ?? "",
-    isLinkExternal: n.isLinkExternal ?? false,
-  };
-}
-
-function NotificationForm({
-  form,
-  onChange,
-  disabled,
-}: {
-  form: FormState;
-  onChange: (f: FormState) => void;
-  disabled?: boolean;
-}) {
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    onChange({ ...form, [k]: v });
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Title */}
-      <div className="space-y-1.5">
-        <Label>Title</Label>
-        <Input
-          placeholder="Notification title"
-          value={form.title}
-          onChange={(e) => set("title", e.target.value)}
-          disabled={disabled}
-          maxLength={120}
-        />
-      </div>
-
-      {/* Message */}
-      <div className="space-y-1.5">
-        <Label>Message</Label>
-        <Textarea
-          placeholder="Notification message"
-          value={form.message}
-          onChange={(e) => set("message", e.target.value)}
-          disabled={disabled}
-          maxLength={1000}
-          rows={3}
-          className="resize-none"
-        />
-        <p className="text-muted-foreground text-right text-xs">
-          {form.message.length}/1000
-        </p>
-      </div>
-
-      {/* Recipient */}
-      <div className="space-y-1.5">
-        <Label>Recipient</Label>
-        <div className="flex gap-2">
-          <Select
-            value={form.toType}
-            onValueChange={(v: "everyone" | "user") => set("toType", v)}
-            disabled={disabled}
-          >
-            <SelectTrigger className="w-36 shrink-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="everyone">
-                <span className="flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-violet-400" /> Everyone
-                </span>
-              </SelectItem>
-              <SelectItem value="user">
-                <span className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-blue-400" /> Specific user
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {form.toType === "user" && (
-            <Input
-              placeholder="User ID"
-              value={form.to}
-              onChange={(e) => set("to", e.target.value)}
-              disabled={disabled}
-              className="font-mono text-sm"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Link */}
-      <div className="space-y-1.5">
-        <Label>
-          Link{" "}
-          <span className="text-muted-foreground font-normal">(optional)</span>
-        </Label>
-        <Input
-          placeholder="https://..."
-          value={form.link}
-          onChange={(e) => set("link", e.target.value)}
-          disabled={disabled}
-          type="url"
-        />
-      </div>
-
-      {/* External toggle */}
-      {form.link && (
-        <div className="flex items-center gap-2">
-          <Switch
-            id="ext"
-            checked={form.isLinkExternal}
-            onCheckedChange={(v) => set("isLinkExternal", v)}
-            disabled={disabled}
-          />
-          <Label htmlFor="ext" className="cursor-pointer font-normal">
-            Open in new tab
-          </Label>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── view dialog ──────────────────────────────────────────────────────────────
 
 function ViewDialog({
@@ -259,9 +114,7 @@ function ViewDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Notification details
-          </DialogTitle>
+          <DialogTitle>Notification details</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-2">
           <div className="space-y-1">
@@ -387,7 +240,6 @@ export default function AdminNotificationsPage() {
   // ── dialog state ───────────────────────────────────────────────────────────
   const [mode, setMode] = useState<DialogMode>(null);
   const [activeNotif, setActiveNotif] = useState<Notification | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   // ── data ───────────────────────────────────────────────────────────────────
   const utils = trpc.useUtils();
@@ -397,7 +249,6 @@ export default function AdminNotificationsPage() {
     pageSize,
   });
 
-  // Client-side search filter (swap for server-side if dataset grows large)
   const filtered = useMemo(() => {
     if (!data?.data) return [];
     if (!debouncedSearch) return data.data;
@@ -410,7 +261,6 @@ export default function AdminNotificationsPage() {
     );
   }, [data, debouncedSearch]);
 
-  // Debounce search
   const handleSearch = (v: string) => {
     setSearch(v);
     clearTimeout((handleSearch as any)._t);
@@ -422,26 +272,7 @@ export default function AdminNotificationsPage() {
 
   const invalidate = () => utils.notification.listAll.invalidate();
 
-  // ── mutations ──────────────────────────────────────────────────────────────
-
-  const send = trpc.notification.send.useMutation({
-    onSuccess: () => {
-      toast.success("Notification sent");
-      setMode(null);
-      setForm(EMPTY_FORM);
-      void invalidate();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const update = trpc.notification.update.useMutation({
-    onSuccess: () => {
-      toast.success("Notification updated");
-      setMode(null);
-      void invalidate();
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  // ── mutations (delete only — send/update handled by dialog) ───────────────
 
   const del = trpc.notification.delete.useMutation({
     onSuccess: () => {
@@ -463,17 +294,17 @@ export default function AdminNotificationsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const isDeleting = del.isPending || delMany.isPending;
+
   // ── handlers ───────────────────────────────────────────────────────────────
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
     setActiveNotif(null);
     setMode("create");
   };
 
   const openEdit = (n: Notification) => {
     setActiveNotif(n);
-    setForm(notifToForm(n));
     setMode("edit");
   };
 
@@ -488,29 +319,6 @@ export default function AdminNotificationsPage() {
   };
 
   const openDeleteMany = () => setMode("deleteMany");
-
-  const handleSubmit = () => {
-    const to = form.toType === "everyone" ? "everyone" : form.to.trim();
-    const payload = {
-      title: form.title.trim(),
-      message: form.message.trim(),
-      to,
-      link: form.link.trim() || undefined,
-      isLinkExternal: form.link.trim() ? form.isLinkExternal : undefined,
-    };
-
-    if (mode === "create") {
-      send.mutate(payload);
-    } else if (mode === "edit" && activeNotif) {
-      update.mutate({
-        id: activeNotif.id,
-        title: payload.title,
-        message: payload.message,
-        link: payload.link ?? null,
-        isLinkExternal: payload.isLinkExternal,
-      });
-    }
-  };
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -528,8 +336,23 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  const isMutating = send.isPending || update.isPending;
-  const isDeleting = del.isPending || delMany.isPending;
+  // Build EditNotification shape from the active notification
+  const editPayload: EditNotification | undefined =
+    mode === "edit" && activeNotif
+      ? {
+          id: activeNotif.id,
+          title: activeNotif.title,
+          message: activeNotif.message,
+          to: activeNotif.to,
+          link: activeNotif.link,
+          isLinkExternal: activeNotif.isLinkExternal,
+          userEmail: activeNotif.userEmail,
+          userName: activeNotif.userName ?? null,
+          userProfilePicUrl: activeNotif.userProfilePicUrl ?? null,
+          userCode: activeNotif.userCode,
+        }
+      : undefined;
+
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
 
@@ -546,15 +369,13 @@ export default function AdminNotificationsPage() {
     <div className="w-full space-y-5 px-6 py-7">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">
-              Notifications
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              {meta ? `${meta.total} total` : "Manage system notifications"}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Notifications
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {meta ? `${meta.total} total` : "Manage system notifications"}
+          </p>
         </div>
         <Button onClick={openCreate} size="sm" className="gap-1.5">
           <Plus className="h-3.5 w-3.5" />
@@ -666,14 +487,12 @@ export default function AdminNotificationsPage() {
                 .filter(Boolean)
                 .join(" ")}
             >
-              {/* Checkbox */}
               <Checkbox
                 checked={selected.has(n.id)}
                 onCheckedChange={() => toggleSelect(n.id)}
                 aria-label="Select row"
               />
 
-              {/* Title + message */}
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{n.title}</p>
                 <p className="text-muted-foreground mt-0.5 truncate text-xs">
@@ -681,22 +500,18 @@ export default function AdminNotificationsPage() {
                 </p>
               </div>
 
-              {/* Recipient */}
               <RecipientBadge to={n.to} userEmail={n.userEmail} />
 
-              {/* Seen by count */}
               <p className="text-muted-foreground text-sm tabular-nums">
                 {n.seenBy?.length ?? 0}
               </p>
 
-              {/* Created at */}
               <p className="text-muted-foreground text-xs">
                 {formatDistanceToNow(new Date(n.createdAt), {
                   addSuffix: true,
                 })}
               </p>
 
-              {/* Actions */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -708,15 +523,15 @@ export default function AdminNotificationsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-36">
-                  <DropdownMenuItem onClick={() => openView(n ?? undefined)}>
+                  <DropdownMenuItem onClick={() => openView(n as any)}>
                     <Eye className="mr-2 h-3.5 w-3.5" /> View
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openEdit(n ?? undefined)}>
+                  <DropdownMenuItem onClick={() => openEdit(n as any)}>
                     <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => openDelete(n ?? undefined)}
+                    onClick={() => openDelete(n as any)}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
@@ -769,52 +584,16 @@ export default function AdminNotificationsPage() {
         </div>
       )}
 
-      {/* ── Create / Edit dialog ─────────────────────────────────────────── */}
-      {(mode === "create" || mode === "edit") && (
-        <Dialog open onOpenChange={() => setMode(null)}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {mode === "create" ? (
-                  <>Send notification</>
-                ) : (
-                  <>Edit notification</>
-                )}
-              </DialogTitle>
-            </DialogHeader>
-
-            <NotificationForm
-              form={form}
-              onChange={setForm}
-              disabled={isMutating}
-            />
-
-            <DialogFooter className="gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setMode(null)}
-                disabled={isMutating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  isMutating ||
-                  !form.title.trim() ||
-                  !form.message.trim() ||
-                  (form.toType === "user" && !form.to.trim())
-                }
-              >
-                {isMutating && (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                )}
-                {mode === "create" ? "Send" : "Save changes"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* ── Send / Edit dialog (shared) ──────────────────────────────────── */}
+      <SendNotificationDialog
+        open={mode === "create" || mode === "edit"}
+        onClose={() => setMode(null)}
+        editNotification={editPayload}
+        onSuccess={() => {
+          setMode(null);
+          void invalidate();
+        }}
+      />
 
       {/* ── View dialog ──────────────────────────────────────────────────── */}
       {mode === "view" && activeNotif && (

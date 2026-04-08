@@ -291,9 +291,11 @@ function AttemptCard({
   index,
   highlight = false,
   isAdmin = false,
+  totalWords,
 }: {
   entry: AttemptResult;
   index: number;
+  totalWords: number;
   highlight?: boolean;
   isAdmin?: boolean;
 }) {
@@ -360,9 +362,20 @@ function AttemptCard({
         {/* CENTER (ABSOLUTE) */}
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-4">
           <div className="text-center">
+            <p className={`text-lg font-bold tabular-nums`}>
+              {Math.max(0, wordCount - entry.result.mistakes)}
+            </p>
+            <p className="text-muted-foreground text-[10px] uppercase">
+              Matter Words
+            </p>
+          </div>
+
+          <Separator orientation="vertical" className="h-8" />
+
+          <div className="text-center">
             <p className="text-lg font-bold tabular-nums">{wordCount}</p>
             <p className="text-muted-foreground text-[10px] uppercase">
-              Total Words
+              Typed Words
             </p>
           </div>
 
@@ -374,17 +387,6 @@ function AttemptCard({
             </p>
             <p className="text-muted-foreground text-[10px] uppercase">
               Mistakes
-            </p>
-          </div>
-
-          <Separator orientation="vertical" className="h-8" />
-
-          <div className="text-center">
-            <p className={`text-lg font-bold tabular-nums ${accuracyColor}`}>
-              {Math.max(0, wordCount - entry.result.mistakes)}
-            </p>
-            <p className="text-muted-foreground text-[10px] uppercase">
-              Correct
             </p>
           </div>
         </div>
@@ -646,6 +648,9 @@ function ResultsBody({
                 key={entry.attempt.id}
                 entry={entry}
                 index={i}
+                totalWords={
+                  testData.correctAnswer.trim().split(" ").length ?? 0
+                }
                 highlight={entry.attempt.id === highlightId}
                 isAdmin={isAdmin}
               />
@@ -700,9 +705,7 @@ export function TestResultsPage({
               {testData?.title}
             </h1>
             <p className="text-muted-foreground mt-0.5 text-sm">
-              {isAdmin
-                ? "Viewing student attempts"
-                : "Your attempts"}
+              {isAdmin ? "Viewing student attempts" : "Your attempts"}
             </p>
           </>
         )}

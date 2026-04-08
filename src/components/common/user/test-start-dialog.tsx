@@ -115,7 +115,7 @@ export function TestStartDialog({
           {!isPractice && (
             <p className="text-muted-foreground text-sm">
               Your first attempt at this speed counts as a test. You can
-              practice freely after.
+              practice it freely afterwords.
             </p>
           )}
         </DialogHeader>

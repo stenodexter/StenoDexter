@@ -390,6 +390,15 @@ function WritingStage({
       {/* ── Top bar ── */}
       <div className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-2.5">
         {/* Timer */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`h-1.5 w-1.5 rounded-full transition-colors ${isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`}
+          />
+          <span className="text-muted-foreground text-sm">
+            {isSyncing ? "Saving…" : "Saved"}
+          </span>
+        </div>
+
         <div className="flex items-center gap-2.5">
           <svg width={26} height={26} className="-rotate-90">
             <circle
@@ -426,14 +435,6 @@ function WritingStage({
         </div>
 
         {/* Save status */}
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-1.5 w-1.5 rounded-full transition-colors ${isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`}
-          />
-          <span className="text-muted-foreground text-sm">
-            {isSyncing ? "Saving…" : "Saved"}
-          </span>
-        </div>
 
         {/* Zoom controls + stats + submit */}
         <div className="flex items-center gap-3">

@@ -16,6 +16,7 @@ import type { api } from "~/trpc/server";
 import { ThemeToggle } from "~/components/utils/theme-toggle";
 import { useState } from "react";
 import SendNotificationDialog from "./send-notification";
+import { useLocalStorage } from "~/hooks/use-local-storage";
 
 interface NavbarProps {
   admin: Awaited<ReturnType<typeof api.admin.auth.me>>;
@@ -23,11 +24,15 @@ interface NavbarProps {
 
 export function AdminNavbar({ admin }: NavbarProps) {
   const [openNotify, setOpenNotify] = useState(false);
+  const [_isOpen, setIsOpen] = useLocalStorage<boolean>("sidebar-open", true);
 
   return (
     <>
       <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <SidebarTrigger className="-ml-1" />
+        <SidebarTrigger
+          className="-ml-1"
+          onClick={() => setIsOpen((prev) => !prev)}
+        />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <span className="text-sm font-semibold">Hi , {admin.name}</span>
 

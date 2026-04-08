@@ -2,20 +2,28 @@
 
 // ─── components/common/send-notification-dialog.tsx ──────────────────────────
 //
-// Reusable "Send Notification" dialog. Drop anywhere in the admin panel.
+// Reusable "Send / Edit Notification" dialog.
 //
-// Pre-fill a specific user (e.g. from the users table):
+// CREATE mode (default to Everyone):
+//   <SendNotificationDialog open={open} onClose={() => setOpen(false)} />
+//
+// CREATE mode (pre-fill a specific user):
 //   <SendNotificationDialog
 //     open={open}
 //     onClose={() => setOpen(false)}
 //     initialRecipient={{ id, name, email, profilePicUrl }}
 //   />
 //
-// Open blank, defaults to "Everyone":
-//   <SendNotificationDialog open={open} onClose={() => setOpen(false)} />
+// EDIT mode:
+//   <SendNotificationDialog
+//     open={open}
+//     onClose={() => setOpen(false)}
+//     editNotification={{ id, title, message, to, link, isLinkExternal,
+//                         userEmail, userName, userProfilePicUrl }}
+//   />
 //
-// The recipient field is always editable inside the dialog — the user can
-// search for anyone or switch back to "Everyone" at any time.
+// The recipient field is always editable — the admin can search for anyone
+// or switch back to "Everyone" at any time, in both create and edit modes.
 
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "~/trpc/react";
@@ -23,6 +31,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +40,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { Bell, Search, X, Users, Check, Loader2 } from "lucide-react";
+import { Bell, Search, X, Users, Check, Loader2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -38,14 +49,33 @@ export type InitialRecipient = {
   id: string;
   name: string | null;
   email: string;
+  userCode: string;
   profilePicUrl: string | null;
+};
+
+export type EditNotification = {
+  id: string;
+  title: string;
+  message: string;
+  /** "everyone" or a userId */
+  to: string;
+  link: string | null;
+  isLinkExternal: boolean | null;
+  userEmail: string | null;
+  userName: string | null;
+  userCode: string;
+  userProfilePicUrl: string | null;
 };
 
 export type SendNotificationDialogProps = {
   open: boolean;
   onClose: () => void;
-  /** Pre-fill a specific user. Omit to default to "Everyone". */
+  /** Pre-fill a specific user in create mode. Ignored when editNotification is set. */
   initialRecipient?: InitialRecipient;
+  /** Pass to switch dialog into edit mode. */
+  editNotification?: EditNotification;
+  /** Called after a successful send or update so the parent can invalidate/refresh. */
+  onSuccess?: () => void;
 };
 
 type Recipient =
@@ -55,6 +85,7 @@ type Recipient =
       id: string;
       name: string | null;
       email: string;
+      userCode: string;
       profilePicUrl: string | null;
     };
 
@@ -109,9 +140,12 @@ function RecipientPill({
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm leading-none font-medium">
-          {recipient.name ?? recipient.email}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-medium">{recipient.name ?? recipient.email}</p>
+          <span className="bg-muted shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
+            {recipient.userCode.toUpperCase()}
+          </span>
+        </div>
         {recipient.name && (
           <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {recipient.email}
@@ -190,9 +224,7 @@ function RecipientSearch({ onSelect }: { onSelect: (r: Recipient) => void }) {
           <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 animate-spin" />
         ) : query ? (
           <button
-            onClick={() => {
-              setQuery("");
-            }}
+            onClick={() => setQuery("")}
             className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
           >
             <X className="h-3.5 w-3.5" />
@@ -239,6 +271,7 @@ function RecipientSearch({ onSelect }: { onSelect: (r: Recipient) => void }) {
                         id: u.id,
                         name: u.name,
                         email: u.email,
+                        userCode: u.userCode,
                         profilePicUrl: u.profilePicUrl,
                       });
                     }}
@@ -250,15 +283,14 @@ function RecipientSearch({ onSelect }: { onSelect: (r: Recipient) => void }) {
                         {initials(u.name, u.email)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0">
+
+                    <div className="flex min-w-0 items-center gap-2">
                       <p className="truncate text-sm font-medium">
                         {u.name ?? u.email}
                       </p>
-                      {u.name && (
-                        <p className="text-muted-foreground truncate text-xs">
-                          {u.email}
-                        </p>
-                      )}
+                      <span className="bg-muted shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
+                        {u.userCode.toUpperCase()}
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -269,7 +301,7 @@ function RecipientSearch({ onSelect }: { onSelect: (r: Recipient) => void }) {
           {!isFetching && users.length === 0 && debounced && (
             <div className="px-3 py-5 text-center">
               <p className="text-muted-foreground text-sm">
-                No users match "{debounced}"
+                No users match &quot;{debounced}&quot;
               </p>
             </div>
           )}
@@ -279,73 +311,153 @@ function RecipientSearch({ onSelect }: { onSelect: (r: Recipient) => void }) {
   );
 }
 
-// ─── dialog ───────────────────────────────────────────────────────────────────
+// ─── main dialog ──────────────────────────────────────────────────────────────
 
 export default function SendNotificationDialog({
   open,
   onClose,
   initialRecipient,
+  editNotification,
+  onSuccess,
 }: SendNotificationDialogProps) {
-  const [recipient, setRecipient] = useState<Recipient>(
-    initialRecipient ? { kind: "user", ...initialRecipient } : EVERYONE,
-  );
+  const isEditMode = !!editNotification;
+
+  const [recipient, setRecipient] = useState<Recipient>(EVERYONE);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [sent, setSent] = useState(false);
+  const [link, setLink] = useState("");
+  const [isLinkExternal, setIsLinkExternal] = useState(false);
+  const [done, setDone] = useState(false);
 
-  // Reset every time the dialog opens (or opens for a different user)
+  // Reset / populate state whenever the dialog opens or the target notification changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    setDone(false);
+
+    if (isEditMode && editNotification) {
+      setTitle(editNotification.title);
+      setMessage(editNotification.message);
+      setLink(editNotification.link ?? "");
+      setIsLinkExternal(editNotification.isLinkExternal ?? false);
+      setRecipient(
+        editNotification.to === "everyone"
+          ? EVERYONE
+          : {
+              kind: "user",
+              id: editNotification.to,
+              name: editNotification.userName,
+              userCode: editNotification.userCode,
+              email: editNotification.userEmail ?? editNotification.to,
+              profilePicUrl: editNotification.userProfilePicUrl,
+            },
+      );
+    } else {
+      setTitle("");
+      setMessage("");
+      setLink("");
+      setIsLinkExternal(false);
       setRecipient(
         initialRecipient ? { kind: "user", ...initialRecipient } : EVERYONE,
       );
-      setTitle("");
-      setMessage("");
-      setSent(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialRecipient?.id]);
+  }, [open, isEditMode, editNotification?.id, initialRecipient?.id]);
 
-  const notify = trpc.notification.send.useMutation({
-    onSuccess: () => setSent(true),
+  // ── mutations ────────────────────────────────────────────────────────────
+
+  const send = trpc.notification.send.useMutation({
+    onSuccess: () => {
+      setDone(true);
+      onSuccess?.();
+    },
+    onError: (e) => toast.error(e.message),
   });
 
-  const handleSend = () => {
+  const update = trpc.notification.update.useMutation({
+    onSuccess: () => {
+      setDone(true);
+      onSuccess?.();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const isPending = send.isPending || update.isPending;
+
+  // ── handlers ─────────────────────────────────────────────────────────────
+
+  const handleSubmit = () => {
     if (!title.trim() || !message.trim()) return;
-    notify.mutate({
-      title: title.trim(),
-      message: message.trim(),
-      to: toValue(recipient),
-    });
+    const linkValue = link.trim() || undefined;
+
+    if (isEditMode && editNotification) {
+      update.mutate({
+        id: editNotification.id,
+        title: title.trim(),
+        message: message.trim(),
+        link: linkValue ?? null,
+        isLinkExternal: linkValue ? isLinkExternal : undefined,
+      });
+    } else {
+      send.mutate({
+        title: title.trim(),
+        message: message.trim(),
+        to: toValue(recipient),
+        link: linkValue,
+        isLinkExternal: linkValue ? isLinkExternal : undefined,
+      });
+    }
   };
 
   const handleClose = () => {
-    if (notify.isPending) return;
+    if (isPending) return;
     onClose();
   };
+
+  const canSubmit =
+    title.trim().length > 0 && message.trim().length > 0 && !isPending;
+
+  // ── render ────────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
-            Send notification
+            {isEditMode ? (
+              <>
+                <Pencil className="h-4 w-4" />
+                Edit notification
+              </>
+            ) : (
+              <>
+                <Bell className="h-4 w-4" />
+                Send notification
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
-        {sent ? (
-          /* ── success state ── */
+        {done ? (
+          /* ── success state ─────────────────────────────────────────────── */
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/20">
               <Check className="h-6 w-6 text-emerald-400" />
             </div>
             <div>
-              <p className="font-semibold">Notification sent!</p>
+              <p className="font-semibold">
+                {isEditMode ? "Notification updated!" : "Notification sent!"}
+              </p>
               <p className="text-muted-foreground mt-1 text-sm">
-                Delivered to{" "}
-                <span className="text-foreground font-medium">
-                  {displayName(recipient)}
-                </span>
+                {isEditMode ? (
+                  "Your changes have been saved."
+                ) : (
+                  <>
+                    Delivered to{" "}
+                    <span className="text-foreground font-medium">
+                      {displayName(recipient)}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <Button
@@ -358,12 +470,13 @@ export default function SendNotificationDialog({
             </Button>
           </div>
         ) : (
+          /* ── form ──────────────────────────────────────────────────────── */
           <div className="flex flex-col gap-4">
-            {/* ── To ── */}
+            {/* To — shown in both modes; recipient switching is always available */}
             <div className="space-y-2">
-              <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                 To
-              </label>
+              </Label>
               <RecipientPill
                 recipient={recipient}
                 onClear={() => setRecipient(EVERYONE)}
@@ -371,54 +484,100 @@ export default function SendNotificationDialog({
               <RecipientSearch onSelect={setRecipient} />
             </div>
 
-            {/* ── Title ── */}
+            {/* Title */}
             <div className="space-y-2">
-              <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                 Title
-              </label>
+              </Label>
               <Input
                 placeholder="e.g. New test available, Score updated…"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                disabled={notify.isPending}
+                disabled={isPending}
+                maxLength={120}
                 className="text-sm"
               />
             </div>
 
-            {/* ── Message ── */}
+            {/* Message */}
             <div className="space-y-2">
-              <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                 Message
-              </label>
+              </Label>
               <Textarea
                 placeholder="Write the notification body…"
                 className="min-h-[90px] resize-none text-sm"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                disabled={notify.isPending}
+                disabled={isPending}
+                maxLength={1000}
+              />
+              <p className="text-muted-foreground text-right text-xs">
+                {message.length}/1000
+              </p>
+            </div>
+
+            {/* Link (optional) */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                Link <span className="font-normal normal-case">(optional)</span>
+              </Label>
+              <Input
+                placeholder="https://…"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                disabled={isPending}
+                type="url"
+                className="text-sm"
               />
             </div>
 
-            {notify.error && (
-              <p className="text-destructive text-xs">{notify.error.message}</p>
+            {/* External toggle — only when a link is entered */}
+            {link.trim() && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="ext"
+                  checked={isLinkExternal}
+                  onCheckedChange={setIsLinkExternal}
+                  disabled={isPending}
+                />
+                <Label
+                  htmlFor="ext"
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  Open in new tab
+                </Label>
+              </div>
+            )}
+
+            {/* Inline error */}
+            {(send.error ?? update.error) && (
+              <p className="text-destructive text-xs">
+                {(send.error ?? update.error)?.message}
+              </p>
             )}
 
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={handleClose}
-                disabled={notify.isPending}
+                disabled={isPending}
               >
                 Cancel
               </Button>
               <Button
-                onClick={handleSend}
-                disabled={!title.trim() || !message.trim() || notify.isPending}
+                onClick={handleSubmit}
+                disabled={!canSubmit}
                 className="gap-1.5"
               >
-                {notify.isPending ? (
+                {isPending ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {isEditMode ? "Saving…" : "Sending…"}
+                  </>
+                ) : isEditMode ? (
+                  <>
+                    <Pencil className="h-3.5 w-3.5" /> Save changes
                   </>
                 ) : (
                   <>

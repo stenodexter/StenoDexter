@@ -47,6 +47,7 @@ type UserRow = {
   profilePicUrl: string | null;
   createdAt: Date;
   renewCount: number;
+  userCode: string;
 };
 
 type SortField = "name" | "joined" | "renew";
@@ -354,9 +355,14 @@ function UsersTable({
 
                     {/* Name + email */}
                     <TableCell className="py-3">
-                      <p className="text-sm leading-none font-medium">
-                        {u.name ?? u.email}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate text-sm font-medium">
+                          {u.name ?? u.email}
+                        </p>
+                        <span className="bg-muted shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
+                          {u.userCode}
+                        </span>
+                      </div>
                       {u.name && (
                         <p className="text-muted-foreground mt-1 text-xs">
                           {u.email}
@@ -400,6 +406,7 @@ function UsersTable({
                               name: u.name,
                               email: u.email,
                               profilePicUrl: u.profilePicUrl,
+                              userCode: u.userCode,
                             });
                           }}
                         >
@@ -608,7 +615,7 @@ export default function AdminUsersPage() {
       <div className="relative my-5">
         <Search className="text-muted-foreground absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2" />
         <Input
-          placeholder="Search by name or email…"
+          placeholder="Search by user code or name or email…"
           value={rawQuery}
           onChange={(e) => handleSearch(e.target.value)}
           className="h-11 rounded-xl pr-11 pl-11 text-sm"

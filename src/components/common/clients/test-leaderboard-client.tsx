@@ -1,8 +1,6 @@
 "use client";
 
-// ─── Shared leaderboard page ──────────────────────────────────────────────────
-
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "~/trpc/react";
@@ -18,18 +16,10 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import {
-  Trophy,
-  Medal,
-  Zap,
-  BarChart2,
-  ChevronLeft,
-  Clock,
-  Type,
-  AlertCircle,
-} from "lucide-react";
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
+import { Trophy, Medal, Zap, BarChart2, ChevronLeft } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Download } from "lucide-react";
 
 function initials(name: string | null | undefined, email: string) {
   if (name)
@@ -49,8 +39,6 @@ function formatDuration(ms: number | null) {
   const sec = totalSec % 60;
   return min > 0 ? `${min}m ${sec}s` : `${sec}s`;
 }
-
-// ─── rank cell ────────────────────────────────────────────────────────────────
 
 function RankCell({ rank }: { rank: number }) {
   if (rank === 1)
@@ -129,11 +117,13 @@ function LeaderboardTable({
   currentUserId,
   isAdmin,
   testId,
+  totalWords,
 }: {
   entries: LeaderboardEntry[];
   currentUserId: string | null;
   isAdmin: boolean;
   testId: string;
+  totalWords: number;
 }) {
   if (entries.length === 0) {
     return (
@@ -178,14 +168,11 @@ function LeaderboardTable({
           <TableHeader>
             <TableRow className="bg-muted/20 hover:bg-muted/20">
               <TableHead className="w-12">Rank</TableHead>
-              <TableHead>Participant</TableHead>
-              <TableHead className="w-36 text-center">
-                Total Typed Words
-              </TableHead>
+              <TableHead>Participants</TableHead>
+              <TableHead className="w-28 text-center">Total Words</TableHead>
+              <TableHead className="w-36 text-center">Typed Words</TableHead>
               <TableHead className="w-28 text-center">Mistakes</TableHead>
-              <TableHead className="w-36 text-center">
-                Transcription Time
-              </TableHead>
+              <TableHead className="w-36 text-center">Completed In</TableHead>
               {!isAdmin && <TableHead className="w-16" />}
             </TableRow>
           </TableHeader>
@@ -212,19 +199,25 @@ function LeaderboardTable({
                         </Avatar>
                       )}
                       <div>
-                        <p className="text-sm leading-none font-medium">
-                          {isAdmin
-                            ? (entry.user.name ?? entry.user.email)
-                            : (entry.user.userCode ?? `User ${entry.rank}`)}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-sm font-medium">
+                            {isAdmin
+                              ? (entry.user.name ?? entry.user.email)
+                              : (entry.user.userCode ?? `User ${entry.rank}`)}
+                          </p>
+
+                          {isAdmin && entry.user.userCode && (
+                            <span className="bg-muted shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
+                              {entry.user.userCode.toUpperCase()}
+                            </span>
+                          )}
+
                           {isMe && (
-                            <Badge
-                              variant="secondary"
-                              className="ml-2 text-[10px]"
-                            >
+                            <Badge variant="secondary" className="text-[10px]">
                               You
                             </Badge>
                           )}
-                        </p>
+                        </div>
                         {/* Email only visible to admin */}
                         {isAdmin && (
                           <p className="text-muted-foreground mt-0.5 text-xs">
@@ -233,6 +226,9 @@ function LeaderboardTable({
                         )}
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell className="py-3.5 text-center text-sm tabular-nums">
+                    {totalWords}
                   </TableCell>
 
                   <TableCell className="py-3.5 text-center text-sm tabular-nums">
@@ -257,18 +253,24 @@ function LeaderboardTable({
                     {formatDuration(entry.writingDuration)}
                   </TableCell>
 
-                  {/* My attempts link — user view only */}
-                  {!isAdmin && (
-                    <TableCell className="py-3.5 text-right">
-                      {isMe && (
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/user/tests/${testId}/results`}>
-                            <BarChart2 className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
-                      )}
-                    </TableCell>
-                  )}
+                  <TableCell className="py-3.5 text-right">
+                    {isMe && !isAdmin && (
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/user/tests/${testId}/results`}>
+                          <BarChart2 className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button asChild variant="ghost" size="sm">
+                        <Link
+                          href={`/admin/test/${testId}/user/${entry.user.id}/results`}
+                        >
+                          <BarChart2 className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -311,6 +313,116 @@ export function TestLeaderboardPage({
     ? entries.find((e) => e.user.id === currentUserId)
     : null;
 
+  const totalWordsInCorrectAnswer = useMemo(() => {
+    return testData?.correctAnswer.trim().split(" ").length;
+  }, [testData]);
+
+  const handleDownloadPDF = async () => {
+    if (!testData) return;
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "a4",
+    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // ── Cover header ──────────────────────────────────────────────────────────
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text(testData.title ?? "Leaderboard", pageWidth / 2, 48, {
+      align: "center",
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text(
+      `Generated on ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}  ·  Assessment attempts only`,
+      pageWidth / 2,
+      64,
+      { align: "center" },
+    );
+    doc.setTextColor(0);
+
+    // ── One section per speed, sorted lowest → highest WPM ───────────────────
+    const sortedSpeeds = [...speeds].sort((a, b) => a.wpm - b.wpm);
+    let yOffset = 88;
+
+    for (const speed of sortedSpeeds) {
+      // Fetch leaderboard for this speed
+      const speedEntries = entries.filter(
+        (e) => e.speed?.id === speed.id,
+      ) as LeaderboardEntry[];
+
+      // ── Speed section heading ──
+      if (yOffset > 700) {
+        doc.addPage();
+        yOffset = 48;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(30);
+      doc.text(`Speed: ${speed.wpm} WPM`, 40, yOffset);
+      yOffset += 6;
+
+      autoTable(doc, {
+        startY: yOffset,
+        head: [
+          [
+            "Rank",
+            "Participant",
+            "Email",
+            "SD ID",
+            "Typed Words",
+            "Mistakes",
+            "Completed In",
+          ],
+        ],
+        body: speedEntries.map((e) => [
+          `#${e.rank}`,
+          e.user.name ?? e.user.email,
+          e.user.email,
+          e.user.userCode,
+          e.totalWords > 0 ? String(e.totalWords) : "—",
+          String(e.mistakes),
+          formatDuration(e.writingDuration),
+        ]),
+        headStyles: {
+          fillColor: [30, 30, 30],
+          textColor: 255,
+          fontStyle: "bold",
+          fontSize: 9,
+        },
+        bodyStyles: { fontSize: 9, textColor: 40 },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        columnStyles: {
+          0: { halign: "center", cellWidth: 36 },
+          3: { halign: "center" },
+          4: { halign: "center" },
+          5: { halign: "center" },
+        },
+        margin: { left: 40, right: 40 },
+        didParseCell(data) {
+          // Colour mistakes column
+          if (data.column.index === 4 && data.section === "body") {
+            const val = Number(data.cell.raw);
+            if (val === 0) data.cell.styles.textColor = [5, 150, 105];
+            else if (val <= 3) data.cell.styles.textColor = [180, 100, 0];
+            else data.cell.styles.textColor = [200, 30, 30];
+          }
+        },
+      });
+
+      yOffset = (doc as any).lastAutoTable.finalY + 28;
+    }
+
+    doc.save(
+      `leaderboard-${testData.title?.replace(/\s+/g, "-").toLowerCase() ?? testId}.pdf`,
+    );
+  };
+
   return (
     <div className="w-full space-y-6 px-6 py-8">
       {/* Header */}
@@ -346,6 +458,18 @@ export function TestLeaderboardPage({
               {userEntry.mistakes} mistakes
             </p>
           </div>
+        )}
+
+        {isAdmin && testData && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-8 shrink-0 self-start"
+            onClick={handleDownloadPDF}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Rank List
+          </Button>
         )}
 
         {!isAdmin && (
@@ -407,6 +531,7 @@ export function TestLeaderboardPage({
           currentUserId={currentUserId}
           isAdmin={isAdmin}
           testId={testId}
+          totalWords={totalWordsInCorrectAnswer ?? 0}
         />
       )}
 

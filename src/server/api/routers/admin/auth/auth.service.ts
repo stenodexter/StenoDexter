@@ -116,10 +116,6 @@ export const authService = {
       await ctx.db.delete(adminSession).where(eq(adminSession.token, token));
     }
 
-    // ctx.resHeaders.append(
-    //   "Set-Cookie",
-    //   serialize(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 }),
-    // );
     return { success: true };
   },
 

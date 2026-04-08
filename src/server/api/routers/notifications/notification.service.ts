@@ -87,6 +87,7 @@ export function createNotificationsService(db: Db) {
             isLinkExternal: notifications.isLinkExternal,
             createdAt: notifications.createdAt,
             userEmail: user.email,
+            userCode: user.userCode,
           })
           .from(notifications)
           .leftJoin(

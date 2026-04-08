@@ -365,7 +365,7 @@ function NotificationCenter() {
 export function UserNavbar({ user }: NavbarProps) {
   const router = useRouter();
 
-  const [isOpen, setIsOpen] = useLocalStorage<boolean>("sidebar-open", true);
+  const [_isOpen, setIsOpen] = useLocalStorage<boolean>("sidebar-open", true);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">

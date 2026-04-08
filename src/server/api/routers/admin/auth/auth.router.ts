@@ -28,6 +28,8 @@ export const adminAuthRouter = createTRPCRouter({
     .input(loginSchema)
 
     .mutation(async ({ input, ctx }) => {
+      console.log("NEW LOGIN", ctx);
+
       await redisService.rateLimitOrThrow(
         { headers: ctx.headers, route: "adminAuth.login" },
         10,

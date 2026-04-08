@@ -413,7 +413,11 @@ export function createAnalyticsService(db: Db) {
       // 🔹 WHERE conditions
       const searchConditions = [
         query
-          ? or(ilike(user.name, `%${query}%`), ilike(user.email, `%${query}%`))
+          ? or(
+              ilike(user.userCode, `%${query}%`),
+              ilike(user.name, `%${query}%`),
+              ilike(user.email, `%${query}%`),
+            )
           : undefined,
 
         filter === "active" ? inArray(user.id, activeUsersSubquery) : undefined,
@@ -444,6 +448,7 @@ export function createAnalyticsService(db: Db) {
             email: true,
             image: true,
             createdAt: true,
+            userCode: true,
           },
           where: whereClause,
           orderBy: dbOrderBy,
@@ -485,6 +490,7 @@ export function createAnalyticsService(db: Db) {
         id: u.id,
         name: u.name,
         email: u.email,
+        userCode: u.userCode,
         profilePicUrl: u.image ? R2Service.getPublicUrl(u.image) : null,
         createdAt: u.createdAt,
         renewCount: renewMap[u.id] ?? 0,

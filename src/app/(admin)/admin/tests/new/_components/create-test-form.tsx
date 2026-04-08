@@ -252,7 +252,7 @@ function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
       <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-          Listening {fmtSec(d)}
+          Audio {fmtSec(d)}
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
@@ -260,7 +260,7 @@ function Timeline({ d, b, t }: { d: number; b: number; t: number }) {
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Writing {fmtSec(t)}
+          Transcription {fmtSec(t)}
         </span>
         <span className="text-foreground/70 ml-auto font-medium">
           Total {fmtSec(d + b + t)}
@@ -539,8 +539,8 @@ function SpeedCard({
                 <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
                   <Mic className="h-3 w-3 text-blue-500" />
                   {speed.audioKey && speed.dictationSeconds < 60
-                    ? "Listening (sec)"
-                    : "Listening (min)"}
+                    ? "Audio (sec)"
+                    : "Audio (min)"}
                 </p>
                 <Input
                   type="number"
@@ -587,7 +587,7 @@ function SpeedCard({
               <div>
                 <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
                   <Keyboard className="h-3 w-3 text-emerald-500" />
-                  Writing (min)
+                  Transcription (min)
                 </p>
                 <Input
                   type="number"
