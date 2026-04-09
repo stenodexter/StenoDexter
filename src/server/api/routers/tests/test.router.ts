@@ -94,7 +94,7 @@ export const testRouter = createTRPCRouter({
   // Public: get single test with all speeds (test detail page)
   get: secureProcedure
     .input(getTestSchema)
-    .query(({ input }) => testService.getById(input)),
+    .query(({ input, ctx }) => testService.getById(input, ctx.user?.id)),
 
   // Admin: rich filtered list with speeds
   getTests: adminProcedure

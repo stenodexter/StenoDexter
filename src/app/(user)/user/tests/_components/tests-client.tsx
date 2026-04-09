@@ -181,13 +181,18 @@ function TestRow({
   test: TestItem;
   onSelect: (s: Selected) => void;
 }) {
+  const router = useRouter();
+
   const within24h = isWithin24h(test.createdAt);
   const uniqueTimes = [
     ...new Set(test.speeds.map((s) => s.writtenDurationSeconds)),
   ];
 
   return (
-    <TableRow className="cursor-pointer">
+    <TableRow
+      className="cursor-pointer"
+      onClick={() => router.push(`/user/tests/${test.id}`)}
+    >
       <TableCell className="py-3.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* Title with truncation + wrap */}

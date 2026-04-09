@@ -414,24 +414,50 @@ export function createTestService(db: Db) {
         totalPages: Math.ceil(total / pageSize),
       };
     },
-    // ── getById ───────────────────────────────────────────────────────────────
 
-    async getById(input: GetTestInput) {
-      const test = await db.query.tests.findFirst({
-        where: eq(tests.id, input.id),
-        with: {
-          speeds: { orderBy: asc(testSpeeds.sortOrder) },
-          attempts: {
-            columns: { id: true },
+    // ── getById ───────────────────────────────────────────────────────────────
+    async getById(input: GetTestInput, userId?: string) {
+      const [test, assessedSpeedRows] = await Promise.all([
+        db.query.tests.findFirst({
+          where: eq(tests.id, input.id),
+          with: {
+            speeds: { orderBy: asc(testSpeeds.sortOrder) },
+            attempts: {
+              columns: { id: true },
+            },
           },
-        },
-      });
+        }),
+        userId
+          ? db
+              .selectDistinct({
+                testId: testAttempts.testId,
+                speedId: testAttempts.speedId,
+              })
+              .from(results)
+              .innerJoin(testAttempts, eq(results.attemptId, testAttempts.id))
+              .where(
+                and(
+                  eq(results.userId, userId),
+                  eq(testAttempts.testId, input.id),
+                ),
+              )
+          : Promise.resolve([]),
+      ]);
 
       if (!test) throw new Error("Test not found");
 
+      const assessedSpeedSet = new Set(
+        assessedSpeedRows.map((r) => `${r.testId}:${r.speedId}`),
+      );
+
       return {
         ...resolveTest(test),
-        speeds: test.speeds.map(resolveSpeed),
+        speeds: test.speeds.map((s) => ({
+          ...resolveSpeed(s),
+          ...(userId && {
+            hasAssessed: assessedSpeedSet.has(`${test.id}:${s.id}`),
+          }),
+        })),
         attemptsCount: test.attempts.length,
       };
     },

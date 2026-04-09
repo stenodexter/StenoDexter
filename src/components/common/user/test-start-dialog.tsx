@@ -2,7 +2,7 @@
 
 // ─── components/common/user/test-start-dialog.tsx ────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,7 @@ interface TestStartDialogProps {
   testTitle: string;
   lockedCursor: boolean;
   speeds: Speed[];
+  selectedSpeedId?: string;
 }
 
 const warnings = [
@@ -72,13 +73,28 @@ export function TestStartDialog({
   testTitle,
   lockedCursor,
   speeds,
+  selectedSpeedId: propSpeedId,
 }: TestStartDialogProps) {
   const router = useRouter();
   const [selectedSpeedId, setSelectedSpeedId] = useState<string | null>(
     () => speeds.find((s) => !s.hasAssessed)?.id ?? speeds[0]?.id ?? null,
   );
 
-  const selectedSpeed = speeds.find((s) => s.id === selectedSpeedId);
+  useEffect(() => {
+    if (propSpeedId) {
+      setSelectedSpeedId(propSpeedId);
+    }
+
+    return () => {
+      setSelectedSpeedId(null);
+    };
+  }, [propSpeedId]);
+
+  const selectedSpeed = useMemo(
+    () => speeds.find((s) => s.id === selectedSpeedId),
+    [selectedSpeedId],
+  );
+
   const isPractice = selectedSpeed?.hasAssessed ?? false;
 
   const createAttempt = trpc.attempt.create.useMutation({
