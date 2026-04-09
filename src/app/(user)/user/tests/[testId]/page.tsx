@@ -24,6 +24,7 @@ import {
   Timer,
   PenLine,
   Coffee,
+  Scale,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { Suspense, useRef, useState } from "react";
@@ -67,7 +68,7 @@ function fmtSec(s: number) {
 
 const TYPE_CONFIG = {
   legal: {
-    icon: Gavel,
+    icon: Scale,
     label: "Legal",
     className:
       "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
