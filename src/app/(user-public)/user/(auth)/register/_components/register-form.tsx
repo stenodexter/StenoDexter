@@ -7,10 +7,11 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Card, CardContent } from "~/components/ui/card";
-import { authClient } from "~/server/better-auth/client";
+import { authClient, getOrCreateDeviceId } from "~/server/better-auth/client";
 import Link from "next/link";
 import { deviceErrorMessage } from "~/server/lib/device-error";
 import { DeviceNotice } from "~/components/utils/device-notice";
+import { Separator } from "~/components/ui/separator";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -72,6 +73,9 @@ export function RegisterForm() {
     const { error } = await authClient.signIn.social({
       provider: "google",
       callbackURL: "/user",
+      additionalData: {
+        deviceId: getOrCreateDeviceId(),
+      },
     });
     if (error) toast.error(error.message ?? "Google sign-in failed");
   };
@@ -79,9 +83,9 @@ export function RegisterForm() {
   return (
     <Card className="w-full max-w-4xl shadow-lg">
       <CardContent className="p-0">
-        <div className="grid md:grid-cols-2">
+        <div className="flex items-center justify-between">
           {/* Column 1 - Heading & Google */}
-          <div className="flex flex-col justify-between space-y-6 p-8 md:p-12">
+          <div className="flex w-[50%] flex-col justify-between space-y-6 p-8 md:p-12">
             <div className="space-y-2">
               <h2 className="text-3xl font-semibold tracking-tight">
                 Create an account
@@ -89,7 +93,7 @@ export function RegisterForm() {
               <p className="text-muted-foreground text-sm">
                 Sign up to get started today
               </p>
-              <DeviceNotice variant="login" className="mb-[100px]" />
+              <DeviceNotice variant="register" className="mb-[100px]" />
             </div>
 
             <span className="flex flex-col items-center gap-3">
@@ -115,8 +119,10 @@ export function RegisterForm() {
             </span>
           </div>
 
+          <Separator orientation="vertical" />
+
           {/* Column 2 - Form */}
-          <div className="border-l p-8 md:p-12">
+          <div className="w-[50%] p-8 md:p-12">
             <form
               onSubmit={(e) => {
                 e.preventDefault();

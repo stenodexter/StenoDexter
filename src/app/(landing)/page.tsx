@@ -82,10 +82,7 @@ const faqs = [
     q: "Can I access the platform on mobile?",
     a: "Fully responsive. Works seamlessly on phone, tablet, and desktop.",
   },
-  {
-    q: "What is the refund policy?",
-    a: "7-day money-back guarantee on all courses. No questions asked.",
-  },
+  
   {
     q: "Do I get a certificate on completion?",
     a: "Yes — a verified completion certificate for every course. Advanced professional certifications are also available.",
@@ -196,7 +193,7 @@ function Hero() {
 
       {/* Trust pills */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        {["Progress in 15 days", "Exam-mapped content", "7-day refund"].map(
+        {["Progress in 15 days", "Exam-mapped content"].map(
           (t) => (
             <span
               key={t}

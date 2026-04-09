@@ -21,6 +21,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { CheckCircle2, Clock, Upload, X } from "lucide-react";
 import Image from "next/image";
+import { DeviceNotice } from "~/components/utils/device-notice";
 
 const AMOUNT = 1500;
 
@@ -252,6 +253,7 @@ export function PaymentDialog({
                   ₹1,500
                 </span>
               </div>
+              <DeviceNotice variant="payment" size="md" />
 
               <div className="flex flex-col items-center gap-2">
                 <span className="rounded-sm border p-3">

@@ -1,24 +1,120 @@
 "use client";
 
-import { Monitor, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Monitor, ShieldCheck, CreditCard } from "lucide-react";
 import { cn } from "~/lib/utils";
+
+type Variant = "register" | "login" | "payment";
+type Size = "sm" | "md" | "lg";
 
 export function DeviceNotice({
   variant,
+  size = "md",
   className,
 }: {
-  variant: "register" | "login";
+  variant: Variant;
+  size?: Size;
   className?: string;
 }) {
   const isRegister = variant === "register";
+  const isLogin = variant === "login";
+
+  const styles = {
+    container: isRegister
+      ? "border-amber-500/25 bg-amber-500/5"
+      : isLogin
+        ? "border-sky-500/25 bg-sky-500/5"
+        : "border-rose-500/25 bg-rose-500/5",
+
+    glow: isRegister ? "bg-amber-400" : isLogin ? "bg-sky-400" : "bg-rose-400",
+
+    iconWrap: isRegister
+      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+      : isLogin
+        ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+        : "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+
+    title: isRegister
+      ? "text-amber-700 dark:text-amber-300"
+      : isLogin
+        ? "text-sky-700 dark:text-sky-300"
+        : "text-rose-700 dark:text-rose-300",
+  };
+
+  const sizes = {
+    sm: {
+      container: "px-3 py-2.5 rounded-lg",
+      icon: "h-6 w-6",
+      iconInner: "h-3 w-3",
+      title: "text-[11px]",
+      desc: "text-[10px]",
+      gap: "gap-2",
+    },
+    md: {
+      container: "px-4 py-3.5 rounded-xl",
+      icon: "h-7 w-7",
+      iconInner: "h-3.5 w-3.5",
+      title: "text-xs",
+      desc: "text-[11px]",
+      gap: "gap-3",
+    },
+    lg: {
+      container: "px-5 py-4 rounded-2xl",
+      icon: "h-8 w-8",
+      iconInner: "h-4 w-4",
+      title: "text-sm",
+      desc: "text-xs",
+      gap: "gap-3.5",
+    },
+  };
+
+  const content = {
+    register: {
+      icon: Monitor,
+      title: " Device will be locked after registration",
+      description: (
+        <>
+          Once registered, your account is linked to this device. Switching
+          devices later requires manual support.
+        </>
+      ),
+    },
+    login: {
+      icon: ShieldCheck,
+      title: "  Primary device verification",
+      description: (
+        <>
+          You’re signing in on your primary device. Other devices won’t be able
+          to access this account
+        </>
+      ),
+    },
+    payment: {
+      icon: CreditCard,
+      title: "Confirm this is your device",
+      description: (
+        <>
+          Payments are restricted to your{" "}
+          <span className="text-foreground font-medium">registered device</span>
+          . You won’t be able to switch devices later without{" "}
+          <span className="text-foreground font-medium">
+            technical assistance
+          </span>
+          .
+        </>
+      ),
+    },
+  };
+
+  const current = content[variant];
+  const Icon = current.icon;
+  const sz = sizes[size];
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border px-4 py-3.5",
-        isRegister
-          ? "border-amber-500/25 bg-amber-500/5"
-          : "border-sky-500/25 bg-sky-500/5",
+        "relative overflow-hidden border",
+        styles.container,
+        sz.container,
         className,
       )}
     >
@@ -26,61 +122,31 @@ export function DeviceNotice({
         aria-hidden
         className={cn(
           "pointer-events-none absolute -top-4 -right-4 h-16 w-16 rounded-full opacity-40 blur-2xl",
-          isRegister ? "bg-amber-400" : "bg-sky-400",
+          styles.glow,
         )}
       />
 
-      <div className="relative flex items-start gap-3">
+      <div className={cn("relative flex items-start", sz.gap)}>
         {/* Icon */}
         <div
           className={cn(
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-            isRegister
-              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-              : "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+            "mt-0.5 flex shrink-0 items-center justify-center rounded-lg",
+            styles.iconWrap,
+            sz.icon,
           )}
         >
-          {isRegister ? (
-            <Monitor className="h-3.5 w-3.5" />
-          ) : (
-            <ShieldCheck className="h-3.5 w-3.5" />
-          )}
+          <Icon className={sz.iconInner} />
         </div>
 
         {/* Text */}
         <div className="min-w-0 space-y-0.5">
           <p
-            className={cn(
-              "text-xs leading-snug font-semibold",
-              isRegister
-                ? "text-amber-700 dark:text-amber-300"
-                : "text-sky-700 dark:text-sky-300",
-            )}
+            className={cn("leading-snug font-semibold", styles.title, sz.title)}
           >
-            {isRegister
-              ? "This device will be your primary device"
-              : "Device-locked account"}
+            {current.title}
           </p>
-          <p className="text-muted-foreground text-[11px] leading-relaxed">
-            {isRegister ? (
-              <>
-                Your account is{" "}
-                <span className="text-foreground font-medium">
-                  bound to this browser
-                </span>
-                . Signing in from a different device will be blocked. Contact
-                support if you ever need to switch.
-              </>
-            ) : (
-              <>
-                Only the{" "}
-                <span className="text-foreground font-medium">
-                  device you registered with
-                </span>{" "}
-                can access this account. If you're on a new device, contact
-                support to reset it.
-              </>
-            )}
+          <p className={cn("text-muted-foreground leading-relaxed", sz.desc)}>
+            {current.description}
           </p>
         </div>
       </div>

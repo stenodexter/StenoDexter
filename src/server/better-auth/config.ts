@@ -1,49 +1,15 @@
-import { APIError, betterAuth } from "better-auth";
+import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { env } from "~/env";
 import { db } from "~/server/db";
 import type { admin, adminSession } from "../db/schema";
-import { emailService } from "../services/mail.service";
-import { comparePassword, hashPassword } from "../lib/hash";
 import { redisService } from "../services/redis.service";
-import { deviceService } from "../api/routers/device/device.service";
+import { hashPassword, comparePassword } from "../lib/hash";
+import { databaseHooks } from "./auth/hooks";
+import { sendResetPasswordEmail, sendVerificationEmail } from "./auth/emails";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
-const DEVICE_ID_HEADER = "x-device-id";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Extract device-id from the raw request headers attached to the better-auth
- * request object. better-auth exposes `request` on hook context as a standard
- * `Request` (Fetch API).
- */
-function getDeviceId(request: Request | undefined): string | null {
-  if (!request) return null;
-  return request.headers.get(DEVICE_ID_HEADER) ?? null;
-}
-
-function getUserAgent(request: Request | undefined): string | null {
-  return request?.headers.get("user-agent") ?? null;
-}
-
-function getIpAddress(request: Request | undefined): string | null {
-  return (
-    request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request?.headers.get("x-real-ip") ??
-    null
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Auth config
-// ---------------------------------------------------------------------------
 
 export const auth = betterAuth({
   ...(env.BETTER_AUTH_SECRET && { secret: env.BETTER_AUTH_SECRET }),
@@ -70,64 +36,7 @@ export const auth = betterAuth({
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Database hooks — single choke point for ALL login methods
-  // -------------------------------------------------------------------------
-
-  databaseHooks: {
-    session: {
-      create: {
-        /**
-         * Fires after better-auth has validated credentials / OAuth token but
-         * BEFORE the session row is written.
-         *
-         * Throwing here aborts the login and returns a 401 to the client.
-         */
-        before: async (session, ctx) => {
-          const request = ctx?.request as Request | undefined;
-          const deviceId = getDeviceId(request);
-          const userId = session.userId;
-
-          console.log(deviceId, userId);
-
-          const existing = await deviceService.get(userId);
-
-          if (!existing) {
-            if (!deviceId) {
-              throw new APIError("UNAUTHORIZED", { message: "DEVICE_MISSING" });
-            }
-
-            await deviceService.create({
-              userId,
-              deviceId,
-              userAgent: getUserAgent(request),
-              ipAddress: getIpAddress(request),
-            });
-
-            return { data: session };
-          }
-
-          if (!deviceId || existing.deviceId !== deviceId) {
-            throw new APIError("UNAUTHORIZED", {
-              message: "DEVICE_MISMATCH",
-            });
-          }
-
-          void deviceService.update({
-            userId,
-            userAgent: getUserAgent(request),
-            ipAddress: getIpAddress(request),
-          });
-
-          return { data: session };
-        },
-      },
-    },
-  },
-
-  // -------------------------------------------------------------------------
-  // Email & password
-  // -------------------------------------------------------------------------
+  databaseHooks,
 
   emailAndPassword: {
     enabled: true,
@@ -142,59 +51,17 @@ export const auth = betterAuth({
     },
 
     sendResetPassword: async ({ user, url }) => {
-      await emailService.sendEmail({
-        to: user.email,
-        subject: "Steno Dexter — Reset your password",
-        html: `
-          <div style="font-family:Arial,sans-serif;line-height:1.6;max-width:600px;margin:auto;">
-            <h2>Reset your password</h2>
-            <p>Click below to set a new password. This link expires in 1 hour.</p>
-            <a href="${url}"
-               style="display:inline-block;margin-top:16px;padding:10px 18px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">
-              Reset Password →
-            </a>
-            <p style="margin-top:20px;color:#666;font-size:13px;">
-              If you didn't request this, ignore this email.
-            </p>
-            <p>— Team</p>
-          </div>
-        `,
-      });
+      await sendResetPasswordEmail(user, url);
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Email verification
-  // -------------------------------------------------------------------------
-
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
-      await emailService.sendEmail({
-        to: user.email,
-        subject: "Steno Dexter — Verify your email",
-        html: `
-          <div style="font-family:Arial,sans-serif;line-height:1.6;max-width:600px;margin:auto;">
-            <h2>Verify your email</h2>
-            <p>Click below to confirm your email address.</p>
-            <a href="${url}"
-               style="display:inline-block;margin-top:16px;padding:10px 18px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">
-              Verify Email →
-            </a>
-            <p style="margin-top:20px;color:#666;font-size:13px;">
-              If you didn't create an account, ignore this.
-            </p>
-            <p>— Team</p>
-          </div>
-        `,
-      });
+      await sendVerificationEmail(user, url);
     },
     autoSignInAfterVerification: true,
     sendOnSignUp: true,
   },
-
-  // -------------------------------------------------------------------------
-  // Social providers
-  // -------------------------------------------------------------------------
 
   socialProviders: {
     google: {
@@ -203,10 +70,6 @@ export const auth = betterAuth({
       redirectURI: `${env.BETTER_AUTH_BASE_URL}/api/auth/callback/google`,
     },
   },
-
-  // -------------------------------------------------------------------------
-  // Advanced / rate limiting
-  // -------------------------------------------------------------------------
 
   advanced: {
     defaultCookieAttributes: {
