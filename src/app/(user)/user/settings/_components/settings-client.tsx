@@ -553,7 +553,7 @@ export default function UserSettingsPage({
 
         <Separator />
 
-        {providers.includes("credential") && !user.isDemo && (
+        {!user.isDemo && (
           <Section
             icon={Lock}
             title="Password"
