@@ -2,23 +2,7 @@ import { z } from "zod";
 import { adminProcedure, createTRPCRouter, publicProcedure } from "../../trpc";
 import { createHofService } from "./hof.service";
 import { db } from "~/server/db";
-
-const createSchema = z.object({
-  name: z.string().min(1),
-  department: z.string().min(1),
-  photoKey: z.string().optional(),
-  batch: z.string().optional(),
-  note: z.string().max(200).optional(),
-});
-
-const updateSchema = z.object({
-  id: z.string(),
-  name: z.string().min(1).optional(),
-  department: z.string().min(1).optional(),
-  photoKey: z.string().nullable().optional(),
-  batch: z.string().nullable().optional(),
-  note: z.string().max(200).nullable().optional(),
-});
+import { createSchema, updateSchema } from "./hof.schema";
 
 export const hofRouter = createTRPCRouter({
   list: publicProcedure

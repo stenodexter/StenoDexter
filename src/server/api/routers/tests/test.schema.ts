@@ -8,40 +8,43 @@ export const TestStatusEnum = z.enum(TEST_STATUS_VALUES);
 export type TestType = z.infer<typeof TestTypeEnum>;
 export type TestStatus = z.infer<typeof TestStatusEnum>;
 
-// ── Speed variant ─────────────────────────────────────────────────────────────
-
 export const createSpeedSchema = z.object({
-  wpm: z.number().int().positive(),
-  audioKey: z.string().min(1),
-  dictationSeconds: z.number().int().nonnegative(),
-  breakSeconds: z.number().int().nonnegative(),
-  writtenDurationSeconds: z.number().int().positive(),
+  wpm: z.number().int().positive("WPM must be a positive number"),
+  audioKey: z.string().min(1, "Audio file is required"),
+  dictationSeconds: z
+    .number()
+    .int()
+    .nonnegative("Dictation duration cannot be negative"),
+  breakSeconds: z
+    .number()
+    .int()
+    .nonnegative("Break duration cannot be negative"),
+  writtenDurationSeconds: z
+    .number()
+    .int()
+    .positive("Written duration must be a positive number"),
   sortOrder: z.number().int().nonnegative().default(0),
 });
 
 export const updateSpeedSchema = createSpeedSchema.partial().extend({
-  id: z.string(), // existing speed id
+  id: z.string().min(1, "Speed ID is required"),
 });
 
-// ── Test CRUD ─────────────────────────────────────────────────────────────────
-
 export const createTestSchema = z.object({
-  title: z.string().min(1),
+  title: z.string().min(1, "Title is required"),
   type: TestTypeEnum,
-  matterPdfKey: z.string().min(1),
+  matterPdfKey: z.string().min(1, "Matter PDF is required"),
   outlinePdfKey: z.string().optional(),
-  correctAnswer: z.string().min(1),
+  correctAnswer: z.string().min(1, "Correct answer is required"),
   solutionAudioKey: z.string().optional(),
   status: TestStatusEnum.default("draft"),
   lockedCursor: z.boolean().optional().default(false),
-
-  // At least one speed must be provided when creating a test
   speeds: z.array(createSpeedSchema).min(1, "At least one speed is required"),
 });
 
 export const updateTestSchema = z.object({
-  id: z.string(),
-  title: z.string().min(1).optional(),
+  id: z.string().min(1, "Test ID is required"),
+  title: z.string().min(1, "Title is required").optional(),
   type: TestTypeEnum.optional(),
   matterPdfKey: z.string().optional(),
   outlinePdfKey: z.string().nullable().optional(),
@@ -49,17 +52,15 @@ export const updateTestSchema = z.object({
   solutionAudioKey: z.string().nullable().optional(),
   status: TestStatusEnum.optional(),
   lockedCursor: z.boolean().optional().default(false),
-
-  // Speeds to upsert (create if no id, update if id present)
   upsertSpeeds: z
     .array(z.union([createSpeedSchema, updateSpeedSchema]))
     .optional(),
-
-  // Speed ids to delete
   deleteSpeeds: z.array(z.string()).optional(),
 });
 
-export const getTestSchema = z.object({ id: z.string() });
+export const getTestSchema = z.object({
+  id: z.string().min(1, "Test ID is required"),
+});
 
 export const listTestsSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -88,39 +89,36 @@ export const getTestsAdminSchema = z.object({
 });
 
 export const searchTestsSchema = z.object({
-  query: z.string().min(1),
+  query: z.string().min(1, "Search query is required"),
   type: z.enum(["legal", "general"]).optional(),
   page: z.number().min(1).default(1),
   pageSize: z.number().min(1).max(50).default(12),
 });
 
-// ── Speed management (standalone — called after test creation) ────────────────
-
 export const addSpeedSchema = createSpeedSchema.extend({
-  testId: z.string(),
+  testId: z.string().min(1, "Test ID is required"),
 });
 
 export const editSpeedSchema = createSpeedSchema.partial().extend({
-  id: z.string(),
-  testId: z.string(), // for ownership verification
+  id: z.string().min(1, "Speed ID is required"),
+  testId: z.string().min(1, "Test ID is required"),
 });
 
 export const deleteSpeedSchema = z.object({
-  id: z.string(),
-  testId: z.string(), // for ownership verification
+  id: z.string().min(1, "Speed ID is required"),
+  testId: z.string().min(1, "Test ID is required"),
 });
 
 export const reorderSpeedsSchema = z.object({
-  testId: z.string(),
-  // Array of { id, sortOrder } — only the order changes
+  testId: z.string().min(1, "Test ID is required"),
   speeds: z
     .array(
       z.object({
-        id: z.string(),
+        id: z.string().min(1, "Speed ID is required"),
         sortOrder: z.number().int().nonnegative(),
       }),
     )
-    .min(1),
+    .min(1, "At least one speed is required"),
 });
 
 export const saveDraftSchema = z.object({
@@ -131,7 +129,6 @@ export const saveDraftSchema = z.object({
   correctAnswer: z.string().optional().default(""),
   solutionAudioKey: z.string().optional(),
   lockedCursor: z.boolean().optional().default(false),
-
   speeds: z
     .array(
       z.object({

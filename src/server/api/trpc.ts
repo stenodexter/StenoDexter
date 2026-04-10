@@ -53,26 +53,21 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
     if (cause instanceof ZodError) {
       return {
         ...shape,
+        message: cause.errors[0]?.message ?? "Validation failed",
         data: {
           ...shape.data,
           code: "VALIDATION_ERROR",
-          message: cause.errors.map((e) => e.message).join(", "),
         },
       };
     }
 
-    if (cause instanceof Error) {
-      return {
-        ...shape,
-        data: {
-          ...shape.data,
-          code: shape.data.code,
-          message: cause.message,
-        },
-      };
-    }
-
-    return shape;
+    return {
+      ...shape,
+      message: error.message,
+      data: {
+        ...shape.data,
+      },
+    };
   },
 });
 

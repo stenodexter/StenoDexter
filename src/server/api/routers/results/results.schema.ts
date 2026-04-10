@@ -1,10 +1,10 @@
 import z from "zod";
 
 export const getTestResultsSchema = z.object({
-  testId: z.string(),
+  testId: z.string().min(1, "Test ID is required"),
   speedId: z.string().optional(),
   page: z.number().min(0).default(0),
-  limit: z.number().min(1).max(100).default(20),
+  limit: z.number().min(1).max(100, "Limit cannot exceed 100").default(20),
   type: z.enum(["assessment", "practice"]).optional(),
   sortBy: z.enum(["score", "mistakes", "time"]).default("score"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
