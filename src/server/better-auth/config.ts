@@ -9,8 +9,6 @@ import { hashPassword, comparePassword } from "../lib/hash";
 import { databaseHooks } from "./auth/hooks";
 import { sendResetPasswordEmail, sendVerificationEmail } from "./auth/emails";
 
-
-
 export const auth = betterAuth({
   ...(env.BETTER_AUTH_SECRET && { secret: env.BETTER_AUTH_SECRET }),
   trustedOrigins: [
@@ -71,6 +69,13 @@ export const auth = betterAuth({
     },
   },
 
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    },
+  },
+
   advanced: {
     defaultCookieAttributes: {
       sameSite: "lax",
@@ -85,9 +90,9 @@ export const auth = betterAuth({
     customRules: {
       "/api/auth/sign-in/email": { window: 60, max: 10 },
       "/api/auth/sign-up/email": { window: 60, max: 5 },
-      "/api/auth/forget-password": { window: 60, max: 5 },
-      "/api/auth/reset-password": { window: 60, max: 5 },
-      "/api/auth/verify-email": { window: 60, max: 10 },
+      "/api/auth/forget-password": { window: 60, max: 2 },
+      "/api/auth/reset-password": { window: 60, max: 2 },
+      "/api/auth/verify-email": { window: 60, max: 2 },
       "/api/auth/sign-in/social": { window: 60, max: 10 },
     },
     storage: "secondary-storage",

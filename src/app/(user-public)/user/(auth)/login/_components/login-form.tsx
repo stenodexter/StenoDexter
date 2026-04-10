@@ -12,6 +12,7 @@ import Link from "next/link";
 import { deviceErrorMessage } from "~/server/lib/device-error";
 import { DeviceNotice } from "~/components/utils/device-notice";
 import { Separator } from "~/components/ui/separator";
+import { ForgotPasswordDialog } from "./forgot-password-dialog";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -176,12 +177,7 @@ export function LoginForm() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label htmlFor={field.name}>Password</Label>
-                      <a
-                        href="/forgot-password"
-                        className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 transition-colors"
-                      >
-                        Forgot password?
-                      </a>
+                      <ForgotPasswordDialog />
                     </div>
                     <Input
                       id={field.name}
