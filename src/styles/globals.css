@@ -142,7 +142,7 @@
   --primary:
     oklch(0.6724 0.1308 38.7559);
   --primary-foreground:
-    oklch(0.1908 0.0020 106.5859);
+    oklch(1 0 0);
   --secondary:
     oklch(0.9818 0.0054 95.0986);
   --secondary-foreground:

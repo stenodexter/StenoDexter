@@ -224,5 +224,14 @@ export function createPaymentService(db: Db) {
         },
       };
     },
+
+    async getPendingCount() {
+      const rows = await db.query.payment.findMany({
+        where: eq(payment.status, "pending"),
+        columns: { id: true },
+      });
+
+      return { count: rows.length };
+    },
   };
 }

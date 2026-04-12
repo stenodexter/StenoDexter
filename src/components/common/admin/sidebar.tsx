@@ -99,6 +99,7 @@ export function AdminSidebar() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
   const isSuper = useMemo(() => admin.data?.isSuper, [admin.data]);
+  const pendingCount = trpc.payment.pendingCount.useQuery();
 
   const isActive = (href: string) =>
     href === "/admin"
@@ -130,7 +131,7 @@ export function AdminSidebar() {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 pb-[100px]">
         {/* ── Create CTA ── */}
         <div className="mb-1 px-2 pt-1">
           <Button asChild className="w-full justify-start gap-2" size="sm">
@@ -233,16 +234,34 @@ export function AdminSidebar() {
             <SidebarMenu>
               {MANAGE_NAV.filter(
                 (item) => !item.super || item.super === isSuper,
-              ).map(({ label, href, icon: Icon }) => (
-                <SidebarMenuItem key={href}>
-                  <SidebarMenuButton asChild isActive={isActive(href)}>
-                    <Link href={href}>
-                      <Icon className="h-4 w-4" />
-                      <span>{label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              ).map(({ label, href, icon: Icon }) => {
+                const count =
+                  label === "Admissions" ? (pendingCount.data?.count ?? 0) : 0;
+
+                return (
+                  <SidebarMenuItem key={href}>
+                    <SidebarMenuButton asChild isActive={isActive(href)}>
+                      <Link
+                        href={href}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {label}
+                        </span>
+                        {count > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-auto h-5 px-1.5 text-[10px] shadow-[0_0_5px_2px_rgba(250,204,21,0.4)] ring-2 ring-yellow-400/70"
+                          >
+                            {count}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

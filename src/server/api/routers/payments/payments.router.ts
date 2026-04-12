@@ -14,7 +14,6 @@ import {
 import { subscription } from "~/server/db/schema";
 import { desc } from "drizzle-orm";
 
-
 // TODO NEEDS TO BE CHANGED
 
 export const paymentRouter = createTRPCRouter({
@@ -60,4 +59,8 @@ export const paymentRouter = createTRPCRouter({
 
     return { subscription: active ?? null };
   }),
+
+  pendingCount: adminProcedure.query(({ ctx }) =>
+    createPaymentService(ctx.db).getPendingCount(),
+  ),
 });

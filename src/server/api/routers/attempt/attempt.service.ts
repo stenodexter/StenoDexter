@@ -165,19 +165,20 @@ export function createAttemptService(db: Db) {
 
         // Use actual elapsed writing time if available, else full duration from speed
         const durationSeconds = attempt.writingStartedAt
-          ? Math.floor(
-              (now.getTime() - attempt.writingStartedAt.getTime()) / 1000,
+          ? Math.min(
+              Math.floor(
+                (now.getTime() - attempt.writingStartedAt.getTime()) / 1000,
+              ),
+              attempt.speed.writtenDurationSeconds,
             )
           : attempt.speed.writtenDurationSeconds;
 
-        // Score against correctAnswer (not matter — matter is the PDF now)
         const evaluation = scoringEngine.evaluate(
           attempt.test.correctAnswer,
           input.answerFinal,
           durationSeconds,
         );
 
-        // 1. Update attempt
         const [updated] = await tx
           .update(testAttempts)
           .set({

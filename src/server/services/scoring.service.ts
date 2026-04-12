@@ -37,6 +37,13 @@ function wordTokens(text: string): string[] {
   return tokenize(text).filter((t) => !/^\s+$/.test(t));
 }
 
+// ─── strip trailing/leading punctuation for comparison purposes ───────────────
+// e.g. "stage," → "stage", "unfulfilled." → "unfulfilled"
+// This is used only for alignment scoring, not for display.
+function normalizeForComparison(word: string): string {
+  return word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "").toLowerCase();
+}
+
 // ─── Needleman-Wunsch on word tokens only ────────────────────────────────────
 // We align only the word arrays. Spaces are handled separately.
 // Each position in the alignment = exactly one mistake if not "correct".
@@ -48,6 +55,10 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   const MISMATCH = -1;
   const GAP = -1;
 
+  // Compare words using punctuation-stripped, lowercased form for alignment
+  const matches = (a: string, b: string): boolean =>
+    a === b || normalizeForComparison(a) === normalizeForComparison(b);
+
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
     new Array(n + 1).fill(0),
   );
@@ -56,7 +67,7 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
+      const diagScore = matches(A[i - 1]!, B[j - 1]!) ? MATCH : MISMATCH;
       dp[i]![j] = Math.max(
         dp[i - 1]![j - 1]! + diagScore,
         dp[i - 1]![j]! + GAP,
@@ -71,12 +82,14 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
-      const diagScore = A[i - 1] === B[j - 1] ? MATCH : MISMATCH;
+      const diagScore = matches(A[i - 1]!, B[j - 1]!) ? MATCH : MISMATCH;
       if (dp[i]![j] === dp[i - 1]![j - 1]! + diagScore) {
+        // Exact match: correct. Punctuation-only mismatch (e.g. "stage," vs "stage"): replace.
+        const exactMatch = A[i - 1] === B[j - 1];
         result.push({
           original: A[i - 1],
           typed: B[j - 1],
-          type: A[i - 1] === B[j - 1] ? "correct" : "replace",
+          type: exactMatch ? "correct" : "replace",
         });
         i--;
         j--;

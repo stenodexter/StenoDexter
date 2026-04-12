@@ -1,82 +1,11 @@
-device mismatch
+copy checking 
 
-register lag  
-emails
+punctuation
 
-stenodexter.com logo in landing
-________________
-priority
-
-admin can approve multiple IPS
-1 Device login
-
-#################################################################
-
-DONE ->
-
-DEMO Feature
-rate-limiting redis
-
-
-__
-create test
-
-
-speeds
-listening -> audio
-writing -> transcription
-
-__
-
-leaderboard rank list
-leaderboard list pdf
-
-participants 
-total words
-
-completed in 
 
 ____
 
-report card  
-total words -> matter words (count)
-typed words -> words
-mistakes
-
-_____
-attempt test dialog.tsx
-
-You can practise it freely afterwords 
-
-__ 
-notification centers
-
-dialog fix
-
-fix user by code , name , email for admin
-display  user code in /admin/users
-
-___
-
-side bar local storage state
-
-___ 
-test attempt
-
-cursor is locked
-
-time <-> saved
-
-__
-
-legal -> taraju weights
-
-__
-logo  -> circle , zoom
-
-favicon
-img is small logo
+test attempting 
+date 
 
 
-___
-scoring engine

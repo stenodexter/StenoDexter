@@ -117,7 +117,7 @@ export function UserSidebar({ user }: SidebarProps) {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 pb-[100px]">
         <SidebarGroup className="mb-2">
           <SidebarGroupLabel>General</SidebarGroupLabel>
           <SidebarGroupContent>
