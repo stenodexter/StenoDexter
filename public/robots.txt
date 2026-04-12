@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /user/login
+Allow: /user/register
+Allow: /user/
+
+Sitemap: https://stenodexter.com/sitemap.xml

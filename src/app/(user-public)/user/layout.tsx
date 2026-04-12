@@ -5,6 +5,10 @@ import { ThemeToggle } from "~/components/utils/theme-toggle";
 export const metadata: Metadata = {
   title: "Steno Dexter User",
   description: "User panel for StenoDexter",
+  icons: [
+    { rel: "icon", url: "/favicon.ico" },
+    { rel: "apple-touch-icon", url: "/icon-192.png" },
+  ],
 };
 
 export default async function AdminAuthLayout({
