@@ -86,7 +86,7 @@ export default function ContactUs() {
             {[
               {
                 name: "YouTube",
-                href: "https://youtube.com/",
+                href: "https://youtube.com/@stenodexter?si=9kP4XwvUXwJ3Bsfa",
               },
             ].map((social) => (
               <a

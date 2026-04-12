@@ -35,7 +35,7 @@ const courses = [
     title: "Advanced Speed Batch",
     description:
       "Our Advanced Speed Batch is designed for aspirants aiming to achieve high speed and accuracy in stenography. Includes daily dictation practice with live explanation sessions. Tailored for SSC, RSMSSB, High Courts, District Courts and other government exams.",
-    level: "Intermediate",
+    level: "Advanced",
     students: 100,
     price: "₹1500",
     image: "/images/stuff/steno1.jpeg",
