@@ -1,6 +1,6 @@
 CREATE TYPE "public"."payment_status" AS ENUM('pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."payments_type" AS ENUM('renew', 'fresh');--> statement-breakpoint
-CREATE TYPE "public"."subscription_status" AS ENUM('active', 'expired');--> statement-breakpoint
+CREATE TYPE "public"."subscription_status" AS ENUM('active', 'expired', 'revoked');--> statement-breakpoint
 CREATE TYPE "public"."invite_status" AS ENUM('active', 'invalidated', 'expired', 'limit_reached');--> statement-breakpoint
 CREATE TYPE "public"."attempt_stage" AS ENUM('audio', 'break', 'writing', 'submitted');--> statement-breakpoint
 CREATE TYPE "public"."attempt_type" AS ENUM('assessment', 'practice');--> statement-breakpoint
@@ -22,6 +22,19 @@ CREATE TABLE "account" (
 	"updated_at" timestamp NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "device" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"device_id" text NOT NULL,
+	"device_name" text,
+	"user_agent" text,
+	"ip_address" text,
+	"last_login_at" timestamp NOT NULL,
+	"created_at" timestamp NOT NULL,
+	"updated_at" timestamp NOT NULL,
+	CONSTRAINT "device_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp NOT NULL,
@@ -37,13 +50,20 @@ CREATE TABLE "session" (
 CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
+	"user_code" text NOT NULL,
 	"email" text NOT NULL,
 	"email_verified" boolean NOT NULL,
 	"phone" text,
 	"profile_url" text,
 	"gender" text,
+	"is_demo" boolean DEFAULT false,
+	"demo_expires_at" timestamp,
+	"demo_revoked" boolean DEFAULT false,
+	"demo_note" text,
+	"demo_created_by_admin_id" text,
 	"created_at" timestamp NOT NULL,
 	"updated_at" timestamp NOT NULL,
+	CONSTRAINT "user_user_code_unique" UNIQUE("user_code"),
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
@@ -79,8 +99,10 @@ CREATE TABLE "subscription" (
 	"current_period_start" timestamp with time zone DEFAULT now() NOT NULL,
 	"current_period_end" timestamp with time zone NOT NULL,
 	"last_reminder_sent_at" timestamp with time zone,
+	"revocation_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "subscription_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "admin" (
@@ -141,6 +163,7 @@ CREATE TABLE "test_attempts" (
 	"answer_final" text,
 	"writing_started_at" timestamp with time zone,
 	"break_skipped" boolean DEFAULT false,
+	"audio_skipped" boolean DEFAULT false,
 	"score" integer,
 	"skipped_at" timestamp with time zone,
 	"submitted_at" timestamp with time zone,
@@ -168,6 +191,7 @@ CREATE TABLE "tests" (
 	"matter_pdf_key" text NOT NULL,
 	"outline_pdf_key" text,
 	"correct_answer" text NOT NULL,
+	"locked_cursor" boolean DEFAULT false,
 	"status" "test_status" DEFAULT 'draft' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"solution_audio_key" text,
@@ -184,6 +208,8 @@ CREATE TABLE "leaderboard" (
 	"wpm" integer NOT NULL,
 	"accuracy" integer NOT NULL,
 	"mistakes" integer,
+	"transcription_time" integer NOT NULL,
+	"total_words_typed" integer NOT NULL,
 	"attempted_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "leaderboard_result_id_unique" UNIQUE("result_id")
@@ -227,7 +253,9 @@ CREATE TABLE "hall_of_fame" (
 );
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "device" ADD CONSTRAINT "device_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user" ADD CONSTRAINT "user_demo_created_by_admin_id_admin_id_fk" FOREIGN KEY ("demo_created_by_admin_id") REFERENCES "public"."admin"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment_proof" ADD CONSTRAINT "payment_proof_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment_proof" ADD CONSTRAINT "payment_proof_verified_by_admin_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."admin"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -251,9 +279,12 @@ ALTER TABLE "results" ADD CONSTRAINT "results_user_id_user_id_fk" FOREIGN KEY ("
 ALTER TABLE "hall_of_fame" ADD CONSTRAINT "hall_of_fame_added_by_id_admin_id_fk" FOREIGN KEY ("added_by_id") REFERENCES "public"."admin"("id") ON DELETE set default ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_provider_account_idx" ON "account" USING btree ("provider_id","account_id");--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "device_user_id_idx" ON "device" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "device_device_id_idx" ON "device" USING btree ("device_id");--> statement-breakpoint
 CREATE INDEX "session_token_expires_idx" ON "session" USING btree ("token","expires_at");--> statement-breakpoint
 CREATE INDEX "session_user_id_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_expires_at_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "is_demo_idx_users" ON "user" USING btree ("is_demo");--> statement-breakpoint
 CREATE INDEX "verification_identifier_expires_idx" ON "verification" USING btree ("identifier","expires_at");--> statement-breakpoint
 CREATE INDEX "verification_expires_at_idx" ON "verification" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "unique_pending_payment_per_user" ON "payment_proof" USING btree ("user_id") WHERE status = 'pending';--> statement-breakpoint

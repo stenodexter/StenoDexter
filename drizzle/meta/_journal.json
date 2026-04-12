@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774457358278,
-      "tag": "0000_kind_stingray",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774884863659,
-      "tag": "0001_spooky_tempest",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1774890817405,
-      "tag": "0002_chief_butterfly",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1774958676535,
-      "tag": "0003_crazy_lockjaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1775583112416,
-      "tag": "0004_good_husk",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1775631824338,
-      "tag": "0005_lame_puck",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1775733582105,
-      "tag": "0006_burly_carnage",
+      "when": 1776021933128,
+      "tag": "0000_secret_lifeguard",
       "breakpoints": true
     }
   ]
