@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRef } from "react";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -21,13 +22,37 @@ type RegisterProps = {
 
 export function RegisterForm({ token }: RegisterProps) {
   const router = useRouter();
-  const registerMutation = trpc.admin.auth.register.useMutation({
-    onSuccess: () => {
-      toast.success("Account created! Redirecting to login…");
+  const submittingRef = useRef(false);
+
+  const loginMutation = trpc.admin.auth.login.useMutation({
+    onSuccess: async ({ admin: { token } }) => {
+      await fetch("/api/set-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, name: "admin_token" }),
+      });
+
+      toast.success("Welcome! Account created 🎉");
+      router.push("/admin");
+    },
+    onError: (error) => {
+      // Account was created but auto-login failed — fall back to login page
+      toast.success("Account created! Please sign in.");
       router.push("/admin/login");
+    },
+  });
+
+  const registerMutation = trpc.admin.auth.register.useMutation({
+    onSuccess: async (_, variables) => {
+      // Auto-login with the same credentials
+      await loginMutation.mutateAsync({
+        username: variables.username,
+        password: variables.password,
+      });
     },
     onError: (error) => {
       toast.error(error?.message || "Registration failed");
+      submittingRef.current = false;
     },
   });
 
@@ -40,14 +65,23 @@ export function RegisterForm({ token }: RegisterProps) {
       code: token ?? "",
     },
     onSubmit: async ({ value }) => {
-      await registerMutation.mutateAsync({
-        name: value.name,
-        username: value.username,
-        password: value.password,
-        code: value.code,
-      });
+      if (submittingRef.current) return;
+      submittingRef.current = true;
+
+      try {
+        await registerMutation.mutateAsync({
+          name: value.name,
+          username: value.username,
+          password: value.password,
+          code: value.code,
+        });
+      } finally {
+        submittingRef.current = false;
+      }
     },
   });
+
+  const isPending = registerMutation.isPending || loginMutation.isPending;
 
   return (
     <Card className="w-full max-w-4xl shadow-lg">
@@ -81,6 +115,7 @@ export function RegisterForm({ token }: RegisterProps) {
               onSubmit={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (submittingRef.current) return;
                 form.handleSubmit();
               }}
               className="space-y-4"
@@ -265,12 +300,13 @@ export function RegisterForm({ token }: RegisterProps) {
                     type="submit"
                     className="w-full"
                     disabled={
-                      !canSubmit || isSubmitting || registerMutation.isPending
+                      !canSubmit ||
+                      isSubmitting ||
+                      isPending ||
+                      submittingRef.current
                     }
                   >
-                    {isSubmitting || registerMutation.isPending
-                      ? "Creating account…"
-                      : "Create account →"}
+                    {isPending ? "Creating account…" : "Create account →"}
                   </Button>
                 )}
               </form.Subscribe>

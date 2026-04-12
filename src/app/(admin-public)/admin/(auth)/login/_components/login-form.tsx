@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRef } from "react";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -17,6 +18,8 @@ function FieldError({ message }: { message: string | undefined }) {
 
 export function LoginForm() {
   const router = useRouter();
+  const submittingRef = useRef(false);
+
   const loginMutation = trpc.admin.auth.login.useMutation({
     onSuccess: async ({ admin: { token } }) => {
       await fetch("/api/set-token", {
@@ -30,6 +33,7 @@ export function LoginForm() {
     },
     onError: (error) => {
       toast.error(error?.message || "Invalid username or password");
+      submittingRef.current = false; // 👈 release on error
     },
   });
 
@@ -39,7 +43,14 @@ export function LoginForm() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await loginMutation.mutateAsync(value);
+      if (submittingRef.current) return; // 👈 guard
+      submittingRef.current = true;      // 👈 lock
+
+      try {
+        await loginMutation.mutateAsync(value);
+      } finally {
+        submittingRef.current = false;   // 👈 always release
+      }
     },
   });
 
@@ -75,6 +86,7 @@ export function LoginForm() {
               onSubmit={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (submittingRef.current) return; // 👈 guard on native submit
                 form.handleSubmit();
               }}
               className="space-y-4"
@@ -150,7 +162,10 @@ export function LoginForm() {
                     type="submit"
                     className="w-full"
                     disabled={
-                      !canSubmit || isSubmitting || loginMutation.isPending
+                      !canSubmit ||
+                      isSubmitting ||
+                      loginMutation.isPending ||
+                      submittingRef.current // 👈 add this
                     }
                   >
                     {isSubmitting || loginMutation.isPending
