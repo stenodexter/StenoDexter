@@ -144,7 +144,7 @@ type CourseContactDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function CourseContactDialog({
+function CourseContactDialog({
   title,
   open,
   onOpenChange,
