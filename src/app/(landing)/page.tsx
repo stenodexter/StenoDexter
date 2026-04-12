@@ -24,38 +24,38 @@ import {
 export const metadata = {
   title: "Steno Dexter – Speed. Precision. Success.",
   description:
-    "India's most trusted stenography platform. Master shorthand for SSC, High Court & government exams.",
+    "India's leading platform for stenography. Master Pitman Shorthand Book, Dictations and live classes for SSC, RSMSSB, High Courts, District Courts, Railways and other Government exams.",
 };
 
 const features = [
   {
+    icon: BookOpen,
+    title: "Pitman Shorthand Instructor",
+    desc: "We provide expert training from basics to advance — structured, proven, no filler.",
+  },
+  {
     icon: Zap,
-    title: "Speed-First Curriculum",
-    desc: "Drills engineered to push your WPM — structured, proven, no filler.",
+    title: "Daily Dictations",
+    desc: "Practice daily exam-oriented dictations and live explanation sessions.",
   },
   {
     icon: Target,
-    title: "Exam-Mapped Content",
-    desc: "Every lesson aligned to SSC, High Court & NHM exam patterns.",
-  },
-  {
-    icon: CalendarCheck,
-    title: "Daily Tests",
-    desc: "Consistent assessment every week with detailed score breakdowns.",
+    title: "Focused Speed Development",
+    desc: "Achieve 80 to 120 wpm with proven methods.",
   },
   {
     icon: TrendingUp,
     title: "Guaranteed Progress",
-    desc: "Visible improvement in 15 days.",
+    desc: "Visible improvement in just 15 days.",
   },
 ];
 
 const benefits = [
-  { icon: Clock, title: "Learn Anytime", desc: "24/7 access on any device." },
+  { icon: Clock, title: "Learn Anytime", desc: "24/7 access." },
   {
     icon: BookOpen,
     title: "Expert-Designed",
-    desc: "By certified stenography pros.",
+    desc: "By certified stenography professionals.",
   },
   {
     icon: BarChart3,
@@ -65,7 +65,7 @@ const benefits = [
   {
     icon: CalendarCheck,
     title: "Weekly Tests",
-    desc: "Every Sunday — stay consistent.",
+    desc: "Every Saturday — stay consistent.",
   },
 ];
 
@@ -76,52 +76,42 @@ const faqs = [
   },
   {
     q: "Are courses designed for government exams?",
-    a: "Yes — SSC, High Court, NHM and more. Every course is pattern-mapped by experts with real selection track records.",
-  },
-  {
-    q: "Can I access the platform on mobile?",
-    a: "Fully responsive. Works seamlessly on phone, tablet, and desktop.",
-  },
-  
-  {
-    q: "Do I get a certificate on completion?",
-    a: "Yes — a verified completion certificate for every course. Advanced professional certifications are also available.",
+    a: "Yes — we target SSC, RSMSSB, High Courts, District Court, Railways and other Government exams. Every course is designed by experts with Government capital linking.",
   },
   {
     q: "I'm a complete beginner — where do I start?",
-    a: "Beginner Speed Build is built for you. It starts from zero and takes you step by step to professional-level accuracy.",
+    a: "We teach Pitman Shorthand Book from basic to advanced levels, including daily exam-oriented dictations and live classes.",
   },
 ];
 
 const govtBodies = [
-  "SSC Stenographer",
-  "High Court",
-  "NHM",
-  "State PSC",
-  "Rail NTPC",
-  "Delhi Police",
+  "SSC",
+  "RSMSSB",
+  "High Courts",
+  "District Courts",
+  "Railways",
 ];
 
 const steps = [
   {
     num: "01",
-    title: "Enroll in a Course",
-    desc: "Pick your level — beginner to advanced. Exam-mapped from day one.",
+    title: "Enroll Smart",
+    desc: "Choose the right course designed with an exam-focused roadmap from day one.",
   },
   {
     num: "02",
-    title: "Practice Daily",
-    desc: "Speed drills, dictation passages, and shorthand exercises every day.",
+    title: "Practice Consistently",
+    desc: "Build speed and accuracy through exam-oriented dictations — legal and general.",
   },
   {
     num: "03",
-    title: "Take Weekly Tests",
-    desc: "Every Sunday, benchmark your WPM and accuracy against real exam patterns.",
+    title: "Track Performance",
+    desc: "Evaluate your progress with regular transcription and real exam-level dictations.",
   },
   {
     num: "04",
-    title: "Get Selected",
-    desc: "Walk into the exam room prepared. Our students get selected.",
+    title: "Achieve Results",
+    desc: "Enter exams with confidence and convert your preparation into selection.",
   },
 ];
 
@@ -175,35 +165,34 @@ function Hero() {
         className="mb-8 gap-2 rounded-full px-4 py-2 text-xs font-bold tracking-widest uppercase"
       >
         <span className="bg-primary h-1.5 w-1.5 animate-pulse rounded-full" />
-        India&apos;s #1 Stenography Platform
+        Start you journey today and move closer to your dream job
       </Badge>
 
       {/* Heading */}
       <h1 className="max-w-4xl text-5xl leading-[1.04] font-extrabold tracking-tight sm:text-6xl md:text-[76px]">
-        Master <span className="text-primary">Stenography.</span>
+        Master the Art of <span className="text-primary">Stenography.</span>
         <br />
-        Land Your Dream Job.
+        Shape your Future.
       </h1>
 
       {/* Subtext */}
       <p className="text-foreground mx-auto mt-6 max-w-xl text-lg leading-relaxed">
-        Structured daily practice, expert courses and weekly tests — built to
-        get you selected in SSC, High Court &amp; government exams.
+        Daily dictations — Legal and general, Pitman Shorthand Book — Basics to
+        Advance and weekly Tests — built to get you selected in SSC, RSMSSB,
+        High Courts, District Courts and other Government exams.
       </p>
 
       {/* Trust pills */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        {["Progress in 15 days", "Exam-mapped content"].map(
-          (t) => (
-            <span
-              key={t}
-              className="border-border bg-muted/30 text-foreground rounded-full border px-4 py-1.5 text-xs font-semibold"
-            >
-              <span className="text-primary mr-1.5">✓</span>
-              {t}
-            </span>
-          ),
-        )}
+        {["Progress in 15 days", "Exam-oriented Dictations"].map((t) => (
+          <span
+            key={t}
+            className="border-border bg-muted/30 text-foreground rounded-full border px-4 py-1.5 text-xs font-semibold"
+          >
+            <span className="text-primary mr-1.5">✓</span>
+            {t}
+          </span>
+        ))}
       </div>
 
       {/* CTAs */}
@@ -266,13 +255,14 @@ function HowItWorks() {
               How It Works
             </p>
             <h2 className="text-4xl leading-tight font-extrabold tracking-tight">
-              From zero to selected — in four steps.
+              From Beginner to Selection —{" "}
+              <span className="text-primary">A Proven Four-Step System.</span>
             </h2>
 
             <div className="mt-10 space-y-8">
               {steps.map((step) => (
                 <div key={step.num} className="flex gap-5">
-                  <div className="text-primary mt-0.5 text-3xl leading-none font-extrabold tabular-nums opacity-20">
+                  <div className="text-primary mt-0.5 text-3xl leading-none font-extrabold tabular-nums">
                     {step.num}
                   </div>
                   <div>
@@ -298,7 +288,14 @@ function Features() {
       <div className="mx-auto max-w-6xl">
         <SectionHead
           tag="Why Steno Dexter"
-          title="Built for real results"
+          title={
+            <>
+              At Steno Dexter, we don&apos;t just teach shorthand —{" "}
+              <span className="text-primary">
+                we build skills that transform careers.
+              </span>
+            </>
+          }
           sub="Everything on this platform is purpose-built for one outcome — getting you selected."
         />
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -399,28 +396,21 @@ function StudySection() {
               The Practice
             </p>
             <h2 className="text-4xl leading-tight font-extrabold tracking-tight">
-              Real shorthand.
+              Master Stenography.
               <br />
-              Real exams.
+              Crack Exams.
               <br />
-              <span className="text-primary">Real results.</span>
+              <span className="text-primary">Deliver Results.</span>
             </h2>
             <p className="text-foreground mt-5 max-w-md text-base leading-relaxed">
-              Our exercises are built directly from SSC and High Court exam
-              passages. Every curve, every stroke you practice here is one you
-              will see on exam day.
+              Our expertly designed dictations accelerate learning, enabling
+              students to achieve speed and accuracy faster than ever.
             </p>
             <p className="text-foreground mt-3 max-w-md text-base leading-relaxed">
-              Hundreds of graded exercises take you from alphabet to full-speed
-              dictation — with performance tracking at every step.
+              Hundreds of graded exercises and dictations take you from alphabet
+              to full speed dictations — with performance tracking at every
+              step.
             </p>
-            <div className="mt-8">
-              <Button variant="outline" asChild className="gap-2 font-bold">
-                <Link href="/courses">
-                  View Exercise Library <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
           </div>
         </div>
       </div>
@@ -489,12 +479,7 @@ function FAQ() {
   return (
     <section id="faq" className="bg-muted/30 px-4 py-24">
       <div className="mx-auto max-w-2xl">
-        <SectionHead
-          tag="FAQ"
-          title="Common questions"
-          sub="Everything you would want to know before enrolling."
-          center
-        />
+        <SectionHead tag="FAQ" title="Common questions" center />
         <Accordion type="single" collapsible className="mt-10 w-full">
           {faqs.map((f, i) => (
             <AccordionItem key={i} value={`item-${i}`}>

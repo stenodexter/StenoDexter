@@ -18,62 +18,56 @@ export default function AboutUs() {
           </h1>
           <p className="text-muted-foreground text-lg">
             We&apos;re on a mission to make stenography accessible, engaging,
-            and achievable for everyone, regardless of background or experience
-            level.
+            and achievable for everyone.
           </p>
         </div>
       </section>
 
-      {/* Our Story */}
       <section className="container mx-auto px-4">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
+          {/* LEFT */}
           <div className="space-y-6">
-            <h2 className="text-3xl font-bold">Our Story</h2>
+            <h2 className="text-3xl font-bold">Our Objective</h2>
+
             <p className="text-muted-foreground">
-              Steno Dexter was founded with a simple belief: stenography
-              education should be accessible, engaging, and effective. We
-              recognized that traditional methods left learners struggling to
-              maintain momentum and track their progress.
+              Welcome to Steno Dexter—your trusted platform for Pitman Shorthand
+              learning and stenography exam preparation.
             </p>
+
             <p className="text-muted-foreground">
-              By combining cutting-edge AI technology with expert instruction,
-              we created a platform that provides personalized guidance,
-              real-time feedback, and measurable results. Our methodology has
-              helped hundreds of thousands of students achieve their stenography
-              goals.
+              This platform is specially designed for aspirants preparing for
+              SSC, RSMSSB, High Courts, District Courts, Railways and other
+              Government exams. We provide exam-oriented stenography dictations
+              in accordance with the latest exam patterns to help students
+              improve their speed, accuracy and transcription skills.
             </p>
-            <p className="text-muted-foreground">
-              Today, Steno Dexter stands as the leading online stenography
-              learning platform, trusted by professionals, students, and
-              institutions worldwide.
+
+            <p className="text-muted-foreground text-sm">
+              🎯 Our mission is to make shorthand learning easy, practical and
+              result-oriented so that every aspirant can achieve success with
+              confidence.
             </p>
           </div>
+
+          {/* RIGHT (Gradient Box) */}
           <div className="from-primary/10 to-accent/10 rounded-lg bg-gradient-to-br p-8">
             <div className="space-y-6">
               <div>
-                <div className="text-primary mb-2 text-4xl font-bold">
-                  900K+
-                </div>
-                <p className="text-muted-foreground text-sm">Active Learners</p>
+                <p className="font-semibold">At Steno Dexter, you will find:</p>
+
+                <ul className="text-muted-foreground mt-3 space-y-2 text-sm">
+                  <li>✔ Pitman Shorthand lessons (Basic to Advanced)</li>
+                  <li>✔ Daily and exam-oriented dictation practice</li>
+                  <li>✔ Transcription guidance and techniques</li>
+                  <li>✔ Speed-building strategies</li>
+                  <li>✔ Explanation sessions after dictation</li>
+                </ul>
               </div>
-              <div>
-                <div className="text-primary mb-2 text-4xl font-bold">98%</div>
-                <p className="text-muted-foreground text-sm">Success Rate</p>
-              </div>
-              <div>
-                <div className="text-primary mb-2 text-4xl font-bold">50+</div>
-                <p className="text-muted-foreground text-sm">
-                  Expert Instructors
-                </p>
-              </div>
-              <div>
-                <div className="text-primary mb-2 text-4xl font-bold">
-                  15 Days
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  Guaranteed Improvement
-                </p>
-              </div>
+
+              <p className="text-muted-foreground text-sm font-medium">
+                📈 Enroll to Steno Dexter and start your journey towards
+                becoming a successful stenographer.
+              </p>
             </div>
           </div>
         </div>
@@ -93,7 +87,7 @@ export default function AboutUs() {
               {
                 title: "Excellence",
                 description:
-                  "We are committed to delivering the highest quality education and support to our learners.",
+                  "We are committed to deliver the highest quality education and support to our learners.",
               },
               {
                 title: "Innovation",
@@ -103,12 +97,12 @@ export default function AboutUs() {
               {
                 title: "Accessibility",
                 description:
-                  "We believe stenography education should be available to everyone, everywhere, at any time.",
+                  "We believe stenography education should be available to everyone, everywhere and at any time.",
               },
               {
                 title: "Community",
                 description:
-                  "We foster a supportive community where learners can connect, share, and grow together.",
+                  "We foster a supportive community where learners can connect, share and grow together.",
               },
               {
                 title: "Integrity",
@@ -129,32 +123,6 @@ export default function AboutUs() {
                 <p className="text-muted-foreground text-sm">
                   {value.description}
                 </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why Choose Us */}
-      <section className="container mx-auto px-4">
-        <div className="space-y-12">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-bold">Why Choose Steno Dexter?</h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2">
-            {[
-              "AI-powered personalized learning paths tailored to your goals",
-              "Real-time feedback and comprehensive analytics",
-              "Expert instructors with decades of stenography experience",
-              "Flexible learning schedule that fits your lifestyle",
-              "Affordable pricing with transparent, no-hidden-fee structure",
-              "Lifetime access to course materials and updates",
-              "Supportive community with peer and mentor connections",
-              "Proven track record with 98% success rate",
-            ].map((benefit, idx) => (
-              <div key={idx} className="flex gap-4">
-                <CheckCircle className="text-primary h-6 w-6 flex-shrink-0" />
-                <p className="text-muted-foreground">{benefit}</p>
               </div>
             ))}
           </div>

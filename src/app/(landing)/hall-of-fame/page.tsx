@@ -70,14 +70,14 @@ export default function HallOfFame() {
       {/* Header */}
       <section className="container mx-auto px-4">
         <div className="mx-auto max-w-2xl space-y-3 text-center">
-          <p className="text-primary text-xs font-semibold tracking-widest uppercase">
+          <h1 className="text-primary tracking-wide uppercase">
             Hall of Fame
-          </p>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Our Govt. Selections
           </h1>
+          <h2 className="tracking-tight">
+            Our Selections
+          </h2>
           <p className="text-muted-foreground">
-            Students who cleared government exams through dedicated practice and
+            Students who have cleared Government exams through dedicated practice and
             expert guidance.
           </p>
         </div>
@@ -173,8 +173,7 @@ export default function HallOfFame() {
               Your name could be here.
             </h2>
             <p className="text-muted-foreground mx-auto mb-8 max-w-md text-sm">
-              Start your journey today — consistent practice, expert guidance,
-              real results.
+              Start your journey today with consistent practice and expert guidance.
             </p>
             <Button size="lg" className="gap-2" asChild>
               <a href="/user">

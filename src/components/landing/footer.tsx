@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function Footer() {
@@ -7,8 +8,14 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-4">
           <div>
             <div className="text-foreground flex items-center gap-2 font-bold">
-              <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded text-sm">
-                SD
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-sm bg-white shadow-sm">
+                <Image
+                  src="/icon.png"
+                  alt="Logo"
+                  width={200}
+                  height={200}
+                  className="h-full w-full translate-y-0.5 scale-135 object-contain"
+                />
               </div>
               <span>Steno Dexter</span>
             </div>

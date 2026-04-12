@@ -1,4 +1,5 @@
 import { Mail, Phone, MapPin } from "lucide-react";
+import { adminInfo } from "~/components/utils/comms/info";
 
 export default function ContactUs() {
   return (
@@ -10,7 +11,7 @@ export default function ContactUs() {
             Get In Touch
           </h1>
           <p className="text-muted-foreground text-lg">
-            Have a question, feedback, or need support? We&apos;d love to hear
+            Have a question, feedback or need support? We&apos;d love to hear
             from you. Our team is ready to help.
           </p>
         </div>
@@ -22,19 +23,21 @@ export default function ContactUs() {
             {
               icon: Mail,
               title: "Email",
-              value: "support@stenodexter.com",
-              description: "We respond within 24 hours",
+              value: adminInfo.email,
+              action: {
+                label: "Send Email",
+                href: `https://mail.google.com/mail/?view=cm&fs=1&to=${adminInfo.email}`,
+              },
             },
             {
               icon: Phone,
               title: "Phone",
-              value: "+91 xxx-xxxx-xxx",
-              description: "Mon-Fri, 9 AM - 6 PM EST",
+              value: adminInfo.phone,
             },
             {
               icon: MapPin,
               title: "Office",
-              value: "Jaipur, Rajasthan, India",
+              value: adminInfo.office,
               description: "Head office location",
             },
           ].map((contact, idx) => {
@@ -45,13 +48,27 @@ export default function ContactUs() {
                 className="border-border bg-card rounded-lg border p-6 text-center transition-shadow hover:shadow-lg"
               >
                 <Icon className="text-primary mx-auto mb-4 h-8 w-8" />
+
                 <h3 className="mb-2 font-semibold">{contact.title}</h3>
-                <p className="text-primary mb-2 font-mono text-sm">
+
+                <p className="text-primary mb-4 font-mono text-sm">
                   {contact.value}
                 </p>
-                <p className="text-muted-foreground text-xs">
-                  {contact.description}
-                </p>
+
+                {contact.action ? (
+                  <a
+                    href={contact.action.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-secondary text-secondary-foreground inline-block rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-90"
+                  >
+                    {contact.action.label}
+                  </a>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    {contact.description}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -66,16 +83,22 @@ export default function ContactUs() {
             Stay updated with the latest news and announcements
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            {["Twitter", "Facebook", "LinkedIn", "Instagram", "YouTube"].map(
-              (social) => (
-                <button
-                  key={social}
-                  className="border-border hover:bg-muted rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
-                >
-                  {social}
-                </button>
-              ),
-            )}
+            {[
+              {
+                name: "YouTube",
+                href: "https://youtube.com/",
+              },
+            ].map((social) => (
+              <a
+                key={social.name}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border hover:bg-muted rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {social.name}
+              </a>
+            ))}
           </div>
         </div>
       </section>
