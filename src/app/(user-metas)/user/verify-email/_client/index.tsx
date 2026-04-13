@@ -26,7 +26,11 @@ export default function VerifyEmailPage({ userEmail }: { userEmail: string }) {
         if (res.error) setError(res.error.message ?? "Verification failed.");
         else {
           setVerified(true);
-          setTimeout(() => router.push("/user"), 1500);
+          authClient.getSession().then((session) => {
+            if (session?.data?.session) {
+              setTimeout(() => router.push("/user"), 1500);
+            }
+          });
         }
       })
       .catch(() => setError("Something went wrong."))
