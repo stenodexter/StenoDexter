@@ -59,6 +59,21 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   const matches = (a: string, b: string): boolean =>
     a === b || normalizeForComparison(a) === normalizeForComparison(b);
 
+  // Score for aligning two words diagonally.
+  // Full match = MATCH(2). Complete mismatch = MISMATCH(-1).
+  // Partial credit (0) when one word is a prefix of the other — e.g. "department"
+  // vs "departmentwhich" (space-fused typo). This is strictly better than MISMATCH
+  // so NW prefers pairing them over a delete+insert split, which renders wrong order.
+  const diagScore = (a: string, b: string): number => {
+    if (matches(a, b)) return MATCH;
+    const na = normalizeForComparison(a);
+    const nb = normalizeForComparison(b);
+    if (na.length > 0 && nb.length > 0) {
+      if (nb.startsWith(na) || na.startsWith(nb)) return 0;
+    }
+    return MISMATCH;
+  };
+
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
     new Array(n + 1).fill(0),
   );
@@ -67,9 +82,8 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      const diagScore = matches(A[i - 1]!, B[j - 1]!) ? MATCH : MISMATCH;
       dp[i]![j] = Math.max(
-        dp[i - 1]![j - 1]! + diagScore,
+        dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!),
         dp[i - 1]![j]! + GAP,
         dp[i]![j - 1]! + GAP,
       );
@@ -82,9 +96,15 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
-      const diagScore = matches(A[i - 1]!, B[j - 1]!) ? MATCH : MISMATCH;
-      if (dp[i]![j] === dp[i - 1]![j - 1]! + diagScore) {
-        // Exact match: correct. Punctuation-only mismatch (e.g. "stage," vs "stage"): replace.
+      const diagVal = dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!);
+      const delVal = dp[i - 1]![j]! + GAP;
+      const insVal = dp[i]![j - 1]! + GAP;
+      const best = Math.max(diagVal, delVal, insVal);
+
+      // Prefer diagonal when it ties with gap moves — keeps original+typed
+      // paired as one replace token instead of a split delete+insert, which
+      // would render in wrong visual order (e.g. "nothingin" vs "nothing in").
+      if (dp[i]![j] === best && diagVal === best) {
         const exactMatch = A[i - 1] === B[j - 1];
         result.push({
           original: A[i - 1],
