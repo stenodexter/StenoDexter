@@ -123,6 +123,14 @@ export class RedisService {
   async del(key: string) {
     return this.client.del(key);
   }
+
+  async incr(key: string, by = 1) {
+    return this.client.incrby(key, by);
+  }
+
+  async decr(key: string, by = 1) {
+    return this.client.incrby(key, -by);
+  }
 }
 
 export const redisService = new RedisService();

@@ -10,8 +10,11 @@ import R2Service, { r2Service } from "~/server/services/r2.service";
 import { notificationsService } from "../notifications/notification.service";
 import { emailService } from "~/server/services/mail.service";
 import { invalidateSubscriptionCache } from "../../trpc";
+import { redisService } from "~/server/services/redis.service";
 
 type Db = typeof db;
+
+const PENDING_PAYMENTS_COUNT_CACHE = "global:payments:pending:count";
 
 export function createPaymentService(db: Db) {
   return {
@@ -35,6 +38,7 @@ export function createPaymentService(db: Db) {
 
       await invalidateSubscriptionCache(userId);
 
+      await redisService.incr(PENDING_PAYMENTS_COUNT_CACHE);
       return { ok: true };
     },
 
@@ -76,6 +80,7 @@ export function createPaymentService(db: Db) {
         }
 
         await invalidateSubscriptionCache(found.userId);
+        await redisService.decr(PENDING_PAYMENTS_COUNT_CACHE);
 
         return { ok: true };
       }
@@ -143,6 +148,8 @@ export function createPaymentService(db: Db) {
       if (found.user?.email) {
         await emailService.sendPaymentApproved(found.user.email);
       }
+
+      await redisService.decr(PENDING_PAYMENTS_COUNT_CACHE);
 
       return { ok: true };
     },
@@ -226,12 +233,24 @@ export function createPaymentService(db: Db) {
     },
 
     async getPendingCount() {
+      const cached = await redisService.get<number>(
+        PENDING_PAYMENTS_COUNT_CACHE,
+      );
+
+      if (cached !== null) {
+        return { count: cached };
+      }
+
       const rows = await db.query.payment.findMany({
         where: eq(payment.status, "pending"),
         columns: { id: true },
       });
 
-      return { count: rows.length };
+      const count = rows.length;
+
+      await redisService.set(PENDING_PAYMENTS_COUNT_CACHE, count);
+
+      return { count };
     },
   };
 }

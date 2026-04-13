@@ -44,18 +44,18 @@ export function LoginForm() {
     },
     onSubmit: async ({ value }) => {
       if (submittingRef.current) return; // 👈 guard
-      submittingRef.current = true;      // 👈 lock
+      submittingRef.current = true; // 👈 lock
 
       try {
         await loginMutation.mutateAsync(value);
       } finally {
-        submittingRef.current = false;   // 👈 always release
+        submittingRef.current = false; // 👈 always release
       }
     },
   });
 
   return (
-    <Card className="w-full max-w-4xl shadow-lg">
+    <Card className="relative z-30 w-full max-w-4xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md">
       <CardContent className="p-0">
         <div className="grid md:grid-cols-2">
           {/* Column 1 - Heading & Links */}
