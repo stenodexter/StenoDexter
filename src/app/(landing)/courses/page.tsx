@@ -24,7 +24,7 @@ const courses = [
     id: 1,
     title: "Pitman Shorthand Instructor",
     description:
-      "Comprehensive Pitman Shorthand course instructed by experienced trainers from basic to advanced levels.",
+      "Comprehensive Pitman Shorthand course instructed by experienced trainers from basics to advanced levels.",
     level: "Beginner",
     students: 100,
     price: "₹1500",
@@ -34,7 +34,7 @@ const courses = [
     id: 2,
     title: "Advanced Speed Batch",
     description:
-      "Our Advanced Speed Batch is designed for aspirants aiming to achieve high speed and accuracy in stenography. Includes daily dictation practice with live explanation sessions. Tailored for SSC, RSMSSB, High Courts, District Courts and other government exams.",
+      "Our Advanced Speed Batch is designed for aspirants aiming to achieve high speed and accuracy in stenography. The Program includes daily dictations practice with live explanation session to ensure clarity and continous improvement. Tailored for SSC, RSMSSB, High Courts, District Courts and other Government exams.",
     level: "Advanced",
     students: 100,
     price: "₹1500",
@@ -108,7 +108,7 @@ export default function CoursesPage() {
                     </div>
                     {course.id === 1 ? (
                       <Button onClick={() => setOpenContact(true)}>
-                        Let's Discuss
+                        Enroll
                         <ArrowRight className="h-3 w-3" />
                       </Button>
                     ) : (

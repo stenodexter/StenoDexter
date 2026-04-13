@@ -71,11 +71,38 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Steno Dexter",
+  title: {
+    default: "Steno Dexter – Speed. Precision. Success.",
+    template: "%s | Steno Dexter",
+  },
+  description:
+    "India's leading platform for stenography. Master Pitman Shorthand Book, Dictations and Live Classes for SSC, RSMSSB, High Courts, District Courts, Railways and other Government Exams.",
   icons: [
     { rel: "icon", url: "/favicon.ico" },
-    { rel: "apple-touch-icon", url: "/icon-192.png" },
+    { rel: "apple-touch-icon", url: "/steno.png" },
   ],
+  openGraph: {
+    title: "Steno Dexter – Speed. Precision. Success.",
+    description:
+      "India's leading platform for stenography. Master Pitman Shorthand Book, Dictations and Live Classes for SSC, RSMSSB, High Courts, District Courts, Railways and other Government Exams.",
+    url: "https://stenodexter.com",
+    siteName: "Steno Dexter",
+    images: [{ url: "https://stenodexter.com/steno.png" }],
+    type: "website",
+  },
+  metadataBase: new URL("https://stenodexter.com"),
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      noimageindex: false,
+    },
+  },
+  other: {
+    google: "nositelinkssearchbox nopagereadaloud",
+  },
 };
 
 export default function RootLayout({
@@ -95,6 +122,21 @@ export default function RootLayout({
         robotoSlabHeading.variable,
       )}
     >
+      <head>
+        <meta name="robots" content="index, follow, nosnippet" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Steno Dexter",
+              url: "https://stenodexter.com",
+              logo: "https://stenodexter.com/steno.png",
+            }),
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         {" "}
         {/* 👈 add this too */}

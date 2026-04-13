@@ -13,12 +13,12 @@ export default function AboutUs() {
       {/* Hero Section */}
       <section className="container mx-auto mt-[60px] px-4">
         <div className="mx-auto max-w-3xl space-y-6 text-center">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="text-primary text-4xl font-bold tracking-tight sm:text-5xl">
             About Steno Dexter
           </h1>
           <p className="text-muted-foreground text-lg">
-            We&apos;re on a mission to make stenography accessible, engaging,
-            and achievable for everyone.
+            We&apos;re on a mission to make stenography accessible, engaging and
+            achievable for everyone.
           </p>
         </div>
       </section>
@@ -27,11 +27,11 @@ export default function AboutUs() {
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           {/* LEFT */}
           <div className="space-y-6">
-            <h2 className="text-3xl font-bold">Our Objective</h2>
+            <h2 className="text-primary text-3xl font-bold">Our Objective</h2>
 
             <p className="text-muted-foreground">
               Welcome to Steno Dexter—your trusted platform for Pitman Shorthand
-              learning and stenography exam preparation.
+              Book and stenography exam preparation.
             </p>
 
             <p className="text-muted-foreground">
@@ -53,20 +53,24 @@ export default function AboutUs() {
           <div className="from-primary/10 to-accent/10 rounded-lg bg-gradient-to-br p-8">
             <div className="space-y-6">
               <div>
-                <p className="font-semibold">At Steno Dexter, you will find:</p>
+                <p className="text-primary font-semibold">
+                  At Steno Dexter, you will find:
+                </p>
 
                 <ul className="text-muted-foreground mt-3 space-y-2 text-sm">
-                  <li>✔ Pitman Shorthand lessons (Basic to Advanced)</li>
-                  <li>✔ Daily and exam-oriented dictation practice</li>
+                  <li>
+                    ✔ Pitman Shorthand lessons (Basics to Advanced levels)
+                  </li>
+                  <li>✔ Daily exam-oriented dictations practice</li>
                   <li>✔ Transcription guidance and techniques</li>
                   <li>✔ Speed-building strategies</li>
-                  <li>✔ Explanation sessions after dictation</li>
+                  <li>✔ Explanation Session after dictation</li>
                 </ul>
               </div>
 
               <p className="text-muted-foreground text-sm font-medium">
                 📈 Enroll to Steno Dexter and start your journey towards
-                becoming a successful stenographer.
+                becoming a successful Stenographer.
               </p>
             </div>
           </div>
@@ -112,7 +116,7 @@ export default function AboutUs() {
               {
                 title: "Impact",
                 description:
-                  "We measure success by the real, tangible progress our learners achieve.",
+                  "We measure success by the real and tangible progress our learners achieve.",
               },
             ].map((value, idx) => (
               <div

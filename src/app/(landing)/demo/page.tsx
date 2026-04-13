@@ -3,16 +3,13 @@ import { adminInfo } from "~/components/utils/comms/info";
 
 export default function DemoPage() {
   return (
-    <div className="container mx-auto mt-[180px] min-h-[60vh] max-w-2xl px-4 text-center">
-      {" "}
-      <div className="space-y-6">
+    <div className="container mx-auto pt-[80px] flex min-h-[calc(100vh-80px)] w-full max-w-2xl items-center justify-center px-4 text-center">
+      <div className="space-y-6 py-8">
         <h1 className="text-3xl font-bold">Book a Demo</h1>
-
         <p className="text-muted-foreground">
           Want to explore how Steno Dexter works before enrolling? Get in touch
           with us to schedule a demo session.
         </p>
-
         <div className="bg-card border-border space-y-4 rounded-lg border p-6 text-left">
           <p className="font-medium">Contact us:</p>
 
@@ -33,7 +30,6 @@ export default function DemoPage() {
             </a>
           </div>
         </div>
-
         <p className="text-muted-foreground text-sm">
           We usually respond within a few hours.
         </p>

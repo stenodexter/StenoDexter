@@ -17,7 +17,8 @@ export const Logo = ({ size = "md", className }: LogoProps) => {
     <h3
       className={`font-logo tracking-tight ${sizeClasses[size]} ${className ?? ""}`}
     >
-      <span className="text-primary">STENO </span>DEXTER
+      <span className="text-primary">STENO </span>
+      <span className="text-foreground">DEXTER</span>
     </h3>
   );
 };

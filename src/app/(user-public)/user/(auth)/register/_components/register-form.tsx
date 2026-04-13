@@ -115,7 +115,7 @@ export function RegisterForm() {
   };
 
   return (
-    <Card className="w-full max-w-4xl shadow-lg">
+    <Card className="w-full max-w-4xl shadow-lg relative z-30">
       <CardContent className="p-0">
         <div className="flex items-center justify-between">
           {/* Column 1 */}

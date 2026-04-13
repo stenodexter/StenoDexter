@@ -441,9 +441,6 @@ export function TestLeaderboardPage({
           <h1 className="text-xl font-semibold tracking-tight">
             {testData?.title ?? "Leaderboard"}
           </h1>
-          <p className="text-muted-foreground mt-0.5 text-sm">
-            Ranked by score · Only assessment attempts count
-          </p>
         </div>
 
         {/* User rank summary card */}

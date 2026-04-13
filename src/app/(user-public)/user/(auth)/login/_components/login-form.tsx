@@ -81,7 +81,7 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-4xl shadow-lg">
+    <Card className="w-full max-w-4xl shadow-lg relative z-40">
       <CardContent className="flex items-center justify-between p-0">
         <div className="flex">
           {/* Column 1 - Heading & Google */}

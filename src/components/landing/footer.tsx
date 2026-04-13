@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Logo } from "../utils/logo";
 
 export function Footer() {
   return (
@@ -17,7 +18,7 @@ export function Footer() {
                   className="h-full w-full translate-y-0.5 scale-135 object-contain"
                 />
               </div>
-              <span>Steno Dexter</span>
+              <Logo size="sm"/>
             </div>
             <p className="text-foreground/70 mt-3 text-sm">
               Master stenography with our innovative platform and expert

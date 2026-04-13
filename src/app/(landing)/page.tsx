@@ -31,12 +31,12 @@ const features = [
   {
     icon: BookOpen,
     title: "Pitman Shorthand Instructor",
-    desc: "We provide expert training from basics to advance — structured, proven, no filler.",
+    desc: "We provide expert training from basics to advanced levels.",
   },
   {
     icon: Zap,
     title: "Daily Dictations",
-    desc: "Practice daily exam-oriented dictations and live explanation sessions.",
+    desc: "Practice daily exam-oriented dictations and live explanation session.",
   },
   {
     icon: Target,
@@ -75,12 +75,12 @@ const faqs = [
     a: "Most students notice measurable improvement within 15–30 days of consistent daily practice. Full proficiency typically takes 3–6 months.",
   },
   {
-    q: "Are courses designed for government exams?",
-    a: "Yes — we target SSC, RSMSSB, High Courts, District Court, Railways and other Government exams. Every course is designed by experts with Government capital linking.",
+    q: "Are courses designed for Government exams?",
+    a: "Yes — we target SSC, RSMSSB, High Courts, District Court, Railways and other Government exams. Every course is designed by experts.",
   },
   {
     q: "I'm a complete beginner — where do I start?",
-    a: "We teach Pitman Shorthand Book from basic to advanced levels, including daily exam-oriented dictations and live classes.",
+    a: "We teach Pitman Shorthand Book from basics to advanced levels including daily exam-oriented dictations and live classes.",
   },
 ];
 
@@ -95,7 +95,7 @@ const govtBodies = [
 const steps = [
   {
     num: "01",
-    title: "Enroll Smart",
+    title: "Enroll",
     desc: "Choose the right course designed with an exam-focused roadmap from day one.",
   },
   {
@@ -165,7 +165,7 @@ function Hero() {
         className="mb-8 gap-2 rounded-full px-4 py-2 text-xs font-bold tracking-widest uppercase"
       >
         <span className="bg-primary h-1.5 w-1.5 animate-pulse rounded-full" />
-        Start you journey today and move closer to your dream job
+        Start your journey today and move closer to your dream job
       </Badge>
 
       {/* Heading */}
@@ -177,8 +177,8 @@ function Hero() {
 
       {/* Subtext */}
       <p className="text-foreground mx-auto mt-6 max-w-xl text-lg leading-relaxed">
-        Daily dictations — Legal and general, Pitman Shorthand Book — Basics to
-        Advance and weekly Tests — built to get you selected in SSC, RSMSSB,
+        Daily dictations — Legal and General, Pitman Shorthand Book — Basics to
+        Advance and Weekly Tests — built to get you selected in SSC, RSMSSB,
         High Courts, District Courts and other Government exams.
       </p>
 

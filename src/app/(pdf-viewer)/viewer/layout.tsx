@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: "Document from STENO DEXTER",
   icons: [
     { rel: "icon", url: "/favicon.ico" },
-    { rel: "apple-touch-icon", url: "/icon-192.png" },
+    { rel: "apple-touch-icon", url: "/steno.png" },
   ],
 };
 
