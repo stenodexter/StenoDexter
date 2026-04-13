@@ -18,6 +18,15 @@ export default function VerifyEmailPage({ userEmail }: { userEmail: string }) {
   const [resent, setResent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [hasSession, setHasSession] = useState(false);
+
+  authClient.getSession().then((session) => {
+    if (session?.data?.session) {
+      setHasSession(true);
+      setTimeout(() => router.push("/user"), 1500);
+    }
+  });
+
   useEffect(() => {
     if (!token) return;
     authClient
@@ -99,6 +108,31 @@ export default function VerifyEmailPage({ userEmail }: { userEmail: string }) {
           )}
         </div>
       </div>
+    );
+  }
+
+  if (!verifying && verified) {
+    return (
+      <>
+        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+        <div>
+          <p className="font-semibold">Email verified!</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {hasSession
+              ? "Redirecting you…"
+              : "Your email is confirmed. Please log in from your registered device."}
+          </p>
+        </div>
+        {!hasSession && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/user/login")}
+          >
+            Go to login
+          </Button>
+        )}
+      </>
     );
   }
 
