@@ -55,15 +55,20 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   const MISMATCH = -1;
   const GAP = -1;
 
-  // Compare words using punctuation-stripped, lowercased form for alignment
+  // Tiny epsilon for positional tiebreaking — never affects true integer scores.
+  // Diagonal pairings at earlier positions (smaller i+j) get a slightly higher
+  // score, so when two alignments cost the same, we prefer the one that matches
+  // typed words to the EARLIEST possible original word.
+  // e.g. original ["who","is"] typed ["but"]: both (who↔but + delete is) and
+  // (delete who + is↔but) cost the same, but the bias ensures who↔but wins.
+  const EPS = 1e-6;
+
   const matches = (a: string, b: string): boolean =>
     a === b || normalizeForComparison(a) === normalizeForComparison(b);
 
-  // Score for aligning two words diagonally.
-  // Full match = MATCH(2). Complete mismatch = MISMATCH(-1).
-  // Partial credit (0) when one word is a prefix of the other — e.g. "department"
-  // vs "departmentwhich" (space-fused typo). This is strictly better than MISMATCH
-  // so NW prefers pairing them over a delete+insert split, which renders wrong order.
+  // Diagonal alignment score:
+  // +2 exact match, 0 prefix/suffix fused word, -1 complete mismatch.
+  // Prefix case handles space-fused typos like "departmentwhich" vs "department".
   const diagScore = (a: string, b: string): number => {
     if (matches(a, b)) return MATCH;
     const na = normalizeForComparison(a);
@@ -82,8 +87,11 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
+      // Add positional bias to diagonal: earlier pairings score slightly higher.
+      // Higher (m+n-i-j) = earlier in the sequence = more bias.
+      const diagBias = EPS * (m + n - i - j + 1);
       dp[i]![j] = Math.max(
-        dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!),
+        dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!) + diagBias,
         dp[i - 1]![j]! + GAP,
         dp[i]![j - 1]! + GAP,
       );
@@ -96,15 +104,13 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
-      const diagVal = dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!);
-      const delVal = dp[i - 1]![j]! + GAP;
-      const insVal = dp[i]![j - 1]! + GAP;
-      const best = Math.max(diagVal, delVal, insVal);
+      const diagBias = EPS * (m + n - i - j + 1);
+      const diagVal = dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!) + diagBias;
+      const delVal  = dp[i - 1]![j]!      + GAP;
+      const insVal  = dp[i]![j - 1]!      + GAP;
+      const best    = Math.max(diagVal, delVal, insVal);
 
-      // Prefer diagonal when it ties with gap moves — keeps original+typed
-      // paired as one replace token instead of a split delete+insert, which
-      // would render in wrong visual order (e.g. "nothingin" vs "nothing in").
-      if (dp[i]![j] === best && diagVal === best) {
+      if (diagVal >= best - EPS * 0.1) {
         const exactMatch = A[i - 1] === B[j - 1];
         result.push({
           original: A[i - 1],
@@ -115,8 +121,13 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
         j--;
         continue;
       }
+      if (insVal >= best - EPS * 0.1) {
+        result.push({ typed: B[j - 1], type: "insert" });
+        j--;
+        continue;
+      }
     }
-    if (i > 0 && (j === 0 || dp[i]![j] === dp[i - 1]![j]! + GAP)) {
+    if (i > 0 && (j === 0 || dp[i]![j]! <= dp[i - 1]![j]! + GAP + EPS * 0.1)) {
       result.push({ original: A[i - 1], type: "delete" });
       i--;
     } else {

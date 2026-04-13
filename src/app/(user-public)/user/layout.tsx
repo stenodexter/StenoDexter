@@ -29,7 +29,7 @@ export default async function AdminAuthLayout({
       </div>
 
       <DoodleBg
-        stroke="#1e40af" // light mode color
+        stroke="#BFC9D1" // light mode color
         opacity={0.22}
         tileSize={200} // smaller = more tiles = denser
       />
