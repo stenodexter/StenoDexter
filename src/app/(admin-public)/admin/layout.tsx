@@ -15,7 +15,7 @@ export default async function AdminAuthLayout({
 }) {
   return (
     <div className="h-screen overflow-hidden">
-      <div className="absolute top-0 left-0 flex w-full items-center justify-between p-4">
+      <div className="absolute z-40 top-0 left-0 flex w-full items-center justify-between p-4">
         <Logo />
         <ThemeToggle />
       </div>
