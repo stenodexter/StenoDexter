@@ -70,6 +70,10 @@ export const databaseHooks: BetterAuthOptions["databaseHooks"] = {
     create: {
       before: async (session, ctx) => {
         const request = ctx?.request as Request | undefined;
+        const pathname = request ? new URL(request.url).pathname : "";
+
+        const isEmailVerificationRoute = pathname.includes("verify-email");
+
         let deviceId = getDeviceId(request);
 
         if (!deviceId) {
@@ -79,8 +83,19 @@ export const databaseHooks: BetterAuthOptions["databaseHooks"] = {
         }
 
         const userId = session.userId;
-
         const existing = await deviceService.get(userId);
+
+        if (isEmailVerificationRoute) {
+          if (!existing) {
+            return { data: session };
+          }
+
+          if (!deviceId || existing.deviceId !== deviceId) {
+            return { data: null as any };
+          }
+
+          return { data: session };
+        }
 
         if (!existing) {
           if (!deviceId) {
