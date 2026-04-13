@@ -287,7 +287,7 @@ export function PaymentDialog({
               </div>
 
               <p className="text-muted-foreground/60 text-xs">
-                After submitting, an admin will verify your payment.
+                After submitting, the admin will verify your payment.
                 {isRenewal
                   ? " Days are added on top of your current expiry."
                   : " Access is granted once approved — usually within a few hours."}
