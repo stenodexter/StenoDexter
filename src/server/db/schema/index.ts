@@ -5,3 +5,4 @@ export * from "./tests";
 export * from "./leaderboard";
 export * from "./notification";
 export * from "./hall-of-fame";
+export * from "./typing-test";
