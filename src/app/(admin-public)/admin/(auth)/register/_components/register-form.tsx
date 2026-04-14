@@ -24,37 +24,8 @@ export function RegisterForm({ token }: RegisterProps) {
   const router = useRouter();
   const submittingRef = useRef(false);
 
-  const loginMutation = trpc.admin.auth.login.useMutation({
-    onSuccess: async ({ admin: { token } }) => {
-      await fetch("/api/set-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name: "admin_token" }),
-      });
-
-      toast.success("Welcome! Account created 🎉");
-      router.push("/admin");
-    },
-    onError: (error) => {
-      // Account was created but auto-login failed — fall back to login page
-      toast.success("Account created! Please sign in.");
-      router.push("/admin/login");
-    },
-  });
-
-  const registerMutation = trpc.admin.auth.register.useMutation({
-    onSuccess: async (_, variables) => {
-      // Auto-login with the same credentials
-      await loginMutation.mutateAsync({
-        username: variables.username,
-        password: variables.password,
-      });
-    },
-    onError: (error) => {
-      toast.error(error?.message || "Registration failed");
-      submittingRef.current = false;
-    },
-  });
+  const registerMutation = trpc.admin.auth.register.useMutation();
+  const loginMutation = trpc.admin.auth.login.useMutation();
 
   const form = useForm({
     defaultValues: {
@@ -75,6 +46,27 @@ export function RegisterForm({ token }: RegisterProps) {
           password: value.password,
           code: value.code,
         });
+
+        const {
+          admin: { token },
+        } = await loginMutation.mutateAsync({
+          username: value.username,
+          password: value.password,
+        });
+
+        const res = await fetch("/api/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, name: "admin_token" }),
+        });
+
+        if (!res.ok) throw new Error("Failed to set auth token");
+
+        toast.success("Welcome! Account created 🎉");
+        router.replace("/admin");
+        router.refresh();
+      } catch (error: any) {
+        toast.error(error?.message || "Registration failed");
       } finally {
         submittingRef.current = false;
       }
@@ -84,7 +76,7 @@ export function RegisterForm({ token }: RegisterProps) {
   const isPending = registerMutation.isPending || loginMutation.isPending;
 
   return (
-    <Card className="w-full max-w-4xl shadow-lg  relative z-30">
+    <Card className="relative z-30 w-full max-w-4xl shadow-lg">
       <CardContent className="p-0">
         <div className="grid md:grid-cols-2">
           {/* Column 1 - Heading & Links */}

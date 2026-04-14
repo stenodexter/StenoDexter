@@ -20,22 +20,7 @@ export function LoginForm() {
   const router = useRouter();
   const submittingRef = useRef(false);
 
-  const loginMutation = trpc.admin.auth.login.useMutation({
-    onSuccess: async ({ admin: { token } }) => {
-      await fetch("/api/set-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name: "admin_token" }),
-      });
-
-      toast.success("Welcome back!");
-      router.push("/admin");
-    },
-    onError: (error) => {
-      toast.error(error?.message || "Invalid username or password");
-      submittingRef.current = false; // 👈 release on error
-    },
-  });
+  const loginMutation = trpc.admin.auth.login.useMutation();
 
   const form = useForm({
     defaultValues: {
@@ -43,19 +28,37 @@ export function LoginForm() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      if (submittingRef.current) return; // 👈 guard
-      submittingRef.current = true; // 👈 lock
+      if (submittingRef.current) return;
+      submittingRef.current = true;
 
       try {
-        await loginMutation.mutateAsync(value);
+        const {
+          admin: { token },
+        } = await loginMutation.mutateAsync(value);
+
+        const res = await fetch("/api/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, name: "admin_token" }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to set auth token");
+        }
+
+        toast.success("Welcome back!");
+        router.replace("/admin");
+        router.refresh();
+      } catch (error: any) {
+        toast.error(error?.message || "Invalid username or password");
       } finally {
-        submittingRef.current = false; // 👈 always release
+        submittingRef.current = false;
       }
     },
   });
 
   return (
-    <Card className="relative z-30 w-full max-w-4xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md">
+    <Card className="relative z-30 w-full max-w-4xl">
       <CardContent className="p-0">
         <div className="grid md:grid-cols-2">
           {/* Column 1 - Heading & Links */}

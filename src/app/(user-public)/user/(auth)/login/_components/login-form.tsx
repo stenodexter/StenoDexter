@@ -81,7 +81,7 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="relative z-40 w-full max-w-4xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md">
+    <Card className="relative z-40 w-full max-w-4xl">
       <CardContent className="flex items-center justify-between p-0">
         <div className="flex">
           {/* Column 1 - Heading & Google */}
