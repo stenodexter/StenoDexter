@@ -1,7 +1,17 @@
 // typing-test.service.ts
 
-import { and, asc, count, desc, eq, gte, ilike, lte } from "drizzle-orm";
-import { typingTests } from "~/server/db/schema";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+} from "drizzle-orm";
+import { typingAttempts, typingTests } from "~/server/db/schema";
 import type {
   CreateTypingTestInput,
   GetTypingTestInput,
@@ -49,24 +59,38 @@ export function createTypingTestManageService(db: Db) {
       return { ok: true };
     },
 
-    async get(input: GetTypingTestInput) {
-      const test = await db.query.typingTests.findFirst({
-        where: eq(typingTests.id, input.id),
-      });
+    async get(input: GetTypingTestInput, userId?: string) {
+      const [test, attemptCount] = await Promise.all([
+        db.query.typingTests.findFirst({ where: eq(typingTests.id, input.id) }),
+        userId
+          ? db
+              .select({ count: count() })
+              .from(typingAttempts)
+              .where(
+                and(
+                  eq(typingAttempts.testId, input.id),
+                  eq(typingAttempts.userId, userId),
+                  eq(typingAttempts.isSubmitted, true),
+                ),
+              )
+              .then((r) => r[0]?.count ?? 0)
+          : Promise.resolve(0),
+      ]);
+
       if (!test) throw new Error("Typing test not found");
-      return test;
+
+      return {
+        ...test,
+        userAttemptCount: attemptCount,
+        isAssessed: (attemptCount as number) > 0,
+      };
     },
 
-    async list(input: ListTypingTestsInput) {
+    async list(input: ListTypingTestsInput, userId?: string) {
       const { page, pageSize, sort, date, search } = input;
       const offset = (page - 1) * pageSize;
 
       const conditions = [];
-
-      if (search) {
-        conditions.push(ilike(typingTests.title, `%${search}%`));
-      }
-
       if (date) {
         const start = new Date(date);
         start.setHours(0, 0, 0, 0);
@@ -75,6 +99,8 @@ export function createTypingTestManageService(db: Db) {
         conditions.push(gte(typingTests.createdAt, start));
         conditions.push(lte(typingTests.createdAt, end));
       }
+      if (search?.trim())
+        conditions.push(ilike(typingTests.title, `%${search.trim()}%`));
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;
       const orderBy =
@@ -82,7 +108,7 @@ export function createTypingTestManageService(db: Db) {
           ? asc(typingTests.createdAt)
           : desc(typingTests.createdAt);
 
-      const [rows, [countRow]] = await Promise.all([
+      const [rows, [countRow], assessedRows] = await Promise.all([
         db.query.typingTests.findMany({
           where,
           orderBy,
@@ -90,12 +116,57 @@ export function createTypingTestManageService(db: Db) {
           offset,
         }),
         db.select({ count: count() }).from(typingTests).where(where),
+        userId
+          ? db
+              .select({
+                testId: typingAttempts.testId,
+                attempts: count(),
+              })
+              .from(typingAttempts)
+              .where(
+                and(
+                  eq(typingAttempts.userId, userId),
+                  eq(typingAttempts.isSubmitted, true),
+                  inArray(typingAttempts.testId, []),
+                ),
+              )
+              .groupBy(typingAttempts.testId)
+          : Promise.resolve([]),
       ]);
+
+      // re-run with actual testIds if userId present
+      const testIds = rows.map((r) => r.id);
+      const userAttemptMap = new Map<string, number>();
+
+      if (userId && testIds.length > 0) {
+        const userAttempts = await db
+          .select({ testId: typingAttempts.testId, attempts: count() })
+          .from(typingAttempts)
+          .where(
+            and(
+              eq(typingAttempts.userId, userId),
+              eq(typingAttempts.isSubmitted, true),
+              inArray(typingAttempts.testId, testIds),
+            ),
+          )
+          .groupBy(typingAttempts.testId);
+
+        for (const r of userAttempts) {
+          userAttemptMap.set(r.testId, Number(r.attempts));
+        }
+      }
 
       const total = countRow?.count ?? 0;
 
       return {
-        data: rows,
+        data: rows.map((t) => {
+          const userAttemptCount = userAttemptMap.get(t.id) ?? 0;
+          return {
+            ...t,
+            userAttemptCount,
+            isAssessed: userAttemptCount > 0,
+          };
+        }),
         page,
         pageSize,
         total,

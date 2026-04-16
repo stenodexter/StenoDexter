@@ -36,6 +36,7 @@ import {
   Sparkles,
   CreditCard,
   Scale,
+  Album,
 } from "lucide-react";
 import Image from "next/image";
 import type { api } from "~/trpc/server";
@@ -49,6 +50,7 @@ const TEST_TYPES = [
 ];
 
 const MAIN_NAV = [
+  { label: "Typing", href: "/user/typing-tests", icon: Album },
   { label: "My Report", href: "/user/report-card", icon: ChartSpline },
   { label: "Attempts", href: "/user/attempts", icon: Star },
 ];

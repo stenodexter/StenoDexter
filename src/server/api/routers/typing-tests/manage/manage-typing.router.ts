@@ -1,6 +1,8 @@
-// typing-test.router.ts
-
-import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  adminProcedure,
+  secureProcedure,
+} from "~/server/api/trpc";
 import {
   createTypingTestSchema,
   updateTypingTestSchema,
@@ -24,11 +26,11 @@ export const manageTypingRouter = createTRPCRouter({
     .input(getTypingTestSchema)
     .mutation(({ input }) => typingTestManageService.delete(input)),
 
-  get: adminProcedure
+  get: secureProcedure
     .input(getTypingTestSchema)
     .query(({ input }) => typingTestManageService.get(input)),
 
-  list: adminProcedure
+  list: secureProcedure
     .input(listTypingTestsSchema)
     .query(({ input }) => typingTestManageService.list(input)),
 });

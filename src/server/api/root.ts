@@ -14,6 +14,7 @@ import { cronRouter } from "./routers/crons/crons.router";
 import { paymentRouter } from "./routers/payments/payments.router";
 import { dusRouter } from "./routers/demo-users/dus.router";
 import { deviceRouter } from "./routers/device/device.router";
+import { typingTestRouter } from "./routers/typing-tests/typing.router";
 
 /**
  * This is the primary router for your server.
@@ -34,6 +35,7 @@ export const appRouter = createTRPCRouter({
   payment: paymentRouter,
   dus: dusRouter,
   device: deviceRouter,
+  typingTest: typingTestRouter,
 });
 
 // export type definition of API

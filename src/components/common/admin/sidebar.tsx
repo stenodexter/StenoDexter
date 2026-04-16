@@ -41,6 +41,7 @@ import {
   UserKey,
   Scale,
   FlaskConical,
+  Album,
 } from "lucide-react";
 import { trpc } from "~/trpc/react";
 import { useMemo } from "react";
@@ -48,6 +49,8 @@ import Image from "next/image";
 import { Logo } from "~/components/utils/logo";
 
 const MAIN_NAV = [
+   { label: "Typing", href: "/admin/typing-tests", icon: Album  },
+ 
   { label: "Analytics", href: "/admin/analytics", icon: BarChart2 },
   { label: "Users", href: "/admin/users", icon: Users },
   {
