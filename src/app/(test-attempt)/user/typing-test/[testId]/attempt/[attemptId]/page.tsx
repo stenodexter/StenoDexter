@@ -8,14 +8,21 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
-import { Send, CheckCircle2, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  Send,
+  CheckCircle2,
+  ZoomIn,
+  ZoomOut,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 
 const SYNC_LOCAL_MS = 3_000;
 const SYNC_SERVER_MS = 15_000;
 const FONT_MIN = 14;
 const FONT_MAX = 48;
-const FONT_STEP = 2;
-const FONT_DEFAULT = 16;
+const FONT_STEP = 1;
+const FONT_DEFAULT = 15;
 const DRAFT_KEY = (id: string) => `typing_draft_${id}`;
 
 function pad(n: number) {
@@ -79,7 +86,7 @@ function SubmittedScreen({
           size="sm"
           onClick={() =>
             router.push(
-              `/user/typing-tests/${testId}/result?attemptId=${attemptId}`,
+              `/user/typing-tests/${testId}/results?attemptId=${attemptId}`,
             )
           }
         >
@@ -124,11 +131,15 @@ export default function TypingAttemptPage() {
   );
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const passageScrollRef = useRef<HTMLDivElement>(null);
   const answerRef = useRef("");
   const lastServerSyncRef = useRef("");
   const localTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
+
+  // line height for scroll-by-line: fontSize * lineHeight ratio
+  const lineHeightPx = Math.round(fontSize * 1.8);
 
   const syncMutation = trpc.typingTest.attempt.sync.useMutation({
     onMutate: () => setIsSyncing(true),
@@ -239,12 +250,21 @@ export default function TypingAttemptPage() {
   }, []);
 
   const handleChange = useCallback((val: string) => {
-    // only allow appending or deleting from end
     const prev = answerRef.current;
     if (!val.startsWith(prev) && !prev.startsWith(val)) return;
     answerRef.current = val;
     setAnswer(val);
   }, []);
+
+  const scrollPassageByLine = useCallback(
+    (direction: "up" | "down") => {
+      passageScrollRef.current?.scrollBy({
+        top: direction === "up" ? -lineHeightPx : lineHeightPx,
+        behavior: "smooth",
+      });
+    },
+    [lineHeightPx],
+  );
 
   // init
   useEffect(() => {
@@ -342,6 +362,12 @@ export default function TypingAttemptPage() {
   const circ = 2 * Math.PI * R;
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
 
+  const passageFont = {
+    fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
+    fontSize: `${fontSize}px`,
+    lineHeight: "1.8",
+  } as const;
+
   return (
     <div className="bg-background fixed inset-0 flex flex-col overflow-hidden">
       {/* ── top bar ── */}
@@ -349,12 +375,15 @@ export default function TypingAttemptPage() {
         <p className="truncate text-base font-semibold">{data.test.title}</p>
         <div className="flex items-center gap-3">
           <LiveClock />
+
           <Badge
             variant={data.attempt.type === "test" ? "default" : "secondary"}
             className="capitalize"
           >
             {data.attempt.type}
           </Badge>
+
+          {/* Timer */}
           <div className="flex items-center gap-2">
             <svg width={26} height={26} className="-rotate-90">
               <circle
@@ -391,6 +420,8 @@ export default function TypingAttemptPage() {
               </Badge>
             )}
           </div>
+
+          {/* Font size control */}
           <div className="bg-muted/40 flex items-center gap-0.5 rounded-md border p-0.5">
             <Button
               variant="ghost"
@@ -418,6 +449,8 @@ export default function TypingAttemptPage() {
               <ZoomIn className="h-3 w-3" />
             </Button>
           </div>
+
+          {/* Submit */}
           <Button
             size="sm"
             onClick={doSubmit}
@@ -431,51 +464,73 @@ export default function TypingAttemptPage() {
       </div>
 
       {/* ── progress line ── */}
-      <div className="bg-border h-0.5 w-full shrink-0">
+      <div className="bg-border/40 h-[2px] w-full shrink-0">
         <div
           className={`h-full transition-all duration-1000 ${isLow ? "bg-destructive" : "bg-primary"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
 
-      {/* ── split panes — each exactly 50% and independently scrollable ── */}
+      {/* ── split panes ── */}
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* passage — top, fixed height, scrollable */}
-        <div
-          className="flex-1 overflow-y-auto border-b"
-          style={{ minHeight: 0 }}
-        >
-          <div className="px-8 py-6">
+        {/* ── Passage pane (top) ── */}
+        <div className="flex min-h-0 flex-1 flex-col border-b">
+          {/* scrollable passage body */}
+          <div
+            ref={passageScrollRef}
+            className="min-h-0 flex-1 overflow-y-auto px-8 py-5"
+          >
             <p className="text-muted-foreground mb-3 text-[10px] font-semibold tracking-widest uppercase">
               Passage
             </p>
             <p
               className="leading-relaxed whitespace-pre-wrap"
-              style={{
-                fontFamily:
-                  "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
-                fontSize: `${fontSize}px`,
-                lineHeight: "1.8",
-              }}
+              style={passageFont}
             >
               {data.test.correctTranscription}
             </p>
           </div>
+
+          {/* passage footer: scroll controls */}
+          <div className="bg-muted/30 flex shrink-0 items-center justify-end gap-1.5 border-t px-4 py-1.5">
+            <span className="text-muted-foreground mr-1 text-[11px]">
+              Scroll passage
+            </span>
+            <button
+              onClick={() => scrollPassageByLine("up")}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+              aria-label="Scroll passage up one line"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => scrollPassageByLine("down")}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+              aria-label="Scroll passage down one line"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* writing area — bottom, fixed height, textarea fills it */}
-        <div className="flex flex-1 flex-col" style={{ minHeight: 0 }}>
+        {/* ── Writing pane (bottom) ── */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* label row */}
+          <div className="shrink-0 px-8 pt-4">
+            <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+              Your transcription
+            </p>
+          </div>
+
+          {/* textarea */}
           <textarea
             ref={textareaRef}
-            className="placeholder:text-muted-foreground/50 flex-1 resize-none border-0 bg-transparent px-8 py-6 outline-none selection:bg-transparent"
+            className="placeholder:text-muted-foreground/40 min-h-0 flex-1 resize-none border-0 bg-transparent px-8 py-3 outline-none selection:bg-transparent"
             style={{
-              fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
-              fontSize: `${fontSize}px`,
-              lineHeight: "1.8",
-              minHeight: 0,
+              ...passageFont,
               caretColor: "auto",
             }}
-            placeholder="Begin your transcription here…"
+            placeholder="Begin typing here…"
             value={answer}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -486,10 +541,14 @@ export default function TypingAttemptPage() {
             spellCheck={false}
             autoFocus
           />
-          <div className="flex shrink-0 items-center justify-between border-t px-6 py-2">
+
+          {/* status bar */}
+          <div className="bg-muted/30 flex shrink-0 items-center justify-between border-t px-5 py-2">
             <div className="flex items-center gap-1.5">
               <span
-                className={`h-1.5 w-1.5 rounded-full transition-colors ${isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`}
+                className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                  isSyncing ? "animate-pulse bg-amber-400" : "bg-emerald-500"
+                }`}
               />
               <span className="text-muted-foreground text-xs">
                 {isSyncing ? "Saving…" : "Saved"}
