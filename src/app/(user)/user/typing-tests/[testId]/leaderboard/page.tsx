@@ -2,16 +2,17 @@ import { TypingLeaderboard } from "~/components/common/clients/typing-test-leade
 import { api } from "~/trpc/server";
 
 interface Props {
-  params: { testId: string };
+  params: Promise<{ testId: string }>;
 }
 
 export default async function UserTypingLeaderboardPage({ params }: Props) {
+  const { testId } = await params;
   const user = await api.user.me();
   const currentUserId = user?.id ?? null;
 
   return (
     <TypingLeaderboard
-      testId={params.testId}
+      testId={testId}
       isAdmin={false}
       currentUserId={currentUserId}
     />

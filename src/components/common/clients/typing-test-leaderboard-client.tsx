@@ -25,6 +25,8 @@ import {
   Clock,
   Target,
   Star,
+  TrendingUp,
+  CheckCircle2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import jsPDF from "jspdf";
@@ -100,31 +102,42 @@ function RankCell({ rank }: { rank: number }) {
   );
 }
 
-// ─── stat pill ────────────────────────────────────────────────────────────────
+// ─── KPI card ─────────────────────────────────────────────────────────────────
 
-function StatPill({
+function KpiCard({
   icon: Icon,
   label,
   value,
-  className,
+  sub,
+  iconClassName,
+  valueClassName,
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
-  className?: string;
+  sub?: string;
+  iconClassName?: string;
+  valueClassName?: string;
 }) {
   return (
-    <div className="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2">
-      <Icon
-        className={`h-3.5 w-3.5 shrink-0 ${className ?? "text-muted-foreground"}`}
-      />
+    <div className="bg-muted/40 flex flex-col gap-2 rounded-xl border p-4">
+      <div
+        className={`flex h-7 w-7 items-center justify-center rounded-lg ${iconClassName ?? "bg-muted"}`}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </div>
       <div>
-        <p className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+        <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
           {label}
         </p>
-        <p className={`text-sm font-bold tabular-nums ${className ?? ""}`}>
+        <p
+          className={`mt-0.5 text-xl leading-tight font-semibold tabular-nums ${valueClassName ?? ""}`}
+        >
           {value}
         </p>
+        {sub && (
+          <p className="text-muted-foreground mt-0.5 text-[11px]">{sub}</p>
+        )}
       </div>
     </div>
   );
@@ -156,7 +169,7 @@ function LeaderboardSkeleton() {
   );
 }
 
-// ─── entry type (from router return) ─────────────────────────────────────────
+// ─── entry type ───────────────────────────────────────────────────────────────
 
 type LeaderboardEntry = {
   rank: number;
@@ -242,26 +255,25 @@ function LeaderboardTable({
               <TableHead>Participant</TableHead>
               <TableHead className="w-28 text-center">
                 <div className="flex items-center justify-center gap-1">
-                  <Star className="h-3 w-3" />
                   Marks / 50
                 </div>
               </TableHead>
               <TableHead className="w-28 text-center">
                 <div className="flex items-center justify-center gap-1">
-                  <Target className="h-3 w-3" />
                   Accuracy
                 </div>
               </TableHead>
-              <TableHead className="w-28 text-center">Net DPH</TableHead>
               <TableHead className="w-28 text-center">Gross WPM</TableHead>
-              <TableHead className="w-24 text-center">Full / Half</TableHead>
-              <TableHead className="w-32 text-center">
+              <TableHead className="w-24 text-center">
                 <div className="flex items-center justify-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Time Taken
+                  Full/Half Err
                 </div>
               </TableHead>
-              <TableHead className="w-24 text-center">Total / Net KS</TableHead>
+              <TableHead className="w-32 text-center">
+                <div className="flex items-center justify-center gap-1">
+                  Completed In
+                </div>
+              </TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -337,11 +349,6 @@ function LeaderboardTable({
                     </span>
                   </TableCell>
 
-                  {/* Net DPH */}
-                  <TableCell className="py-3.5 text-center text-sm tabular-nums">
-                    {Math.round(entry.netDph).toLocaleString()}
-                  </TableCell>
-
                   {/* Gross WPM */}
                   <TableCell className="py-3.5 text-center text-sm tabular-nums">
                     {entry.grossWpm}
@@ -365,13 +372,6 @@ function LeaderboardTable({
                       {" "}
                       / {formatSeconds(testDurationSeconds)}
                     </span>
-                  </TableCell>
-
-                  {/* Total / Net keystrokes */}
-                  <TableCell className="text-muted-foreground py-3.5 text-center text-sm tabular-nums">
-                    {entry.totalStrokes}
-                    <span className="text-muted-foreground/50">/</span>
-                    {entry.netStrokes}
                   </TableCell>
 
                   {/* CTA */}
@@ -403,6 +403,8 @@ function LeaderboardTable({
   );
 }
 
+// ─── main component ───────────────────────────────────────────────────────────
+
 interface TypingLeaderboardProps {
   testId: string;
   isAdmin?: boolean;
@@ -431,7 +433,6 @@ export function TypingLeaderboard({
     ? entries.find((e) => e.userId === currentUserId)
     : null;
 
-  // Summary stats
   const avgMarks = useMemo(() => {
     if (!entries.length) return null;
     return entries.reduce((s, e) => s + e.marksOutOf50, 0) / entries.length;
@@ -479,13 +480,10 @@ export function TypingLeaderboard({
           "SD ID",
           "Marks / 50",
           "Accuracy",
-          "Net DPH",
           "Gross WPM",
           "Full Err",
           "Half Err",
           "Time Taken",
-          "Total KS",
-          "Net KS",
         ],
       ],
       body: entries.map((e) => [
@@ -495,13 +493,10 @@ export function TypingLeaderboard({
         e.user.userCode ?? "—",
         e.marksOutOf50.toFixed(2),
         `${e.accuracy.toFixed(1)}%`,
-        Math.round(e.netDph).toLocaleString(),
         String(e.grossWpm),
         String(e.fullMistakes),
         String(e.halfMistakes),
         formatSeconds(e.transcriptionTimeSeconds),
-        String(e.totalStrokes),
-        String(e.netStrokes),
       ]),
       headStyles: {
         fillColor: [20, 20, 20],
@@ -519,9 +514,6 @@ export function TypingLeaderboard({
         7: { halign: "center" },
         8: { halign: "center" },
         9: { halign: "center" },
-        10: { halign: "center" },
-        11: { halign: "center" },
-        12: { halign: "center" },
       },
       didParseCell(data) {
         if (data.column.index === 4 && data.section === "body") {
@@ -618,31 +610,42 @@ export function TypingLeaderboard({
         </div>
       </div>
 
-      {/* ── Summary stat pills (admin only) ── */}
+      {/* ── KPI Cards (admin only) ── */}
       {isAdmin && entries.length > 0 && avgMarks !== null && (
-        <div className="flex flex-wrap gap-3">
-          <StatPill
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiCard
             icon={Trophy}
             label="Top Score"
             value={`${entries[0]!.marksOutOf50.toFixed(2)} / 50`}
-            className="text-amber-500"
+            sub="highest marks"
+            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400"
+            valueClassName="text-amber-600 dark:text-amber-400"
           />
-          <StatPill
-            icon={Star}
+          <KpiCard
+            icon={TrendingUp}
             label="Avg Marks"
             value={`${avgMarks.toFixed(2)} / 50`}
+            sub="across all candidates"
+            iconClassName="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
+            valueClassName="text-blue-600 dark:text-blue-400"
           />
-          <StatPill
-            icon={Target}
+          <KpiCard
+            icon={CheckCircle2}
             label="Avg Accuracy"
             value={`${avgAccuracy!.toFixed(1)}%`}
+            sub="across all candidates"
+            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
+            valueClassName="text-emerald-600 dark:text-emerald-400"
           />
-          <StatPill
+          <KpiCard
             icon={Clock}
             label="Fastest"
             value={formatSeconds(
               Math.min(...entries.map((e) => e.transcriptionTimeSeconds)),
             )}
+            sub={`of ${formatSeconds(testData?.durationSeconds ?? 0)}`}
+            iconClassName="bg-teal-100 text-teal-600 dark:bg-teal-950 dark:text-teal-400"
+            valueClassName="text-teal-600 dark:text-teal-400"
           />
         </div>
       )}

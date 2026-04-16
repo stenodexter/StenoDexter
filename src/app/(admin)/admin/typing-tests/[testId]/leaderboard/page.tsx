@@ -1,15 +1,13 @@
 import { TypingLeaderboard } from "~/components/common/clients/typing-test-leaderboard-client";
 
 interface Props {
-  params: { testId: string };
+  params: Promise<{ testId: string }>;
 }
 
 export default async function AdminTypingLeaderboardPage({ params }: Props) {
+  const { testId } = await params;
+
   return (
-    <TypingLeaderboard
-      testId={params.testId}
-      isAdmin={true}
-      currentUserId={null}
-    />
+    <TypingLeaderboard testId={testId} isAdmin={true} currentUserId={null} />
   );
 }
