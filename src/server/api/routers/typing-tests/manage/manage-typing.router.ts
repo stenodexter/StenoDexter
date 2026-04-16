@@ -28,9 +28,21 @@ export const manageTypingRouter = createTRPCRouter({
 
   get: secureProcedure
     .input(getTypingTestSchema)
-    .query(({ input }) => typingTestManageService.get(input)),
+    .query(async ({ input, ctx }) => {
+      if (ctx.user && ctx.user.id) {
+        return await typingTestManageService.get(input, ctx.user.id);
+      }
+
+      return await typingTestManageService.get(input);
+    }),
 
   list: secureProcedure
     .input(listTypingTestsSchema)
-    .query(({ input }) => typingTestManageService.list(input)),
+    .query(async ({ input, ctx }) => {
+      if (ctx.user && ctx.user.id) {
+        return await typingTestManageService.list(input, ctx.user.id);
+      }
+
+      return await typingTestManageService.list(input);
+    }),
 });

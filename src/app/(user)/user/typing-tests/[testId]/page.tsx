@@ -9,5 +9,5 @@ export default function Page({
   params: Promise<{ testId: string }>;
 }) {
   const { testId } = use(params);
-  return <TypingTestDetailPage testId={testId} isAdmin={true} />;
+  return <TypingTestDetailPage testId={testId} isAdmin={false} />;
 }

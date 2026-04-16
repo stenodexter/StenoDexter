@@ -61,8 +61,16 @@ function TestRow({
   test: TypingTestCard;
   onStart: (test: TypingTestCard) => void;
 }) {
+  const router = useRouter();
+
   return (
-    <div className="bg-card hover:bg-muted/30 grid cursor-pointer grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 rounded-xl border px-5 py-3.5 transition-all">
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        router.push(`/user/typing-tests/${test.id}`);
+      }}
+      className="bg-card hover:bg-muted/30 grid cursor-pointer grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 rounded-xl border px-5 py-3.5 transition-all"
+    >
       {/* title */}
       <p className="min-w-0 truncate text-sm font-semibold">{test.title}</p>
 
@@ -91,7 +99,10 @@ function TestRow({
         size="sm"
         variant={test.isAssessed ? "outline" : "default"}
         className={cn("h-7 text-xs", !test.isAssessed)}
-        onClick={() => onStart(test)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onStart(test);
+        }}
       >
         {test.isAssessed ? "Practice" : "Give Test"}
       </Button>

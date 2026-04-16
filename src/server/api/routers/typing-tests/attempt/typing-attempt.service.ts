@@ -27,6 +27,7 @@ export function createTypingAttemptService(db: Db) {
             eq(typingAttempts.userId, userId),
             eq(typingAttempts.testId, input.testId),
             eq(typingAttempts.isSubmitted, true),
+            eq(typingAttempts.stage, "submitted"),
           ),
         }),
       ]);

@@ -316,7 +316,7 @@ function AttemptCard({
           <Separator />
           <div className="text-muted-foreground mb-2 grid grid-cols-2 gap-4 text-xs">
             <span>
-              Correct words: <strong>{correctWords}</strong>
+              Total words: <strong>{correctWords}</strong>
             </span>
             <span>
               Typed words: <strong>{typedWords}</strong>
