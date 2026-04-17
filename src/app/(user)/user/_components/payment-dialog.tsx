@@ -19,11 +19,9 @@ import {
   DialogDescription,
 } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
-import { CheckCircle2, Clock, Upload, X } from "lucide-react";
+import { CheckCircle2, Upload, X } from "lucide-react";
 import Image from "next/image";
 import { DeviceNotice } from "~/components/utils/device-notice";
-import { UserIdentity } from "../settings/_components/settings-client";
-import { authClient } from "~/server/better-auth/client";
 
 const AMOUNT = 1500;
 
@@ -40,33 +38,210 @@ function CopyButton({ value }: { value: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="text-muted-foreground hover:text-foreground ml-1.5 inline-flex shrink-0 items-center transition-colors"
+      className={cn(
+        "flex h-7 items-center gap-1 rounded-md border px-2.5 text-xs transition-colors",
+        copied
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+          : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
     >
       {copied ? (
-        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+        <>
+          <CheckCircle2 className="h-3 w-3" />
+          Copied
+        </>
       ) : (
-        <svg
-          viewBox="0 0 24 24"
-          className="h-3 w-3"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-        </svg>
+        <>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3 w-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+          </svg>
+          Copy
+        </>
       )}
     </button>
   );
 }
 
+// ─── Timeline step ────────────────────────────────────────────────────────────
+
+type TlStatus = "done" | "active" | "pending";
+
+function TimelineStep({
+  status,
+  title,
+  desc,
+  last = false,
+}: {
+  status: TlStatus;
+  title: string;
+  desc: string;
+  last?: boolean;
+}) {
+  return (
+    <div className="flex gap-3">
+      {/* spine */}
+      <div className="flex flex-col items-center">
+        <div
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+            status === "done" &&
+              "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950",
+            status === "active" &&
+              "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950",
+            status === "pending" && "border-border bg-muted",
+          )}
+        >
+          {status === "done" && (
+            <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none">
+              <path
+                d="M2 6l3 3 5-5"
+                stroke="#16a34a"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+          {status === "active" && (
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+          )}
+          {status === "pending" && (
+            <span className="bg-muted-foreground/30 h-2 w-2 rounded-full" />
+          )}
+        </div>
+        {!last && <div className="bg-border mt-1 w-px flex-1" />}
+      </div>
+      {/* content */}
+      <div className={cn("pb-4", last && "pb-0")}>
+        <p
+          className={cn(
+            "text-sm leading-6 font-medium",
+            status === "pending" && "text-muted-foreground",
+          )}
+        >
+          {title}
+        </p>
+        <p className="text-muted-foreground text-xs">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Submitted state ──────────────────────────────────────────────────────────
+
+function SubmittedView({
+  isRenewal,
+  isGate,
+  userCode,
+  onClose,
+}: {
+  isRenewal: boolean;
+  isGate: boolean;
+  userCode?: string;
+  onClose?: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      {/* header */}
+      <div className="flex flex-col gap-1">
+        <div className="mb-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Under review
+        </div>
+        <h3 className="text-base font-medium">Payment submitted</h3>
+        <p className="text-muted-foreground text-sm">
+          Your screenshot has been received. Access will be restored once the
+          admin approves it — usually within a few hours.
+        </p>
+      </div>
+
+      {/* amount + date row */}
+      <div className="flex  items-center justify-between gap-2 bg-muted/50 px-5 py-2.5 rounded-lg">
+        <div className="">
+          <p className="text-muted-foreground text-xs">Amount paid</p>
+          <p className="mt-0.5 text-sm font-medium tabular-nums">₹1,500</p>
+        </div>
+        <div className="">
+          <p className="text-muted-foreground text-xs">Submitted</p>
+          <p className="mt-0.5 text-sm font-medium">Just now</p>
+        </div>
+      </div>
+
+      {/* user code */}
+      {userCode && (
+        <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+          <div>
+            <p className="text-muted-foreground text-xs">Your user code</p>
+            <p className="mt-0.5 font-mono text-sm font-medium tracking-wider">
+              {userCode}
+            </p>
+          </div>
+          <CopyButton value={userCode} />
+        </div>
+      )}
+
+      {/* timeline */}
+      <div className="rounded-lg border px-4 py-3">
+        <TimelineStep
+          status="done"
+          title="Screenshot uploaded"
+          desc="Payment receipt received successfully."
+        />
+        <TimelineStep
+          status="active"
+          title="Admin review"
+          desc="Usually completed within a few hours."
+        />
+        <TimelineStep
+          status="pending"
+          title={isRenewal ? "Subscription extended" : "Access restored"}
+          desc={
+            isRenewal
+              ? "31 days added on top of your current expiry."
+              : "Full access granted for 31 days."
+          }
+          last
+        />
+      </div>
+
+      {/* footer */}
+      {isRenewal && (
+        <div className="flex items-center justify-between gap-3 border-t pt-4">
+          <p className="text-muted-foreground text-xs">
+            You'll see the updated expiry in your subscription page.
+          </p>
+          (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="shrink-0"
+          >
+            Close
+          </Button>
+          )
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main dialog ──────────────────────────────────────────────────────────────
+
 export type PaymentDialogMode = "gate" | "renew";
 
 interface PaymentDialogProps {
   open: boolean;
-  mode?: PaymentDialogMode; // "gate" = unclosable, "renew" = closable
+  mode?: PaymentDialogMode;
   hasPendingPayment?: boolean;
-  onOpenChange?: (open: boolean) => void; // only used in renew mode
+  onOpenChange?: (open: boolean) => void;
   onSubmitted?: () => void;
 }
 
@@ -175,13 +350,11 @@ export function PaymentDialog({
 
   const dialogProps = isGate
     ? {
-        // Gate: prevent any close
         onPointerDownOutside: (e: Event) => e.preventDefault(),
         onEscapeKeyDown: (e: KeyboardEvent) => e.preventDefault(),
         onInteractOutside: (e: Event) => e.preventDefault(),
       }
     : {
-        // Renew: normal closable
         onPointerDownOutside: () => onOpenChange?.(false),
         onEscapeKeyDown: () => onOpenChange?.(false),
       };
@@ -189,74 +362,30 @@ export function PaymentDialog({
   return (
     <Dialog open={open} onOpenChange={isRenewal ? onOpenChange : undefined}>
       <DialogContent
-        className={cn("sm:max-w-3xl", isGate && "[&>button.absolute]:hidden")}
+        className={cn(
+          step !== "submitted" && "sm:max-w-3xl",
+          isGate && "[&>button.absolute]:hidden",
+        )}
         {...dialogProps}
       >
+        {/* ── Submitted ─────────────────────────────────────────────────── */}
         {step === "submitted" && (
-          <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
-              <Clock className="h-6 w-6 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Payment Under Review</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Your payment screenshot has been submitted. An admin will verify
-                it shortly — usually within a few hours.
-              </p>
-            </div>
-            <div className="w-full rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-left text-sm text-amber-700 dark:text-amber-400">
-              {user.data?.userCode && (
-                <div className="bg-muted/50 flex w-full items-center justify-between rounded-lg border px-3 py-2 mb-2">
-                  <div className="min-w-0">
-                    <p className="text-muted-foreground text-xs">
-                      Your User Code
-                    </p>
-                    <p className="font-mono text-sm font-semibold tracking-wider">
-                      {user.data.userCode}
-                    </p>
-                  </div>
-                  <CopyButton value={user.data.userCode} />
-                </div>
-              )}
-              <p className="font-semibold">What happens next?</p>
-              <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
-                <li>Admin reviews and approves your payment</li>
-                <li>
-                  Your{" "}
-                  {isRenewal
-                    ? "subscription extends by 31 days"
-                    : "account gets activated for 31 days"}
-                </li>
-                <li>
-                  You'll{" "}
-                  {isRenewal
-                    ? "see the updated expiry in your subscription page"
-                    : "regain full access automatically"}
-                </li>
-              </ul>
-            </div>
-            {isRenewal && (
-              <Button variant="outline" onClick={() => onOpenChange?.(false)}>
-                Close
-              </Button>
-            )}
-            {isGate && (
-              <p className="text-muted-foreground text-xs">
-                You can close this tab and come back later. Access will be
-                restored once your payment is verified.
-              </p>
-            )}
-          </div>
+          <SubmittedView
+            isRenewal={isRenewal}
+            isGate={isGate}
+            userCode={user.data?.userCode ?? undefined}
+            onClose={() => onOpenChange?.(false)}
+          />
         )}
 
-        {/* ── Pay / Upload state ──────────────────────────────────────────── */}
+        {/* ── Pay / Upload ───────────────────────────────────────────────── */}
         {step !== "submitted" && (
           <div className="grid md:grid-cols-2 md:divide-x">
             {/* Left — QR & info */}
             <div className="flex flex-col gap-4 pb-6 md:pr-6 md:pb-0">
               <DialogHeader>
                 <DialogTitle>
-                  {isRenewal ? "Renew Subscription" : "Activate Your Account"}
+                  {isRenewal ? "Renew subscription" : "Activate your account"}
                 </DialogTitle>
                 <DialogDescription>
                   {isRenewal
@@ -265,11 +394,10 @@ export function PaymentDialog({
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="flex items-baseline gap-1">
-                <span className="text-primary text-3xl font-bold tabular-nums">
-                  ₹1,500
-                </span>
-              </div>
+              <span className="text-primary text-3xl font-bold tabular-nums">
+                ₹1,500
+              </span>
+
               <DeviceNotice variant="payment" size="md" />
 
               <div className="flex flex-col items-center gap-2">
@@ -296,20 +424,23 @@ export function PaymentDialog({
 
             {/* Right — UPI + screenshot */}
             <div className="flex flex-col gap-4 md:pl-6">
-              <div>
-                {user.data?.userCode && (
-                  <div className="bg-muted/50 mb-3 flex items-center justify-between rounded-lg border px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-muted-foreground text-xs">
-                        Your User Code
-                      </p>
-                      <p className="font-mono text-sm font-semibold tracking-wider">
-                        {user.data.userCode}
-                      </p>
-                    </div>
-                    <CopyButton value={user.data.userCode} />
+              {/* User code */}
+              {user.data?.userCode && (
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-muted-foreground text-xs">
+                      Your user code
+                    </p>
+                    <p className="font-mono text-sm font-medium tracking-wider">
+                      {user.data.userCode}
+                    </p>
                   </div>
-                )}
+                  <CopyButton value={user.data.userCode} />
+                </div>
+              )}
+
+              {/* UPI ID */}
+              <div>
                 <label
                   htmlFor="upi-id"
                   className="mb-1.5 block text-sm font-medium"
@@ -340,9 +471,10 @@ export function PaymentDialog({
                 )}
               </div>
 
+              {/* Screenshot upload */}
               <div>
                 <p className="mb-1.5 text-sm font-medium">
-                  Payment Screenshot <span className="text-destructive">*</span>
+                  Payment screenshot <span className="text-destructive">*</span>
                 </p>
                 <div
                   onClick={() => !isBusy && inputRef.current?.click()}
@@ -401,6 +533,7 @@ export function PaymentDialog({
                       <Upload className="h-4 w-4" />
                     )}
                   </div>
+
                   {file ? (
                     <div className="w-full min-w-0 px-6">
                       <p className="w-full truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">
@@ -426,6 +559,7 @@ export function PaymentDialog({
                       </p>
                     </>
                   )}
+
                   {file && !isBusy && (
                     <button
                       type="button"
@@ -436,7 +570,7 @@ export function PaymentDialog({
                         setUploadState("idle");
                         setStep("pay");
                       }}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-2 right-2 rounded p-1 transition-colors"
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 rounded p-1 transition-colors"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -449,6 +583,7 @@ export function PaymentDialog({
                 )}
               </div>
 
+              {/* Submit */}
               <Button
                 onClick={handleUploadAndSubmit}
                 disabled={!canSubmit}
@@ -467,7 +602,7 @@ export function PaymentDialog({
                 ) : (
                   <>
                     <Upload className="mr-2 h-3.5 w-3.5" />
-                    Submit Payment
+                    Submit payment
                   </>
                 )}
               </Button>

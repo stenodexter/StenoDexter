@@ -164,7 +164,7 @@ export function createTypingAttemptService(db: Db) {
             grossErrors: Math.round(evaluation.grossErrors * 2),
             errorStrokes: Math.round(evaluation.errorStrokes),
             totalStrokes: evaluation.totalStrokes,
-            netStrokes: Math.round(evaluation.netStrokes),
+            netStrokes: evaluation.netStrokes,
             grossWpm: evaluation.grossWpm,
             netWpm: evaluation.netWpm,
             accuracy: evaluation.accuracy,

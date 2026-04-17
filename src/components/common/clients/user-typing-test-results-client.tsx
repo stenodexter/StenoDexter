@@ -11,6 +11,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronLeft, AlignLeft } from "lucide-react";
 import { format } from "date-fns";
 import type { DiffToken } from "~/server/services/typing-scoring.service";
+import { MarksCalculationDialog } from "~/components/utils/marks-calculation-dialog";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -342,13 +343,7 @@ function PageSkeleton() {
   );
 }
 
-// ─── result service additions needed ─────────────────────────────────────────
-// Add to typing-attempt.service.ts:
-//
-// async getResult(attemptId: string, userId: string) { ... }
-// async getResultAdmin(attemptId: string) { ... }
-// async getUserAttempts(testId: string, userId: string) { ... }
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── page ─────────────────────────────────────────────────────────────────────
 
 export function TypingTestResultsPage({
   userId,
@@ -404,27 +399,35 @@ export function TypingTestResultsPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground mb-2 -ml-2"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-3.5 w-3.5" /> Back
-        </Button>
-        {testLoading ? (
-          <Skeleton className="h-7 w-64" />
-        ) : (
-          <>
-            <h1 className="text-xl font-semibold tracking-tight">
-              {testData?.title}
-            </h1>
-            <p className="text-muted-foreground mt-0.5 text-sm">
-              {isAdmin ? "Student's attempts" : "Your attempts"}
-            </p>
-          </>
-        )}
+      {/* ── page header ── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground mb-2 -ml-2"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Back
+          </Button>
+          {testLoading ? (
+            <Skeleton className="h-7 w-64" />
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold tracking-tight">
+                {testData?.title}
+              </h1>
+              <p className="text-muted-foreground mt-0.5 text-sm">
+                {isAdmin ? "Student's attempts" : "Your attempts"}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ── marks formula button — top right ── */}
+        <div className="shrink-0 pt-8">
+          <MarksCalculationDialog />
+        </div>
       </div>
 
       {isLoading ? (

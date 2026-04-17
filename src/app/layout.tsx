@@ -122,24 +122,7 @@ export default function RootLayout({
         robotoSlabHeading.variable,
       )}
     >
-      <head>
-        <meta name="robots" content="index, follow, nosnippet" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              name: "Steno Dexter",
-              url: "https://stenodexter.com",
-              logo: "https://stenodexter.com/steno.png",
-            }),
-          }}
-        />
-      </head>
       <body suppressHydrationWarning>
-        {" "}
-        {/* 👈 add this too */}
         {/* 🔥 Prevent theme flicker — runs before page renders */}
         <Script id="theme-init" strategy="beforeInteractive">
           {`
@@ -157,6 +140,20 @@ export default function RootLayout({
             })();
           `}
         </Script>
+        {/* JSON-LD structured data — moved out of manual <head> to fix hydration mismatch */}
+        <Script
+          id="org-schema"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Steno Dexter",
+              url: "https://stenodexter.com",
+              logo: "https://stenodexter.com/steno.png",
+            }),
+          }}
+        />
         <DeviceIdInit />
         <ThemeProvider>
           <TooltipProvider>
