@@ -30,6 +30,6 @@ export const cronRouter = createTRPCRouter({
       60,
     );
 
-    await cronService.expireStaleAttempts();
+    await cronService.deleteStaleAttempts();
   }),
 });

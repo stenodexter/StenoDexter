@@ -4,11 +4,7 @@ export async function GET(req: Request) {
   console.log("Starting Daily Cron Service.");
 
   try {
-    await Promise.all([
-      await api.crons.expireSubscription(),
-      await api.crons.sendExpiryReminders(),
-      await api.crons.expireStaleAttempts(),
-    ]);
+    await api.crons.expireStaleAttempts();
 
     return Response.json({ success: true });
   } catch (error) {

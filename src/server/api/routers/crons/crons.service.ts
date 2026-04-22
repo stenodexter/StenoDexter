@@ -13,9 +13,14 @@ import {
 import { env } from "~/env";
 import { db } from "~/server/db";
 import {
+  leaderboard,
+  results,
   subscription,
   testAttempts,
   testSpeeds,
+  typingAttempts,
+  typingLeaderboard,
+  typingResults,
   user,
 } from "~/server/db/schema";
 import { emailService } from "~/server/services/mail.service";
@@ -120,41 +125,110 @@ export const cronService = {
     }
   },
 
-  async expireStaleAttempts() {
-    const BUFFER_SECONDS = 90;
+  async deleteStaleAttempts() {
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const cutoff = new Date(Date.now() - TWO_HOURS_MS);
 
-    const now = new Date();
+    // ── 1. dictation test attempts ────────────────────────────────────────────
 
-    const stale = await db
-      .select({ id: testAttempts.id })
+    const staleTestAttempts = await db
+      .select({
+        id: testAttempts.id,
+      })
       .from(testAttempts)
       .innerJoin(testSpeeds, eq(testAttempts.speedId, testSpeeds.id))
       .where(
         and(
           eq(testAttempts.isSubmitted, false),
           isNotNull(testAttempts.stageStartedAt),
-          sql`${testAttempts.stageStartedAt} + make_interval(secs => ${testSpeeds.dictationSeconds} + ${testSpeeds.breakSeconds} + ${testSpeeds.writtenDurationSeconds} + ${BUFFER_SECONDS}) < ${now}`,
+          sql`${testAttempts.stageStartedAt} + make_interval(secs => ${testSpeeds.dictationSeconds} + ${testSpeeds.breakSeconds} + ${testSpeeds.writtenDurationSeconds}) < ${cutoff}`,
         ),
       );
 
-    if (stale.length === 0) {
-      console.log("No stale attempts found");
-      return;
+    if (staleTestAttempts.length > 0) {
+      const staleTestAttemptIds = staleTestAttempts.map((a) => a.id);
+
+      // Find results linked to these attempts (needed to find leaderboard entries)
+      const linkedResults = await db
+        .select({ id: results.id })
+        .from(results)
+        .where(inArray(results.attemptId, staleTestAttemptIds));
+
+      if (linkedResults.length > 0) {
+        const linkedResultIds = linkedResults.map((r) => r.id);
+
+        // Delete leaderboard entries first (resultId has onDelete: "restrict")
+        await db
+          .delete(leaderboard)
+          .where(inArray(leaderboard.resultId, linkedResultIds));
+
+        // Delete results next (attemptId has onDelete: "cascade" but being explicit)
+        await db.delete(results).where(inArray(results.id, linkedResultIds));
+      }
+
+      // Delete attempts last
+      await db
+        .delete(testAttempts)
+        .where(inArray(testAttempts.id, staleTestAttemptIds));
+
+      console.log(
+        `Deleted ${staleTestAttempts.length} stale dictation attempt(s) ` +
+          `and ${linkedResults?.length ?? 0} associated result(s).`,
+      );
+    } else {
+      console.log("No stale dictation attempts found.");
     }
 
-    const staleIds = stale.map((a) => a.id);
+    // ── 2. typing test attempts ───────────────────────────────────────────────
 
-    await db
-      .update(testAttempts)
-      .set({
-        isSubmitted: true,
-        stage: "submitted",
-        submittedAt: now,
-        answerFinal: sql`coalesce(${testAttempts.answerFinal}, ${testAttempts.answerDraft})`,
-        updatedAt: now,
-      })
-      .where(inArray(testAttempts.id, staleIds));
+    const staleTypingAttempts = await db
+      .select({ id: typingAttempts.id })
+      .from(typingAttempts)
+      .where(
+        and(
+          eq(typingAttempts.isSubmitted, false),
+          isNotNull(typingAttempts.writingStartedAt),
+          // typing tests have a fixed durationSeconds on the test itself
+          sql`${typingAttempts.writingStartedAt} + make_interval(secs => (
+              SELECT duration_seconds FROM typing_tests
+              WHERE id = ${typingAttempts.testId}
+            )) < ${cutoff}`,
+        ),
+      );
 
-    console.log(`Expired ${staleIds.length} stale attempt(s)`);
+    if (staleTypingAttempts.length > 0) {
+      const staleTypingAttemptIds = staleTypingAttempts.map((a) => a.id);
+
+      const linkedTypingResults = await db
+        .select({ id: typingResults.id })
+        .from(typingResults)
+        .where(inArray(typingResults.attemptId, staleTypingAttemptIds));
+
+      if (linkedTypingResults.length > 0) {
+        const linkedTypingResultIds = linkedTypingResults.map((r) => r.id);
+
+        // Delete leaderboard entries first (resultId has onDelete: "restrict")
+        await db
+          .delete(typingLeaderboard)
+          .where(inArray(typingLeaderboard.resultId, linkedTypingResultIds));
+
+        // Delete results
+        await db
+          .delete(typingResults)
+          .where(inArray(typingResults.id, linkedTypingResultIds));
+      }
+
+      // Delete attempts last
+      await db
+        .delete(typingAttempts)
+        .where(inArray(typingAttempts.id, staleTypingAttemptIds));
+
+      console.log(
+        `Deleted ${staleTypingAttempts.length} stale typing attempt(s) ` +
+          `and ${linkedTypingResults?.length ?? 0} associated result(s).`,
+      );
+    } else {
+      console.log("No stale typing attempts found.");
+    }
   },
 };
