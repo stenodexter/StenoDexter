@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../../../src/index.js"],
+  "sourceRoot": "/home/manthan-sharma/steno-app/steno-dexter/worker/.wrangler/tmp/deploy-LPWfAB",
+  "sourcesContent": ["export default {\n  // required even if unused\n  async fetch(request, env, ctx) {\n    return new Response(\"OK\", { status: 200 });\n  },\n\n  async scheduled(event, env, ctx) {\n    console.log(\"RUNNING SCHEDULED\", ctx);\n\n    const BASE_URL = \"https://www.stenodexter.com\";\n    const headers = {\n      Authorization: `Bearer ${env.CRON_SECRET}`,\n      \"Content-Type\": \"application/json\",\n    };\n\n    if (event.cron === \"0 */2 * * *\") {\n      await fetch(`${BASE_URL}/api/crons/2hr`, { headers });\n      console.log(\"2hr cron done\");\n    } else if (event.cron === \"0 0 * * *\") {\n      await fetch(`${BASE_URL}/api/crons/daily`, { headers });\n      console.log(\"Daily cron done\");\n    }\n  },\n};\n"],
+  "mappings": ";AAAA,IAAO,gBAAQ;AAAA;AAAA,EAEb,MAAM,MAAM,SAAS,KAAK,KAAK;AAC7B,WAAO,IAAI,SAAS,MAAM,EAAE,QAAQ,IAAI,CAAC;AAAA,EAC3C;AAAA,EAEA,MAAM,UAAU,OAAO,KAAK,KAAK;AAC/B,YAAQ,IAAI,qBAAqB,GAAG;AAEpC,UAAM,WAAW;AACjB,UAAM,UAAU;AAAA,MACd,eAAe,UAAU,IAAI,WAAW;AAAA,MACxC,gBAAgB;AAAA,IAClB;AAEA,QAAI,MAAM,SAAS,eAAe;AAChC,YAAM,MAAM,GAAG,QAAQ,kBAAkB,EAAE,QAAQ,CAAC;AACpD,cAAQ,IAAI,eAAe;AAAA,IAC7B,WAAW,MAAM,SAAS,aAAa;AACrC,YAAM,MAAM,GAAG,QAAQ,oBAAoB,EAAE,QAAQ,CAAC;AACtD,cAAQ,IAAI,iBAAiB;AAAA,IAC/B;AAAA,EACF;AACF;",
+  "names": []
+}
