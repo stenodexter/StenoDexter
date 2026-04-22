@@ -32,13 +32,12 @@ export function createAttemptService(db: Db) {
     // Uses results table (not testAttempts) — only completed attempts count.
 
     async create(input: CreateAttemptInput, userId: string) {
-      // Fetch test + chosen speed in parallel
       const [test, speed] = await Promise.all([
         db.query.tests.findFirst({ where: eq(tests.id, input.testId) }),
         db.query.testSpeeds.findFirst({
           where: and(
             eq(testSpeeds.id, input.speedId),
-            eq(testSpeeds.testId, input.testId), // ownership check
+            eq(testSpeeds.testId, input.testId),
           ),
         }),
       ]);
@@ -47,9 +46,19 @@ export function createAttemptService(db: Db) {
       if (!speed) throw new Error("Speed variant not found");
       if (test.status !== "active") throw new Error("Test is not active");
 
-      // Assessment eligibility is per (userId, testId, speedId).
-      // Each speed has its own independent first-attempt window.
-      // A user can assess on speed A and still assess on speed B within 24h.
+      // Resume any existing incomplete attempt for this user+test+speed
+      const existingAttempt = await db.query.testAttempts.findFirst({
+        where: and(
+          eq(testAttempts.userId, userId),
+          eq(testAttempts.testId, input.testId),
+          eq(testAttempts.speedId, input.speedId),
+          eq(testAttempts.isSubmitted, false),
+        ),
+      });
+
+      if (existingAttempt) return existingAttempt; // resume — type is already set
+
+      // No in-progress attempt — check if they've ever submitted one
       const priorSubmitted = await db.query.testAttempts.findFirst({
         where: and(
           eq(testAttempts.userId, userId),
@@ -63,7 +72,6 @@ export function createAttemptService(db: Db) {
       const isWithinWindow =
         now.getTime() - test.createdAt.getTime() <= 24 * 60 * 60 * 1000;
 
-      // Assessment = no prior submission on this test (any speed) + within 24h
       const type: "assessment" | "practice" =
         !priorSubmitted && isWithinWindow ? "assessment" : "practice";
 
@@ -81,7 +89,6 @@ export function createAttemptService(db: Db) {
 
       return attempt!;
     },
-
     // ── sync ─────────────────────────────────────────────────────────────────
     // Lightweight — called on debounce / stage transitions.
 

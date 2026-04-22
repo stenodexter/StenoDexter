@@ -18,21 +18,31 @@ type Db = typeof dbInstance;
 export function createTypingAttemptService(db: Db) {
   return {
     async create(input: CreateTypingAttemptInput, userId: string) {
-      const [test, priorSubmitted] = await Promise.all([
+      const [test, existingAttempt] = await Promise.all([
         db.query.typingTests.findFirst({
           where: eq(typingTests.id, input.testId),
         }),
+        // Resume any incomplete attempt first
         db.query.typingAttempts.findFirst({
           where: and(
             eq(typingAttempts.userId, userId),
             eq(typingAttempts.testId, input.testId),
-            eq(typingAttempts.isSubmitted, true),
-            eq(typingAttempts.stage, "submitted"),
+            eq(typingAttempts.isSubmitted, false),
           ),
         }),
       ]);
 
       if (!test) throw new Error("Test not found");
+
+      if (existingAttempt) return existingAttempt; // resume — type already set
+
+      const priorSubmitted = await db.query.typingAttempts.findFirst({
+        where: and(
+          eq(typingAttempts.userId, userId),
+          eq(typingAttempts.testId, input.testId),
+          eq(typingAttempts.isSubmitted, true),
+        ),
+      });
 
       const type: "test" | "practice" = priorSubmitted ? "practice" : "test";
 
