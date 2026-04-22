@@ -127,8 +127,7 @@ export const cronService = {
 
   async deleteStaleAttempts() {
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    const cutoff = new Date(Date.now() - TWO_HOURS_MS);
-
+    const cutoff = new Date(Date.now() - TWO_HOURS_MS).toISOString();
     // ── 1. dictation test attempts ────────────────────────────────────────────
 
     const staleTestAttempts = await db
