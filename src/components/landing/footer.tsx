@@ -91,7 +91,7 @@ export function Footer() {
             <ul className="mt-4 space-y-2">
               <li>
                 <Link
-                  href="/"
+                  href="/privacy-policy"
                   className="text-foreground/70 hover:text-primary text-sm"
                 >
                   Privacy
@@ -99,7 +99,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/"
+                  href="/terms-of-service"
                   className="text-foreground/70 hover:text-primary text-sm"
                 >
                   Terms
@@ -107,7 +107,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/"
+                  href="/refund-policy"
                   className="text-foreground/70 hover:text-primary text-sm"
                 >
                   Refund Policy
