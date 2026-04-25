@@ -5,6 +5,7 @@ import {
   typingTests,
   typingResults,
   typingLeaderboard,
+  user,
 } from "~/server/db/schema";
 import type {
   CreateTypingAttemptInput,
@@ -126,6 +127,10 @@ export function createTypingAttemptService(db: Db) {
 
     async submit(input: SubmitTypingAttemptInput, userId: string) {
       return db.transaction(async (tx) => {
+        const attempt_user = await tx.query.user.findFirst({
+          where: eq(user.id, userId),
+        });
+
         const attempt = await tx.query.typingAttempts.findFirst({
           where: and(
             eq(typingAttempts.id, input.attemptId),
@@ -185,7 +190,7 @@ export function createTypingAttemptService(db: Db) {
           })
           .returning();
 
-        if (attempt.type === "test") {
+        if (attempt.type === "test" && !attempt_user?.isDemo) {
           await tx
             .insert(typingLeaderboard)
             .values({
