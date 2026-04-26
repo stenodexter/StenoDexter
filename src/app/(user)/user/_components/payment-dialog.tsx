@@ -246,7 +246,6 @@ const PLAN_FEATURES: Record<PlanId, { label: string; included: boolean }[]> = {
   full: [
     { label: "Full app access", included: true },
     { label: "Typing tests", included: true },
-    { label: "Save ₹300 vs separate", included: true },
   ],
 };
 
