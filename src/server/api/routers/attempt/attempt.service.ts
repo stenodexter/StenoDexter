@@ -170,7 +170,6 @@ export function createAttemptService(db: Db) {
 
         const now = new Date();
 
-        // Use actual elapsed writing time if available, else full duration from speed
         const durationSeconds = attempt.writingStartedAt
           ? Math.min(
               Math.floor(

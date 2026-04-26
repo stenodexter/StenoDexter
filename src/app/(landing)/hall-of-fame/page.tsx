@@ -66,7 +66,7 @@ export default function HallOfFame() {
   }, [handleObserver]);
 
   return (
-    <div className="mt-[60px] space-y-16 py-12 md:py-20">
+    <div className="pt-[260px] space-y-16 py-12 md:py-20">
       {/* Header */}
       <section className="container mx-auto px-4">
         <div className="mx-auto max-w-2xl space-y-3 text-center">

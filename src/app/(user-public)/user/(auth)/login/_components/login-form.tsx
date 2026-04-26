@@ -13,6 +13,7 @@ import { deviceErrorMessage } from "~/server/lib/device-error";
 import { DeviceNotice } from "~/components/utils/device-notice";
 import { Separator } from "~/components/ui/separator";
 import { ForgotPasswordDialog } from "./forgot-password-dialog";
+import { InputPassword } from "~/components/ui/input-password";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -91,7 +92,7 @@ export function LoginForm() {
                 Welcome back
               </h2>
               <p className="text-muted-foreground text-sm">
-                Sign in to your account to continue
+                Login to your account to continue
               </p>
               <DeviceNotice variant="login" className="mb-[60px]" />
             </div>
@@ -113,7 +114,7 @@ export function LoginForm() {
                   href="/user/register"
                   className="text-foreground hover:text-primary font-medium underline underline-offset-4 transition-colors"
                 >
-                  Sign up
+                  Register
                 </Link>
               </p>
             </span>
@@ -179,9 +180,8 @@ export function LoginForm() {
                       <Label htmlFor={field.name}>Password</Label>
                       <ForgotPasswordDialog />
                     </div>
-                    <Input
+                    <InputPassword
                       id={field.name}
-                      type="password"
                       placeholder="••••••••"
                       autoComplete="current-password"
                       value={field.state.value}
@@ -207,7 +207,7 @@ export function LoginForm() {
                     className="w-full"
                     disabled={!canSubmit || isSubmitting}
                   >
-                    {isSubmitting ? "Signing in…" : "Sign in →"}
+                    {isSubmitting ? "Logging in…" : "Login →"}
                   </Button>
                 )}
               </form.Subscribe>

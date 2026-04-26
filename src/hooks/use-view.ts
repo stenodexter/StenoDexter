@@ -1,4 +1,4 @@
-// ─── hooks/use-view.ts ────────────────────────────────────────────────────────
+"use client";
 
 import { useState } from "react";
 

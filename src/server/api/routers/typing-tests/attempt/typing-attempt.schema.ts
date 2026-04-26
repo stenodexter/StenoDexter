@@ -12,7 +12,7 @@ export const syncTypingAttemptSchema = z.object({
 
 export const submitTypingAttemptSchema = z.object({
   attemptId: z.string().min(1),
-  answerFinal: z.string().min(1, "Answer cannot be empty"),
+  answerFinal: z.string().optional().default(" "),
 });
 
 export const getTypingAttemptSchema = z.object({

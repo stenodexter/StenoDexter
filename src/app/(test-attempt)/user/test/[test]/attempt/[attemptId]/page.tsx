@@ -8,7 +8,6 @@ import {
   useState,
   useCallback,
   useMemo,
-  useLayoutEffect,
 } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "~/trpc/react";
@@ -17,6 +16,7 @@ import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
+import { useLeaveGuard } from "~/hooks/use-leave-guard";
 import {
   SkipForward,
   Send,
@@ -25,6 +25,7 @@ import {
   ZoomOut,
   Lock,
 } from "lucide-react";
+import { format } from "date-fns";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -226,14 +227,14 @@ function AudioStage({
   secondsLeft,
   onEnded,
   onProgress,
-  onSkip, // ← new
+  onSkip,
 }: {
   audioUrl: string;
   durationSeconds: number;
   secondsLeft: number;
   onEnded: () => void;
   onProgress: (s: number) => void;
-  onSkip: () => void; // ← new
+  onSkip: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -293,7 +294,6 @@ function AudioStage({
         total={durationSeconds}
       />
 
-      {/* ── hint + skip — stacked, visually grouped ── */}
       <div className="flex flex-col items-center gap-3">
         <p className="text-muted-foreground text-xs">
           A break follows once audio ends
@@ -409,7 +409,6 @@ function WritingStage({
         onChange(val);
         return;
       }
-      // Only allow appending or backspacing from end
       if (val.startsWith(answer) || answer.startsWith(val)) {
         onChange(val);
       }
@@ -420,7 +419,6 @@ function WritingStage({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (!lockedCursor) return;
-      // Block paste, cut, undo, redo
       if (
         (e.ctrlKey || e.metaKey) &&
         ["v", "x", "z", "y"].includes(e.key.toLowerCase())
@@ -434,7 +432,7 @@ function WritingStage({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLTextAreaElement>) => {
       if (!lockedCursor) return;
-      e.preventDefault(); // prevents repositioning cursor on click
+      e.preventDefault();
       textareaRef.current?.focus();
     },
     [lockedCursor],
@@ -611,11 +609,7 @@ function LiveClock() {
   }, []);
   return (
     <span className="text-muted-foreground hidden text-xs tabular-nums sm:block">
-      {now.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })}
+      {format(now, "do MMMM, yyyy")}
       {" · "}
       {now.toLocaleTimeString("en-IN", {
         hour: "2-digit",
@@ -699,8 +693,12 @@ export default function AttemptPage() {
 
   const answerRef = useRef("");
   const lastServerSyncRef = useRef("");
+  const stageRef = useRef<Stage>("countdown");
   const localSyncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverSyncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep stageRef in sync so onNavigateAway can read it without stale closure
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
   const saveLocal = useCallback(() => {
     try {
@@ -738,6 +736,31 @@ export default function AttemptPage() {
     setAnswer(val);
   }, []);
 
+  // ── Leave guard ───────────────────────────────────────────────────────────────
+  // Reload/close  → browser warning dialog, no auto-submit
+  // Navigate away → submit whatever draft we have, fire-and-forget
+  const onNavigateAway = useCallback(async () => {
+    if (stageRef.current === "submitted") return;
+    stopSyncIntervals();
+    saveLocal();
+    // Only submit if we're in the writing stage — before that there's nothing to submit
+    if (stageRef.current === "transcription") {
+      await submitMutation
+        .mutateAsync({
+          attemptId: params.attemptId,
+          answerFinal: answerRef.current,
+        })
+        .catch(() => null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { override: navigateSafe } = useLeaveGuard(
+    stage !== "submitted",
+    onNavigateAway,
+  );
+
+  // ── cleanup on unmount ────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       stopSyncIntervals();
@@ -863,7 +886,6 @@ export default function AttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Skip audio → go straight to break ────────────────────────────────────────
   const handleSkipAudio = useCallback(() => {
     const breakTotal = data?.speed.breakSeconds ?? 0;
     setStage("break");
@@ -904,7 +926,10 @@ export default function AttemptPage() {
     return (
       <div className="bg-background fixed inset-0 flex flex-col items-center justify-center gap-4">
         <p className="font-medium">Test not found</p>
-        <Button variant="outline" onClick={() => router.push("/user")}>
+        <Button
+          variant="outline"
+          onClick={() => navigateSafe(() => router.push("/user"))}
+        >
           Back to tests
         </Button>
       </div>

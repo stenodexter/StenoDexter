@@ -13,6 +13,7 @@ import Link from "next/link";
 import { deviceErrorMessage } from "~/server/lib/device-error";
 import { DeviceNotice } from "~/components/utils/device-notice";
 import { Separator } from "~/components/ui/separator";
+import { InputPassword } from "~/components/ui/input-password";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -91,7 +92,7 @@ export function RegisterForm() {
 
         if (signInError) {
           // Account was created but sign-in failed — send them to login
-          toast.success("Account created! Please sign in.");
+          toast.success("Account created! Please login.");
           router.push("/user/login");
           return;
         }
@@ -115,7 +116,7 @@ export function RegisterForm() {
   };
 
   return (
-    <Card className="w-full max-w-4xl shadow-lg relative z-30">
+    <Card className="relative z-30 w-full max-w-4xl shadow-lg">
       <CardContent className="p-0">
         <div className="flex items-center justify-between">
           {/* Column 1 */}
@@ -125,7 +126,7 @@ export function RegisterForm() {
                 Create an account
               </h2>
               <p className="text-muted-foreground text-sm">
-                Sign up to get started today
+                Register to get started today
               </p>
               <DeviceNotice variant="register" className="mb-[100px]" />
             </div>
@@ -142,12 +143,12 @@ export function RegisterForm() {
               </Button>
 
               <p className="text-muted-foreground text-sm">
-                Already have an account?{" "}
+                Already have an account?
                 <Link
                   href="/user/login"
                   className="text-foreground hover:text-primary font-medium underline underline-offset-4 transition-colors"
                 >
-                  Sign in
+                  Login
                 </Link>
               </p>
             </span>
@@ -247,9 +248,8 @@ export function RegisterForm() {
                 {(field) => (
                   <div className="space-y-1.5">
                     <Label htmlFor={field.name}>Password</Label>
-                    <Input
+                    <InputPassword
                       id={field.name}
-                      type="password"
                       placeholder="Min. 8 characters"
                       autoComplete="new-password"
                       value={field.state.value}
@@ -280,9 +280,8 @@ export function RegisterForm() {
                 {(field) => (
                   <div className="space-y-1.5">
                     <Label htmlFor={field.name}>Confirm password</Label>
-                    <Input
+                    <InputPassword
                       id={field.name}
-                      type="password"
                       placeholder="Re-enter your password"
                       autoComplete="new-password"
                       value={field.state.value}

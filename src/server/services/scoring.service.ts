@@ -1,9 +1,20 @@
+// scoring-engine.ts
+// NW-alignment engine — with paragraph sentinel, punctuation normalization
+
+import {
+  PARAGRAPH_SENTINEL,
+  preparePassage,
+  prepareTyped,
+  normalizePunctuation,
+} from "../lib/engine-utils";
+
 export type DiffType =
   | "correct"
   | "replace"
   | "insert"
   | "delete"
-  | "extra_space";
+  | "extra_space"
+  | "paragraph"; // new: marks a correctly typed ¶ token
 
 export type DiffToken = {
   original?: string;
@@ -13,7 +24,7 @@ export type DiffToken = {
 
 // ─── tokenizer ────────────────────────────────────────────────────────────────
 // Each whitespace-separated run = one word token.
-// Whitespace characters are their own tokens (for extra_space detection).
+// Single whitespace characters are their own tokens.
 function tokenize(text: string): string[] {
   const tokens: string[] = [];
   let i = 0;
@@ -32,21 +43,23 @@ function tokenize(text: string): string[] {
   return tokens;
 }
 
-// ─── word-only tokens (no whitespace) ────────────────────────────────────────
 function wordTokens(text: string): string[] {
   return tokenize(text).filter((t) => !/^\s+$/.test(t));
 }
 
-// ─── strip trailing/leading punctuation for comparison purposes ───────────────
-// e.g. "stage," → "stage", "unfulfilled." → "unfulfilled"
-// This is used only for alignment scoring, not for display.
+/**
+ * Strip leading/trailing punctuation for comparison — but preserve ¶ sentinel
+ * and respect normalizePunctuation so dashes/apostrophes are equivalent.
+ */
 function normalizeForComparison(word: string): string {
-  return word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "").toLowerCase();
+  if (word === PARAGRAPH_SENTINEL) return word;
+  return normalizePunctuation(word)
+    .replace(/^[^a-zA-Z0-9¶]+|[^a-zA-Z0-9¶]+$/g, "")
+    .toLowerCase();
 }
 
-// ─── Needleman-Wunsch on word tokens only ────────────────────────────────────
-// We align only the word arrays. Spaces are handled separately.
-// Each position in the alignment = exactly one mistake if not "correct".
+// ─── Needleman-Wunsch on word tokens ─────────────────────────────────────────
+
 function nwWords(A: string[], B: string[]): DiffToken[] {
   const m = A.length;
   const n = B.length;
@@ -54,22 +67,16 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   const MATCH = 2;
   const MISMATCH = -1;
   const GAP = -1;
-
-  // Tiny epsilon for positional tiebreaking — never affects true integer scores.
-  // Diagonal pairings at earlier positions (smaller i+j) get a slightly higher
-  // score, so when two alignments cost the same, we prefer the one that matches
-  // typed words to the EARLIEST possible original word.
-  // e.g. original ["who","is"] typed ["but"]: both (who↔but + delete is) and
-  // (delete who + is↔but) cost the same, but the bias ensures who↔but wins.
   const EPS = 1e-6;
 
   const matches = (a: string, b: string): boolean =>
     a === b || normalizeForComparison(a) === normalizeForComparison(b);
 
-  // Diagonal alignment score:
-  // +2 exact match, 0 prefix/suffix fused word, -1 complete mismatch.
-  // Prefix case handles space-fused typos like "departmentwhich" vs "department".
   const diagScore = (a: string, b: string): number => {
+    // Sentinel must match exactly
+    if (a === PARAGRAPH_SENTINEL || b === PARAGRAPH_SENTINEL) {
+      return a === b ? MATCH : MISMATCH;
+    }
     if (matches(a, b)) return MATCH;
     const na = normalizeForComparison(a);
     const nb = normalizeForComparison(b);
@@ -87,8 +94,6 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      // Add positional bias to diagonal: earlier pairings score slightly higher.
-      // Higher (m+n-i-j) = earlier in the sequence = more bias.
       const diagBias = EPS * (m + n - i - j + 1);
       dp[i]![j] = Math.max(
         dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!) + diagBias,
@@ -99,23 +104,25 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   }
 
   const result: DiffToken[] = [];
-  let i = m;
-  let j = n;
+  let i = m,
+    j = n;
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
       const diagBias = EPS * (m + n - i - j + 1);
-      const diagVal = dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!) + diagBias;
-      const delVal  = dp[i - 1]![j]!      + GAP;
-      const insVal  = dp[i]![j - 1]!      + GAP;
-      const best    = Math.max(diagVal, delVal, insVal);
+      const diagVal =
+        dp[i - 1]![j - 1]! + diagScore(A[i - 1]!, B[j - 1]!) + diagBias;
+      const delVal = dp[i - 1]![j]! + GAP;
+      const insVal = dp[i]![j - 1]! + GAP;
+      const best = Math.max(diagVal, delVal, insVal);
 
       if (diagVal >= best - EPS * 0.1) {
         const exactMatch = A[i - 1] === B[j - 1];
+        const isPara = A[i - 1] === PARAGRAPH_SENTINEL;
         result.push({
           original: A[i - 1],
           typed: B[j - 1],
-          type: exactMatch ? "correct" : "replace",
+          type: isPara ? "paragraph" : exactMatch ? "correct" : "replace",
         });
         i--;
         j--;
@@ -140,23 +147,19 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   return result;
 }
 
-// ─── rebuild full diff with spaces re-inserted ────────────────────────────────
-// After aligning words, walk both original and typed token streams to re-insert
-// space tokens in the right places and detect extra_space.
+// ─── rebuild full diff with spaces + extra_space tokens ───────────────────────
+
 function buildFullDiff(original: string, typed: string): DiffToken[] {
   const origWords = wordTokens(original);
   const typedWords = wordTokens(typed);
-  const wordDiff = nwWords(origWords, typedWords);
+  const diff = nwWords(origWords, typedWords);
 
-  // Re-tokenize both sides to get spacing info
-  const origTokens = tokenize(original);
-  const typedTokens = tokenize(typed);
+  const typedTokensList = tokenize(typed);
 
-  // Collect space runs between words from typed input
-  // We'll append extra_space tokens where multiple spaces appear between words
+  // Collect space run counts between typed words
   const typedSpaceCounts: number[] = [];
   let spaceRun = 0;
-  for (const t of typedTokens) {
+  for (const t of typedTokensList) {
     if (/^\s$/.test(t)) {
       spaceRun++;
     } else {
@@ -165,25 +168,25 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
     }
   }
 
-  // Build final token list: interleave word diff tokens with space tokens
   const result: DiffToken[] = [];
   let typedWordIdx = 0;
 
-  for (let wi = 0; wi < wordDiff.length; wi++) {
-    const tok = wordDiff[wi]!;
+  for (let wi = 0; wi < diff.length; wi++) {
+    const tok = diff[wi]!;
 
-    // Add a space before each word (except the first)
     if (wi > 0) {
+      // Insert extra_space tokens for multiple consecutive spaces
       const spacesTyped = typedSpaceCounts[typedWordIdx] ?? 1;
-      if (tok.type !== "delete") {
-        // only count spaces when typed word exists
-        if (spacesTyped > 1) {
-          for (let s = 1; s < spacesTyped; s++) {
-            result.push({ typed: " ", type: "extra_space" });
-          }
+      if (tok.type !== "delete" && spacesTyped > 1) {
+        for (let s = 1; s < spacesTyped; s++) {
+          result.push({ typed: " ", type: "extra_space" });
         }
       }
-      result.push({ original: " ", typed: " ", type: "correct" }); // the expected single space
+
+      // Paragraph token: no space separator rendered — it IS the break
+      if (tok.type !== "paragraph") {
+        result.push({ original: " ", typed: " ", type: "correct" });
+      }
     }
 
     result.push(tok);
@@ -200,23 +203,27 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
 
 export default class ScoringEngine {
   compare(original: string, typed: string): DiffToken[] {
-    return buildFullDiff(original.trim(), typed.trim());
+    return buildFullDiff(preparePassage(original), prepareTyped(typed));
   }
 
   evaluate(original: string, typed: string, durationSeconds: number) {
-    original = original.trim();
-    typed = typed.trim();
+    // Stroke count taken from RAW typed length before any processing
+    // Indian standard: every character (including spaces) = 1 stroke
+    const totalStrokes = typed.length;
+
+    original = preparePassage(original);
+    typed = prepareTyped(typed);
 
     const origWords = wordTokens(original);
     const typedWords = wordTokens(typed);
-    const wordDiff = nwWords(origWords, typedWords);
+    const diff = nwWords(origWords, typedWords);
 
-    // Count extra spaces from typed input
-    const typedTokens = tokenize(typed);
+    // Count extra spaces
+    const typedTokensList = tokenize(typed);
     let extraSpaces = 0;
     let spaceRun = 0;
     let seenWord = false;
-    for (const t of typedTokens) {
+    for (const t of typedTokensList) {
       if (/^\s$/.test(t)) {
         if (seenWord) spaceRun++;
       } else {
@@ -226,9 +233,10 @@ export default class ScoringEngine {
       }
     }
 
-    // One mistake per wrong/missing/extra word position + extra spaces
+    // Count word-level mistakes
+    // ¶ sentinel counts as full mistake if missing or extra
     let wordMistakes = 0;
-    for (const d of wordDiff) {
+    for (const d of diff) {
       if (d.type === "replace" || d.type === "insert" || d.type === "delete") {
         wordMistakes++;
       }
@@ -237,14 +245,17 @@ export default class ScoringEngine {
     const mistakes = wordMistakes + extraSpaces;
     const total = origWords.length;
     const correct = Math.max(0, total - wordMistakes);
-    const accuracy = total === 0 ? 0 : Math.round((correct / total) * 100);
-    const wpm = Math.max(0, Math.round(correct / (durationSeconds / 60)));
+    const accuracy =
+      total === 0 ? 0 : parseFloat(((correct / total) * 100).toFixed(2));
+    const durationMinutes = Math.max(durationSeconds / 60, 0.0001);
+    const wpm = Math.max(0, Math.round(correct / durationMinutes));
 
     return {
       mistakes,
       accuracy,
       wpm,
       score: correct,
+      totalStrokes,
       diff: this.compare(original, typed),
     };
   }

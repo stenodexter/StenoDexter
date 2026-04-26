@@ -10,6 +10,7 @@ import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRef } from "react";
+import { InputPassword } from "~/components/ui/input-password";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -68,7 +69,7 @@ export function LoginForm() {
                 Welcome back
               </h2>
               <p className="text-muted-foreground text-sm">
-                Sign in to your admin account to continue
+                Login to your admin account to continue
               </p>
             </div>
 
@@ -136,27 +137,18 @@ export function LoginForm() {
                 }}
               >
                 {(field) => (
-                  <div className="space-y-1.5">
-                    <Label htmlFor={field.name}>Password</Label>
-                    <Input
-                      id={field.name}
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className={
-                        field.state.meta.errors[0]
-                          ? "border-destructive focus-visible:ring-destructive"
-                          : ""
-                      }
-                    />
-                    <FieldError message={field.state.meta.errors[0]} />
-                  </div>
+                  <InputPassword
+                    label="Password"
+                    id={field.name}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    error={field.state.meta.errors[0]}
+                  />
                 )}
               </form.Field>
-
               <form.Subscribe
                 selector={(state) => [state.canSubmit, state.isSubmitting]}
               >
@@ -172,8 +164,8 @@ export function LoginForm() {
                     }
                   >
                     {isSubmitting || loginMutation.isPending
-                      ? "Signing in…"
-                      : "Sign in →"}
+                      ? "Logging in…"
+                      : "Login →"}
                   </Button>
                 )}
               </form.Subscribe>

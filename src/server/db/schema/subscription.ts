@@ -1,3 +1,5 @@
+// ─── server/db/schema/payment.ts ─────────────────────────────────────────────
+
 import { relations, sql } from "drizzle-orm";
 import {
   integer,
@@ -25,6 +27,8 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "revoked",
 ]);
 
+export const planEnum = pgEnum("plan_type", ["app", "typing", "full"]);
+
 export const payment = pgTable(
   "payment_proof",
   {
@@ -43,6 +47,8 @@ export const payment = pgTable(
     status: paymentStatusEnum("status").default("pending").notNull(),
 
     type: paymentsTypeEnum("type").notNull(),
+
+    plan: planEnum("plan").default("app").notNull(),
 
     verifiedBy: text("verified_by").references(() => admin.id, {
       onDelete: "set null",
@@ -78,12 +84,12 @@ export const subscription = pgTable(
 
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" })
-      .unique(),
-
+      .references(() => user.id, { onDelete: "cascade" }),
     paymentProofId: text("payment_proof_id").references(() => payment.id),
 
     status: subscriptionStatusEnum("status").default("active").notNull(),
+
+    plan: planEnum("plan").default("app").notNull(),
 
     currentPeriodStart: timestamp("current_period_start", {
       withTimezone: true,
@@ -112,8 +118,8 @@ export const subscription = pgTable(
   (t) => [
     index("subscription_user_idx").on(t.userId),
 
-    uniqueIndex("one_active_subscription_per_user")
-      .on(t.userId)
+    uniqueIndex("one_active_sub_per_user_per_plan")
+      .on(t.userId, t.plan)
       .where(sql`status = 'active'`),
   ],
 );

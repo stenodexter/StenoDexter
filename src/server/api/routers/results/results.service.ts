@@ -1,3 +1,4 @@
+// server/services/results.service.ts
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db as globalDb } from "~/server/db";
 import { leaderboard, results, testAttempts } from "~/server/db/schema";
@@ -16,10 +17,7 @@ export function createResultService(db: Db) {
           eq(testAttempts.id, attemptId),
           eq(testAttempts.userId, userId),
         ),
-        with: {
-          test: true,
-          speed: true,
-        },
+        with: { test: true, speed: true },
       });
 
       if (!attempt) throw new Error("Attempt not found");
@@ -31,6 +29,7 @@ export function createResultService(db: Db) {
 
       if (!result) throw new Error("Result not found");
 
+      // ✅ Pass RAW correctAnswer to compare() — preserves paragraph \n
       const diff = scoringEngine.compare(
         attempt.test.correctAnswer,
         attempt.answerFinal ?? "",
@@ -108,12 +107,7 @@ export function createResultService(db: Db) {
 
       const rows = await db.execute<Row>(sql`
         SELECT
-          r.attempt_id,
-          r.type,
-          r.score,
-          r.wpm,
-          r.accuracy,
-          r.mistakes,
+          r.attempt_id, r.type, r.score, r.wpm, r.accuracy, r.mistakes,
           r.submitted_at,
           u.id    AS user_id,
           u.name  AS user_name,
@@ -163,6 +157,7 @@ export function createResultService(db: Db) {
 
       if (!result) throw new Error("Result not found");
 
+      // ✅ Raw correctAnswer — paragraph breaks preserved
       const diff = scoringEngine.compare(
         attempt.test.correctAnswer,
         attempt.answerFinal ?? "",
@@ -241,14 +236,8 @@ export function createResultService(db: Db) {
 
       const rows = await db.execute<Row>(sql`
         SELECT
-          r.attempt_id,
-          r.type,
-          r.score,
-          r.wpm,
-          r.accuracy,
-          r.mistakes,
-          r.submitted_at,
-          r.user_id,
+          r.attempt_id, r.type, r.score, r.wpm, r.accuracy, r.mistakes,
+          r.submitted_at, r.user_id,
           u.name        AS user_name,
           u.email       AS user_email,
           ta.test_id,
@@ -320,9 +309,7 @@ export function createResultService(db: Db) {
           },
           speed: { columns: { id: true, wpm: true } },
           result: {
-            columns: {
-              id: true,
-            },
+            columns: { id: true },
             with: {
               attempt: {
                 columns: {
@@ -330,29 +317,21 @@ export function createResultService(db: Db) {
                   writingStartedAt: true,
                   submittedAt: true,
                 },
-                with: {
-                  test: {
-                    columns: {
-                      id: true,
-                      correctAnswer: true,
-                    },
-                  },
-                },
+                with: { test: { columns: { id: true, correctAnswer: true } } },
               },
             },
           },
         },
         orderBy: [
-          asc(leaderboard.mistakes), // 🔥 primary priority
-          asc(leaderboard.transcriptionTime), // 🔥 secondary
-          asc(leaderboard.attemptedAt), // tie-breaker
+          asc(leaderboard.mistakes),
+          asc(leaderboard.transcriptionTime),
+          asc(leaderboard.attemptedAt),
         ],
         limit,
       });
 
       return data.map((r, i) => {
         const attempt = r.result?.attempt;
-
         let writingDuration = null;
         let totalWords = 0;
 
@@ -403,26 +382,26 @@ export function createResultService(db: Db) {
       };
 
       const rows = await db.execute<Row>(sql`
-    SELECT
-      r.user_id,
-      u.name                           AS user_name,
-      u.email                          AS user_email,
-      COUNT(*)::int                    AS attempts,
-      MAX(r.accuracy)::int             AS best_accuracy,
-      ROUND(AVG(r.accuracy))::int      AS avg_accuracy,
-      MAX(r.wpm)::int                  AS best_wpm,
-      MAX(r.submitted_at)              AS last_attempt_at,
-      COUNT(*) OVER ()                 AS total_count
-    FROM results r
-    INNER JOIN test_attempts ta ON ta.id = r.attempt_id
-    INNER JOIN "user"         u  ON u.id = r.user_id
-    WHERE ta.test_id = ${testId}
-      ${type ? sql`AND r.type = ${type}` : sql``}
-      ${search ? sql`AND (u.name ILIKE ${"%" + search + "%"} OR u.email ILIKE ${"%" + search + "%"})` : sql``}
-    GROUP BY r.user_id, u.name, u.email
-    ORDER BY best_accuracy DESC, last_attempt_at DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `);
+        SELECT
+          r.user_id,
+          u.name                           AS user_name,
+          u.email                          AS user_email,
+          COUNT(*)::int                    AS attempts,
+          MAX(r.accuracy)::int             AS best_accuracy,
+          ROUND(AVG(r.accuracy))::int      AS avg_accuracy,
+          MAX(r.wpm)::int                  AS best_wpm,
+          MAX(r.submitted_at)              AS last_attempt_at,
+          COUNT(*) OVER ()                 AS total_count
+        FROM results r
+        INNER JOIN test_attempts ta ON ta.id = r.attempt_id
+        INNER JOIN "user"         u  ON u.id = r.user_id
+        WHERE ta.test_id = ${testId}
+          ${type ? sql`AND r.type = ${type}` : sql``}
+          ${search ? sql`AND (u.name ILIKE ${"%" + search + "%"} OR u.email ILIKE ${"%" + search + "%"})` : sql``}
+        GROUP BY r.user_id, u.name, u.email
+        ORDER BY best_accuracy DESC, last_attempt_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `);
 
       const total = Number(rows[0]?.total_count ?? 0);
 

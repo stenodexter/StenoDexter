@@ -56,7 +56,8 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
     );
 
   return (
-    <p
+    // ✅ <div> instead of <p> — <p> cannot contain <br> correctly in all browsers
+    <div
       className="break-words select-none"
       style={{
         fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
@@ -65,6 +66,9 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
       }}
     >
       {diff.map((token, i) => {
+        // ✅ NEW — renders paragraph break
+        if (token.type === "paragraph_break") return <br key={i} />;
+
         if (token.type === "correct")
           return <span key={i}>{token.original}</span>;
 
@@ -110,7 +114,7 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
 
         return null;
       })}
-    </p>
+    </div>
   );
 }
 

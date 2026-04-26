@@ -214,6 +214,7 @@ function PdfCard({
 }
 
 // ─── Diff renderer ────────────────────────────────────────────────────────────
+
 function DiffView({ diff }: { diff: DiffToken[] }) {
   if (!diff?.length)
     return (
@@ -223,15 +224,19 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
     );
 
   return (
-    <p
-      className="text-[20px] break-words select-none"
+    // ✅ <div> instead of <p> — <p> cannot contain <br> correctly in all browsers
+    <div
+      className="break-words select-none"
       style={{
         fontFamily: "'Calibri', 'Carlito', 'Liberation Sans', sans-serif",
+        fontSize: "18px",
         lineHeight: "2.2",
-        userSelect: "none", // fallback for safety
       }}
     >
       {diff.map((token, i) => {
+        // ✅ NEW — renders paragraph break
+        if (token.type === "paragraph_break") return <br key={i} />;
+
         if (token.type === "correct")
           return <span key={i}>{token.original}</span>;
 
@@ -249,10 +254,7 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
 
         if (token.type === "delete")
           return (
-            <span
-              key={i}
-              className="font-extrabold text-red-500 dark:text-red-500"
-            >
+            <span key={i} className="font-extrabold text-red-500">
               {token.original}
             </span>
           );
@@ -271,7 +273,7 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
           return (
             <span
               key={i}
-              className="mx-0.5 rounded-xs bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400"
+              className="mx-0.5 rounded-sm bg-orange-700/50 p-0.5 text-sm text-orange-500 dark:text-orange-400"
               title="extra space"
             >
               ␣
@@ -280,7 +282,7 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
 
         return null;
       })}
-    </p>
+    </div>
   );
 }
 

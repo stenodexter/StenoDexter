@@ -14,8 +14,6 @@ import {
 import { subscription } from "~/server/db/schema";
 import { desc } from "drizzle-orm";
 
-// TODO NEEDS TO BE CHANGED
-
 export const paymentRouter = createTRPCRouter({
   submit: nonDemoUserProcedure
     .input(submitPaymentSchema)

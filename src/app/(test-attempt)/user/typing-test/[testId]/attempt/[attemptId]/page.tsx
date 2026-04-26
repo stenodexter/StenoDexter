@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
+import { useLeaveGuard } from "~/hooks/use-leave-guard"; // ← add this
 import {
   Send,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
+import { format } from "date-fns";
 
 const SYNC_LOCAL_MS = 3_000;
 const SYNC_SERVER_MS = 15_000;
@@ -41,11 +43,7 @@ function LiveClock() {
   }, []);
   return (
     <span className="text-muted-foreground hidden text-xs tabular-nums sm:block">
-      {now.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })}
+      {format(now, "do MMMM, yyyy")}
       {" · "}
       {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
     </span>
@@ -113,6 +111,22 @@ export default function TypingAttemptPage() {
   const [answer, setAnswer] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // ── Leave guard ──────────────────────────────────────────────────────────────
+  // Reload/close  → browser "Leave site?" warning (no submit)
+  // Navigate away → silently submit current draft, then proceed
+  const onNavigateAway = useCallback(async () => {
+    if (submittedRef.current) return;
+    stopIntervals();
+    saveLocal();
+    await submitMutation.mutateAsync({
+      attemptId: params.attemptId,
+      answerFinal: answerRef.current,
+    }).catch(() => null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { override: navigateSafe } = useLeaveGuard(!submitted, onNavigateAway);
+
   const [fontSize, setFontSize] = useState<number>(() => {
     const stored =
       typeof document !== "undefined" ? getCookie("typing_font_size") : null;
@@ -138,7 +152,6 @@ export default function TypingAttemptPage() {
   const serverTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
 
-  // line height for scroll-by-line: fontSize * lineHeight ratio
   const lineHeightPx = Math.round(fontSize * 1.8);
 
   const syncMutation = trpc.typingTest.attempt.sync.useMutation({
@@ -196,10 +209,8 @@ export default function TypingAttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // locked cursor handlers — only append / backspace from end
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // block all clipboard ops
       if (
         (e.ctrlKey || e.metaKey) &&
         ["v", "x", "z", "y", "a"].includes(e.key.toLowerCase())
@@ -207,7 +218,6 @@ export default function TypingAttemptPage() {
         e.preventDefault();
         return;
       }
-      // block arrow keys repositioning cursor
       if (
         [
           "ArrowLeft",
@@ -266,7 +276,6 @@ export default function TypingAttemptPage() {
     [lineHeightPx],
   );
 
-  // init
   useEffect(() => {
     if (!data) return;
     const localDraft = (() => {
@@ -289,19 +298,16 @@ export default function TypingAttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // fullscreen
   useEffect(() => {
     document.documentElement.requestFullscreen().catch(() => null);
   }, []);
 
-  // timer
   useEffect(() => {
     if (submitted || timeLeft <= 0) return;
     const t = setInterval(() => setTimeLeft((s) => s - 1), 1000);
     return () => clearInterval(t);
   }, [submitted, timeLeft]);
 
-  // auto-submit
   useEffect(() => {
     if (
       timeLeft === 0 &&
@@ -314,7 +320,6 @@ export default function TypingAttemptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]);
 
-  // cleanup
   useEffect(() => {
     return () => {
       stopIntervals();
@@ -337,7 +342,8 @@ export default function TypingAttemptPage() {
         <p className="font-medium">Test not found</p>
         <Button
           variant="outline"
-          onClick={() => router.push("/user/typing-tests")}
+          // use navigateSafe so even error-state navigation respects the guard
+          onClick={() => navigateSafe(() => router.push("/user/typing-tests"))}
         >
           Back
         </Button>
@@ -475,7 +481,6 @@ export default function TypingAttemptPage() {
       <div className="flex min-h-0 flex-1 flex-col">
         {/* ── Passage pane (top) ── */}
         <div className="flex min-h-0 flex-1 flex-col border-b">
-          {/* scrollable passage body */}
           <div
             ref={passageScrollRef}
             className="min-h-0 flex-1 overflow-y-auto px-8 py-5"
@@ -491,7 +496,6 @@ export default function TypingAttemptPage() {
             </p>
           </div>
 
-          {/* passage footer: scroll controls */}
           <div className="bg-muted/30 flex shrink-0 items-center justify-end gap-1.5 border-t px-4 py-1.5">
             <span className="text-muted-foreground mr-1 text-[11px]">
               Scroll passage
@@ -515,14 +519,12 @@ export default function TypingAttemptPage() {
 
         {/* ── Writing pane (bottom) ── */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* label row */}
           <div className="shrink-0 px-8 pt-4">
             <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
               Your transcription
             </p>
           </div>
 
-          {/* textarea */}
           <textarea
             ref={textareaRef}
             className="placeholder:text-muted-foreground/40 min-h-0 flex-1 resize-none border-0 bg-transparent px-8 py-3 outline-none selection:bg-transparent"
@@ -542,7 +544,6 @@ export default function TypingAttemptPage() {
             autoFocus
           />
 
-          {/* status bar */}
           <div className="bg-muted/30 flex shrink-0 items-center justify-between border-t px-5 py-2">
             <div className="flex items-center gap-1.5">
               <span

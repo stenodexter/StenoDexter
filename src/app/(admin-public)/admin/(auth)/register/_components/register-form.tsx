@@ -10,6 +10,7 @@ import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRef } from "react";
+import { InputPassword } from "~/components/ui/input-password";
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
@@ -96,7 +97,7 @@ export function RegisterForm({ token }: RegisterProps) {
                 href="/admin/login"
                 className="text-foreground hover:text-primary font-medium underline underline-offset-4 transition-colors"
               >
-                Sign in
+                Login
               </Link>
             </p>
           </div>
@@ -198,9 +199,8 @@ export function RegisterForm({ token }: RegisterProps) {
                 {(field) => (
                   <div className="space-y-1.5">
                     <Label htmlFor={field.name}>Password</Label>
-                    <Input
+                    <InputPassword
                       id={field.name}
-                      type="password"
                       placeholder="Min. 8 characters"
                       autoComplete="new-password"
                       value={field.state.value}
@@ -235,9 +235,8 @@ export function RegisterForm({ token }: RegisterProps) {
                 {(field) => (
                   <div className="space-y-1.5">
                     <Label htmlFor={field.name}>Confirm password</Label>
-                    <Input
+                    <InputPassword
                       id={field.name}
-                      type="password"
                       placeholder="Re-enter your password"
                       autoComplete="new-password"
                       value={field.state.value}
