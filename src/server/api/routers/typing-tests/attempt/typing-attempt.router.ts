@@ -1,4 +1,4 @@
-import { createTRPCRouter, demoOrPaidUserProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, demoOrTypingUserProcedure } from "~/server/api/trpc";
 import {
   createTypingAttemptSchema,
   syncTypingAttemptSchema,
@@ -8,25 +8,25 @@ import {
 import { typingAttemptService } from "./typing-attempt.service";
 
 export const typingAttemptRouter = createTRPCRouter({
-  create: demoOrPaidUserProcedure
+  create: demoOrTypingUserProcedure
     .input(createTypingAttemptSchema)
     .mutation(({ input, ctx }) =>
       typingAttemptService.create(input, ctx.user.id),
     ),
 
-  sync: demoOrPaidUserProcedure
+  sync: demoOrTypingUserProcedure
     .input(syncTypingAttemptSchema)
     .mutation(({ input, ctx }) =>
       typingAttemptService.sync(input, ctx.user.id),
     ),
 
-  submit: demoOrPaidUserProcedure
+  submit: demoOrTypingUserProcedure
     .input(submitTypingAttemptSchema)
     .mutation(({ input, ctx }) =>
       typingAttemptService.submit(input, ctx.user.id),
     ),
 
-  getResume: demoOrPaidUserProcedure
+  getResume: demoOrTypingUserProcedure
     .input(getTypingAttemptSchema)
     .query(({ input, ctx }) =>
       typingAttemptService.getResume(input.attemptId, ctx.user.id),

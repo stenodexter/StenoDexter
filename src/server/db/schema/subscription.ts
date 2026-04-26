@@ -28,6 +28,7 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
 ]);
 
 export const planEnum = pgEnum("plan_type", ["app", "typing", "full"]);
+export const subscriptionEnum = pgEnum("subscription_type", ["app", "typing"]);
 
 export const payment = pgTable(
   "payment_proof",
@@ -89,7 +90,7 @@ export const subscription = pgTable(
 
     status: subscriptionStatusEnum("status").default("active").notNull(),
 
-    plan: planEnum("plan").default("app").notNull(),
+    type: subscriptionEnum("type").default("app").notNull(),
 
     currentPeriodStart: timestamp("current_period_start", {
       withTimezone: true,
@@ -119,7 +120,7 @@ export const subscription = pgTable(
     index("subscription_user_idx").on(t.userId),
 
     uniqueIndex("one_active_sub_per_user_per_plan")
-      .on(t.userId, t.plan)
+      .on(t.userId, t.type)
       .where(sql`status = 'active'`),
   ],
 );

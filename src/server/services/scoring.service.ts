@@ -203,16 +203,20 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
 
 export default class ScoringEngine {
   compare(original: string, typed: string): DiffToken[] {
-    return buildFullDiff(preparePassage(original), prepareTyped(typed));
+    const preparedOriginal = preparePassage(original);
+    const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
+    return buildFullDiff(preparedOriginal, prepareTyped(typed, hasParagraphs));
   }
 
   evaluate(original: string, typed: string, durationSeconds: number) {
-    // Stroke count taken from RAW typed length before any processing
-    // Indian standard: every character (including spaces) = 1 stroke
     const totalStrokes = typed.length;
 
-    original = preparePassage(original);
-    typed = prepareTyped(typed);
+    const preparedOriginal = preparePassage(original);
+    const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
+    const preparedTyped = prepareTyped(typed, hasParagraphs);
+
+    original = preparedOriginal;
+    typed = preparedTyped;
 
     const origWords = wordTokens(original);
     const typedWords = wordTokens(typed);

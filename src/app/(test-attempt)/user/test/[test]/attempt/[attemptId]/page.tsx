@@ -648,7 +648,7 @@ function SubmittedScreen({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => router.push("/user")}
+          onClick={() => router.push("/user/tests")}
         >
           Back to tests
         </Button>
@@ -928,7 +928,7 @@ export default function AttemptPage() {
         <p className="font-medium">Test not found</p>
         <Button
           variant="outline"
-          onClick={() => navigateSafe(() => router.push("/user"))}
+          onClick={() => navigateSafe(() => router.push("/user/tests"))}
         >
           Back to tests
         </Button>

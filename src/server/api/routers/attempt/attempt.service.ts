@@ -207,7 +207,7 @@ export function createAttemptService(db: Db) {
             type: attempt.type,
             score: evaluation.score,
             wpm: evaluation.wpm,
-            accuracy: evaluation.accuracy,
+            accuracy: Math.round(evaluation.accuracy),
             mistakes: evaluation.mistakes,
             submittedAt: now,
           })
@@ -225,7 +225,7 @@ export function createAttemptService(db: Db) {
               resultId: result!.id,
               score: evaluation.score,
               wpm: evaluation.wpm,
-              accuracy: evaluation.accuracy,
+              accuracy: Math.round(evaluation.accuracy),
               mistakes: evaluation.mistakes,
               attemptedAt: now,
               totalWordsTyped: input.answerFinal.split(" ").length ?? 0,

@@ -23,11 +23,10 @@ import {
   ArrowUpDown,
   X,
   CalendarDays,
-  PlayCircle,
-  CheckCircle2,
-  RotateCcw,
+  BarChart2,
+  Trophy,
 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "~/lib/utils";
 import { useDebounce } from "~/hooks/use-debounce";
 import { TypingTestStartDialog } from "~/components/common/user/typing-test-start-dialog";
@@ -65,11 +64,8 @@ function TestRow({
 
   return (
     <div
-      onClick={(e) => {
-        e.stopPropagation();
-        router.push(`/user/typing-tests/${test.id}`);
-      }}
-      className="bg-card hover:bg-muted/30 grid cursor-pointer grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 rounded-xl border px-5 py-3.5 transition-all"
+      onClick={() => router.push(`/user/typing-tests/${test.id}`)}
+      className="bg-card hover:bg-muted/30 grid cursor-pointer grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-3 rounded-xl border px-5 py-3.5 transition-all"
     >
       {/* title */}
       <p className="min-w-0 truncate text-sm font-semibold">{test.title}</p>
@@ -77,28 +73,60 @@ function TestRow({
       {/* duration */}
       <div className="text-muted-foreground flex items-center gap-1 text-xs">
         <Tooltip>
-          <TooltipTrigger className="hover:bg-card/10 flex items-center justify-center gap-2">
+          <TooltipTrigger className="flex items-center gap-1.5">
             <Clock className="h-3 w-3" />
             <span>{fmtDuration(test.durationSeconds)}</span>
           </TooltipTrigger>
-          <TooltipContent>
-            <p>Duration</p>
-          </TooltipContent>
+          <TooltipContent>Duration</TooltipContent>
         </Tooltip>
       </div>
 
-      <div className="text-muted-foreground flex items-center gap-1 text-xs">
-        <span className="tabular-nums">
-          {test.userAttemptCount} attempt
-          {test.userAttemptCount !== 1 ? "s" : ""}
-        </span>
+      {/* attempt count */}
+      <div className="text-muted-foreground text-xs tabular-nums">
+        {test.userAttemptCount} attempt{test.userAttemptCount !== 1 ? "s" : ""}
       </div>
 
-      {/* action */}
+      {/* my results */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/user/typing-tests/${test.id}/results`);
+            }}
+          >
+            <BarChart2 className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>My Results</TooltipContent>
+      </Tooltip>
+
+      {/* leaderboard */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/user/typing-tests/${test.id}/leaderboard`);
+            }}
+          >
+            <Trophy className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Leaderboard</TooltipContent>
+      </Tooltip>
+
+      {/* start / practice */}
       <Button
         size="sm"
         variant={test.isAssessed ? "outline" : "default"}
-        className={cn("h-7 text-xs", !test.isAssessed)}
+        className="h-7 text-xs"
         onClick={(e) => {
           e.stopPropagation();
           onStart(test);
@@ -118,12 +146,13 @@ function TableSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="bg-card grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 rounded-xl border px-5 py-3.5"
+          className="bg-card grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-3 rounded-xl border px-5 py-3.5"
         >
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-12" />
           <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+          <Skeleton className="h-7 w-7 rounded-md" />
           <Skeleton className="h-7 w-20" />
         </div>
       ))}
@@ -245,6 +274,7 @@ export function TypingTestFeed() {
   useEffect(() => {
     if (debouncedQuery === queryParam) return;
     setParams({ q: debouncedQuery });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery]);
 
   const { data, isLoading } = trpc.typingTest.manage.list.useQuery({

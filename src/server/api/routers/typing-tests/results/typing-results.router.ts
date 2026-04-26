@@ -1,14 +1,14 @@
 import {
   adminProcedure,
   createTRPCRouter,
-  demoOrPaidUserProcedure,
+  demoOrTypingUserProcedure,
 } from "~/server/api/trpc";
 import { typingAttemptService } from "../attempt/typing-attempt.service";
 import z from "zod";
 
 // typing-result.router.ts
 export const typingResultRouter = createTRPCRouter({
-  getResult: demoOrPaidUserProcedure
+  getResult: demoOrTypingUserProcedure
     .input(z.object({ attemptId: z.string() }))
     .query(({ input, ctx }) =>
       typingAttemptService.getResult(input.attemptId, ctx.user.id),
@@ -18,7 +18,7 @@ export const typingResultRouter = createTRPCRouter({
     .input(z.object({ attemptId: z.string() }))
     .query(({ input }) => typingAttemptService.getResultAdmin(input.attemptId)),
 
-  getUserAttempts: demoOrPaidUserProcedure
+  getUserAttempts: demoOrTypingUserProcedure
     .input(z.object({ testId: z.string() }))
     .query(({ input, ctx }) =>
       typingAttemptService.getUserAttempts(input.testId, ctx.user.id),

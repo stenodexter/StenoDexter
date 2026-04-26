@@ -27,7 +27,7 @@ const courses = [
       "Comprehensive Pitman Shorthand course instructed by experienced trainers from basics to advanced levels.",
     level: "Beginner",
     students: 100,
-    price: "₹1500",
+
     image: "/images/stuff/steno1.jpeg",
   },
   {
@@ -37,7 +37,7 @@ const courses = [
       "Our Advanced Speed Batch is designed for aspirants aiming to achieve high speed and accuracy in stenography. The Program includes daily dictations practice with live explanation session to ensure clarity and continous improvement. Tailored for SSC, RSMSSB, High Courts, District Courts and other Government exams.",
     level: "Advanced",
     students: 100,
-    price: "₹1500",
+
     image: "/images/stuff/steno1.jpeg",
     href: `${env.NEXT_PUBLIC_APP_URL}/user`,
   },
@@ -103,9 +103,6 @@ export default function CoursesPage() {
 
                   {/* Footer */}
                   <div className="border-border mt-auto flex items-center justify-between pt-4">
-                    <div className="text-primary text-lg font-bold">
-                      {course.price}
-                    </div>
                     {course.id === 1 ? (
                       <Button onClick={() => setOpenContact(true)}>
                         Enroll

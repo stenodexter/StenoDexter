@@ -11,19 +11,8 @@ import type { AdminSession } from "../better-auth/config";
 import R2Service from "../services/r2.service";
 import { redisService } from "../services/redis.service";
 
-// ---------------------------------------------------------------------------
-// Cache TTLs
-// ---------------------------------------------------------------------------
-
-const ADMIN_SESSION_CACHE_TTL_SEC = 10 * 60; // 10 minutes
-const SUBSCRIPTION_CACHE_TTL_SEC = 20 * 60; // 20 minutes
-
-// ---------------------------------------------------------------------------
-// 1. CONTEXT
-//
-// - Resolves user session via better-auth (traditional)
-// - Only extracts the raw admin_token cookie — no DB call for admin here
-// ---------------------------------------------------------------------------
+const ADMIN_SESSION_CACHE_TTL_SEC = 10 * 60;
+const SUBSCRIPTION_CACHE_TTL_SEC = 20 * 60;
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const userSession = (await auth.api.getSession({
@@ -64,19 +53,13 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
     return {
       ...shape,
       message: error.message,
-      data: {
-        ...shape.data,
-      },
+      data: { ...shape.data },
     };
   },
 });
 
 export const createCallerFactory = t.createCallerFactory;
 export const createTRPCRouter = t.router;
-
-// ---------------------------------------------------------------------------
-// Rate Limit Middleware
-// ---------------------------------------------------------------------------
 
 const rateLimitMiddleware = t.middleware(async ({ ctx, next, path }) => {
   await redisService.rateLimitOrThrow(
@@ -87,14 +70,8 @@ const rateLimitMiddleware = t.middleware(async ({ ctx, next, path }) => {
   return next({ ctx });
 });
 
-// ---------------------------------------------------------------------------
-// 3. PROCEDURES
-// ---------------------------------------------------------------------------
-
-/** Public — no auth required */
 export const publicProcedure = t.procedure.use(rateLimitMiddleware);
 
-/** Protected user — better-auth session already resolved in context */
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
@@ -113,10 +90,6 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
     },
   });
 });
-
-// ---------------------------------------------------------------------------
-// Admin session resolver — Redis cached
-// ---------------------------------------------------------------------------
 
 const resolveAdminSession = async (
   token: string | null,
@@ -144,7 +117,6 @@ const resolveAdminSession = async (
   );
 };
 
-/** Admin — resolves + caches admin session lazily via Redis */
 export const adminProcedure = publicProcedure.use(async ({ ctx, next }) => {
   const adminData = await resolveAdminSession(ctx._adminToken);
 
@@ -169,7 +141,6 @@ export const adminProcedure = publicProcedure.use(async ({ ctx, next }) => {
   });
 });
 
-/** Super admin only */
 export const superAdminProcedure = adminProcedure.use(({ ctx, next }) => {
   if (!ctx.admin?.isSuper) {
     throw new TRPCError({
@@ -180,7 +151,6 @@ export const superAdminProcedure = adminProcedure.use(({ ctx, next }) => {
   return next();
 });
 
-/** System admin only */
 export const systemAdminProcedure = adminProcedure.use(({ ctx, next }) => {
   if (!ctx.admin?.isSystem) {
     throw new TRPCError({
@@ -191,15 +161,23 @@ export const systemAdminProcedure = adminProcedure.use(({ ctx, next }) => {
   return next();
 });
 
-const resolveSubscription = async (userId: string) => {
-  const cacheKey = `subscription:${userId}`;
+type ActiveSubscriptions = {
+  all: (typeof subscription.$inferSelect)[];
+  hasAppAccess: boolean;
+  hasTypingAccess: boolean;
+};
 
-  return redisService.cache<typeof subscription.$inferSelect | null>(
+const resolveActiveSubscriptions = async (
+  userId: string,
+): Promise<ActiveSubscriptions> => {
+  const cacheKey = `subscriptions:${userId}`;
+
+  return redisService.cache<ActiveSubscriptions>(
     cacheKey,
     async () => {
       const now = new Date();
 
-      const [activeSubscription] = await db
+      const rows = await db
         .select()
         .from(subscription)
         .where(
@@ -208,30 +186,71 @@ const resolveSubscription = async (userId: string) => {
             eq(subscription.status, "active"),
             gt(subscription.currentPeriodEnd, now),
           ),
-        )
-        .limit(1);
+        );
 
-      return activeSubscription ?? null;
+      const types = rows.map((r) => r.type);
+
+      return {
+        all: rows,
+        hasAppAccess: types.includes("app"),
+        hasTypingAccess: types.includes("typing"),
+      };
     },
     SUBSCRIPTION_CACHE_TTL_SEC,
   );
 };
 
+const resolveDemoAccess = (user: {
+  isDemo?: boolean | null;
+  demoExpiresAt?: Date | string | null;
+  demoRevoked?: boolean | null;
+}): boolean => {
+  if (!user.isDemo) return false;
+  const now = new Date();
+  const expires = user.demoExpiresAt ? new Date(user.demoExpiresAt) : null;
+  if (expires && now > expires) return false;
+  if (user.demoRevoked) return false;
+  return true;
+};
+
 export const paidUserProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    const sub = await resolveSubscription(ctx.user.id);
+    const { all, hasAppAccess } = await resolveActiveSubscriptions(ctx.user.id);
 
-    if (!sub) {
+    if (!hasAppAccess) {
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "An active subscription is required to access this feature.",
+        message:
+          "An active app subscription is required to access this feature.",
       });
     }
 
     return next({
       ctx: {
         ...ctx,
-        subscription: sub,
+        subscriptions: all,
+      },
+    });
+  },
+);
+
+export const typingUserProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    const { all, hasTypingAccess } = await resolveActiveSubscriptions(
+      ctx.user.id,
+    );
+
+    if (!hasTypingAccess) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "A typing subscription is required to access this feature.",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        subscriptions: all,
       },
     });
   },
@@ -239,31 +258,25 @@ export const paidUserProcedure = protectedProcedure.use(
 
 export const demoOrPaidUserProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    const now = new Date();
-
     if (ctx.user.isDemo) {
-      const expires = ctx.user.demoExpiresAt;
-      if ((expires && now > new Date(expires)) || ctx.user.demoRevoked) {
+      if (!resolveDemoAccess(ctx.user)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Your demo access has expired.",
         });
       }
+
       return next({
         ctx: {
           ...ctx,
-          user: {
-            ...ctx.user,
-            profilePicUrl: R2Service.getPublicUrl(ctx.user.image),
-          },
-          subscription: null,
+          subscriptions: [] as (typeof subscription.$inferSelect)[],
         },
       });
     }
 
-    const sub = await resolveSubscription(ctx.user.id);
+    const { all, hasAppAccess } = await resolveActiveSubscriptions(ctx.user.id);
 
-    if (!sub) {
+    if (!hasAppAccess) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "An active subscription is required to access this feature.",
@@ -273,11 +286,45 @@ export const demoOrPaidUserProcedure = protectedProcedure.use(
     return next({
       ctx: {
         ...ctx,
-        user: {
-          ...ctx.user,
-          profilePicUrl: R2Service.getPublicUrl(ctx.user.image),
+        subscriptions: all,
+      },
+    });
+  },
+);
+
+export const demoOrTypingUserProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    if (ctx.user.isDemo) {
+      if (!resolveDemoAccess(ctx.user)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your demo access has expired.",
+        });
+      }
+
+      return next({
+        ctx: {
+          ...ctx,
+          subscriptions: [] as (typeof subscription.$inferSelect)[],
         },
-        subscription: sub,
+      });
+    }
+
+    const { all, hasTypingAccess } = await resolveActiveSubscriptions(
+      ctx.user.id,
+    );
+
+    if (!hasTypingAccess) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "A typing subscription is required to access this feature.",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        subscriptions: all,
       },
     });
   },
@@ -292,12 +339,12 @@ export const nonDemoUserProcedure = protectedProcedure.use(
       });
     }
 
-    const sub = await resolveSubscription(ctx.user.id);
+    const { all } = await resolveActiveSubscriptions(ctx.user.id);
 
     return next({
       ctx: {
         ...ctx,
-        subscription: sub ?? null,
+        subscriptions: all,
       },
     });
   },
@@ -318,10 +365,10 @@ export const invalidateAdminSessionCache = (token: string) =>
   redisService.del(`admin_session:${token}`);
 
 export const invalidateSubscriptionCache = (userId: string) =>
-  redisService.del(`subscription:${userId}`);
+  redisService.del(`subscriptions:${userId}`);
 
 export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
 
 export type PaidUserContext = TRPCContext & {
-  subscription: typeof subscription.$inferSelect;
+  subscriptions: (typeof subscription.$inferSelect)[];
 };

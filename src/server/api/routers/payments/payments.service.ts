@@ -16,6 +16,53 @@ type Db = typeof db;
 
 const PENDING_PAYMENTS_COUNT_CACHE = "global:payments:pending:count";
 
+// Maps plan → which subscription types to extend
+const PLAN_TO_SUB_TYPES: Record<string, Array<"app" | "typing">> = {
+  app: ["app"],
+  typing: ["typing"],
+  full: ["app", "typing"],
+};
+
+async function upsertSubscription(
+  tx: any,
+  userId: string,
+  paymentId: string,
+  subType: "app" | "typing",
+) {
+  const existing = await tx.query.subscription.findFirst({
+    where: (s: any, { eq, and }: any) =>
+      and(eq(s.userId, userId), eq(s.type, subType)),
+  });
+
+  const now = new Date();
+  let start: Date;
+
+  if (existing && existing.currentPeriodEnd > now) {
+    start = new Date(existing.currentPeriodEnd);
+  } else {
+    start = now;
+  }
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 30);
+
+  if (existing) {
+    await tx
+      .update(subscription)
+      .set({ currentPeriodEnd: end, updatedAt: new Date() })
+      .where(eq(subscription.id, existing.id));
+  } else {
+    await tx.insert(subscription).values({
+      id: crypto.randomUUID(),
+      userId,
+      paymentProofId: paymentId,
+      type: subType,
+      currentPeriodStart: start,
+      currentPeriodEnd: end,
+    });
+  }
+}
+
 export function createPaymentService(db: Db) {
   return {
     async submitPayment(userId: string, data: SubmitPaymentInput) {
@@ -31,13 +78,13 @@ export function createPaymentService(db: Db) {
       await db.insert(payment).values({
         userId,
         type: data.type,
+        plan: data.plan,
         amount: data.amount,
         fromUPIId: data.fromUPIId,
         screenshotKey: data.screenshotKey,
       });
 
       await invalidateSubscriptionCache(userId);
-
       await redisService.incr(PENDING_PAYMENTS_COUNT_CACHE);
       return { ok: true };
     },
@@ -45,9 +92,7 @@ export function createPaymentService(db: Db) {
     async verifyPayment(adminId: string, input: AdminVerifyPaymentInput) {
       const found = await db.query.payment.findFirst({
         where: eq(payment.id, input.paymentId),
-        with: {
-          user: true,
-        },
+        with: { user: true },
       });
 
       if (!found) throw new Error("Payment not found");
@@ -81,17 +126,20 @@ export function createPaymentService(db: Db) {
 
         await invalidateSubscriptionCache(found.userId);
         await redisService.decr(PENDING_PAYMENTS_COUNT_CACHE);
-
         return { ok: true };
       }
 
-      const existingSub = await db.query.subscription.findFirst({
-        where: eq(subscription.userId, found.userId),
+      // Check no revoked subs block approval
+      const revokedSub = await db.query.subscription.findFirst({
+        where: (s: any, { eq, and }: any) =>
+          and(eq(s.userId, found.userId), eq(s.status, "revoked")),
       });
 
-      if (existingSub?.status === "revoked") {
+      if (revokedSub) {
         throw new Error("User subscription is revoked. Cannot verify payment.");
       }
+
+      const subTypes = PLAN_TO_SUB_TYPES[found.plan] ?? ["app"];
 
       await db.transaction(async (tx: any) => {
         await tx
@@ -103,39 +151,8 @@ export function createPaymentService(db: Db) {
           })
           .where(eq(payment.id, input.paymentId));
 
-        const existing = await tx.query.subscription.findFirst({
-          where: (s: any, { eq, and }: any) => and(eq(s.userId, found.userId)),
-        });
-
-        const now = new Date();
-
-        let start: Date;
-
-        if (existing && existing.currentPeriodEnd > now) {
-          start = new Date(existing.currentPeriodEnd);
-        } else {
-          start = now;
-        }
-
-        const end = new Date(start);
-        end.setDate(end.getDate() + 30);
-
-        if (existing) {
-          await tx
-            .update(subscription)
-            .set({
-              currentPeriodEnd: end,
-              updatedAt: new Date(),
-            })
-            .where(eq(subscription.id, existing.id));
-        } else {
-          await tx.insert(subscription).values({
-            id: crypto.randomUUID(),
-            userId: found.userId,
-            paymentProofId: found.id,
-            currentPeriodStart: start,
-            currentPeriodEnd: end,
-          });
+        for (const subType of subTypes) {
+          await upsertSubscription(tx, found.userId, found.id, subType);
         }
       });
 
@@ -149,18 +166,15 @@ export function createPaymentService(db: Db) {
         await emailService.sendPaymentApproved(found.user.email);
       }
 
+      await invalidateSubscriptionCache(found.userId);
       await redisService.decr(PENDING_PAYMENTS_COUNT_CACHE);
-
       return { ok: true };
     },
 
-    // ── Admin: List Payments ─────────────────────────────────────
     async getPayments(input: AdminGetPaymentsInput) {
       const conditions = [];
-
       if (input.status) conditions.push(eq(payment.status, input.status));
       if (input.userId) conditions.push(eq(payment.userId, input.userId));
-
       const where = conditions.length ? and(...conditions) : undefined;
 
       const [data, [countRow]] = await Promise.all([
@@ -169,12 +183,8 @@ export function createPaymentService(db: Db) {
           orderBy: desc(payment.createdAt),
           limit: input.limit,
           offset: input.page * input.limit,
-
-          with: {
-            user: true,
-          },
+          with: { user: true },
         }),
-
         db
           .select({ count: sql<number>`count(*)` })
           .from(payment)
@@ -209,7 +219,6 @@ export function createPaymentService(db: Db) {
           limit,
           offset: page * limit,
         }),
-
         db
           .select({ count: sql<number>`count(*)` })
           .from(payment)
@@ -223,12 +232,7 @@ export function createPaymentService(db: Db) {
           ...d,
           screenshotURL: R2Service.getPublicUrl(d.screenshotKey),
         })),
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };
     },
 
@@ -236,10 +240,7 @@ export function createPaymentService(db: Db) {
       const cached = await redisService.get<number>(
         PENDING_PAYMENTS_COUNT_CACHE,
       );
-
-      if (cached !== null) {
-        return { count: cached };
-      }
+      if (cached !== null) return { count: cached };
 
       const rows = await db.query.payment.findMany({
         where: eq(payment.status, "pending"),
@@ -247,9 +248,7 @@ export function createPaymentService(db: Db) {
       });
 
       const count = rows.length;
-
       await redisService.set(PENDING_PAYMENTS_COUNT_CACHE, count);
-
       return { count };
     },
   };

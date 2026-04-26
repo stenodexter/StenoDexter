@@ -57,13 +57,10 @@ export const userRouter = createTRPCRouter({
     return { accounts, user: ctx.user };
   }),
 
-  paidMe: paidUserProcedure.query(async ({ ctx }) => {
-    return ctx.subscription.currentPeriodEnd >= new Date();
-  }),
-
   checkSubscription: protectedProcedure.query(async ({ ctx }) => {
     const now = new Date();
 
+    // ── Demo user ──────────────────────────────────────────────────────────────
     if (ctx.user.isDemo) {
       const user = await ctx.db.query.user.findFirst({
         where: (u, { eq }) => eq(u.id, ctx.user.id),
@@ -71,15 +68,12 @@ export const userRouter = createTRPCRouter({
 
       const expires = user?.demoExpiresAt;
 
-      if (
-        !expires ||
-        (expires && now > new Date(expires)) ||
-        user?.demoRevoked
-      ) {
+      if (!expires || now > new Date(expires) || user?.demoRevoked) {
         return {
           active: false,
           isRevoked: true,
           isDemo: true,
+          subscriptions: [],
         };
       }
 
@@ -87,37 +81,72 @@ export const userRouter = createTRPCRouter({
         active: true,
         expiresAt: expires.toISOString(),
         isDemo: true,
+        subscriptions: [],
       };
     }
 
-    const sub = await ctx.db.query.subscription.findFirst({
-      where: (s, { eq }) => eq(s.userId, ctx.user.id),
-      orderBy: (s, { desc }) => desc(s.currentPeriodEnd),
-    });
+    // ── Real user — fetch ALL active subs + latest expired ────────────────────
+    const [activeSubs, pendingPayment] = await Promise.all([
+      ctx.db.query.subscription.findMany({
+        where: (s, { eq, and }) =>
+          and(eq(s.userId, ctx.user.id), eq(s.status, "active")),
+      }),
+      ctx.db.query.payment.findFirst({
+        where: (p, { eq, and }) =>
+          and(eq(p.userId, ctx.user.id), eq(p.status, "pending")),
+      }),
+    ]);
 
-    const pendingPayment = await ctx.db.query.payment.findFirst({
-      where: (p, { eq, and }) =>
-        and(eq(p.userId, ctx.user.id), eq(p.status, "pending")),
-    });
+    // Filter to truly active (not past expiry)
+    const nowActiveSubs = activeSubs.filter((s) => s.currentPeriodEnd >= now);
 
-    if (!sub)
+    // If nothing active, grab most recent sub for expiry info
+    if (nowActiveSubs.length === 0) {
+      const lastSub = await ctx.db.query.subscription.findFirst({
+        where: (s, { eq }) => eq(s.userId, ctx.user.id),
+        orderBy: (s, { desc }) => desc(s.currentPeriodEnd),
+      });
+
       return {
         active: false,
-        expiresAt: null,
-        pendingPayment,
-        isRevoked: false,
+        expiresAt: lastSub?.currentPeriodEnd.toISOString() ?? null,
+        isRevoked: lastSub?.status === "revoked",
         isDemo: false,
+        pendingPayment,
+        subscriptions: [],
+        // Convenience flags
+        hasAppAccess: false,
+        hasTypingAccess: false,
       };
+    }
 
-    const isRevoked = sub.status === "revoked";
-    const isActive = sub.status === "active" && sub.currentPeriodEnd >= now;
+    // Derive access from active plan set
+    const plans = nowActiveSubs.map((s) => s.type);
+    const hasAppAccess = plans.some((p) => p === "app");
+    const hasTypingAccess = plans.some((p) => p === "typing");
+
+    // Latest expiry across all active subs (for generic "expires at" display)
+    const latestExpiry = nowActiveSubs.reduce(
+      (max, s) => (s.currentPeriodEnd > max ? s.currentPeriodEnd : max),
+      nowActiveSubs[0]!.currentPeriodEnd,
+    );
 
     return {
-      active: isActive,
-      expiresAt: sub.currentPeriodEnd.toISOString(),
-      pendingPayment,
-      isRevoked,
+      active: true,
+      expiresAt: latestExpiry.toISOString(),
+      isRevoked: false,
       isDemo: false,
+      pendingPayment,
+      hasAppAccess,
+      hasTypingAccess,
+      // Full list so UI can render per-plan expiry cards
+      subscriptions: nowActiveSubs.map((s) => ({
+        id: s.id,
+        type: s.type,
+        status: s.status,
+        currentPeriodStart: s.currentPeriodStart.toISOString(),
+        currentPeriodEnd: s.currentPeriodEnd.toISOString(),
+      })),
     };
   }),
 

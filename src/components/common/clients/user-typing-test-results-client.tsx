@@ -1,7 +1,7 @@
 // components/common/typing-test/typing-test-results-page.tsx
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -10,10 +10,21 @@ import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronLeft, AlignLeft } from "lucide-react";
 import { format } from "date-fns";
-import type { DiffToken } from "~/server/services/typing-scoring.service";
+import type {
+  DiffToken,
+  RepetitionResult,
+} from "~/server/services/typing-scoring.service";
 import { MarksCalculationDialog } from "~/components/utils/marks-calculation-dialog";
 
-// ─── types ────────────────────────────────────────────────────────────────────
+type ExtendedDiffToken = DiffToken & {
+  type:
+    | "correct"
+    | "replace"
+    | "insert"
+    | "delete"
+    | "extra_space"
+    | "paragraph";
+};
 
 type TypingAttemptResult = {
   attempt: {
@@ -31,7 +42,7 @@ type TypingAttemptResult = {
   result: {
     fullMistakes: number;
     halfMistakes: number;
-    grossErrors: number; // stored ×2 in DB
+    grossErrors: number;
     errorStrokes: number;
     totalStrokes: number;
     netStrokes: number;
@@ -39,15 +50,63 @@ type TypingAttemptResult = {
     netWpm: number;
     accuracy: number;
     netDph: number;
-    marksOutOf50: number; // stored ×100 in DB
+    marksOutOf50: number;
+    marksOutOf25: number;
     transcriptionTimeSeconds: number;
+    repeatCount: number;
+    repetitions: RepetitionResult[];
   };
-  diff: DiffToken[];
+  diff: ExtendedDiffToken[];
 };
 
-// ─── diff renderer ────────────────────────────────────────────────────────────
+// ─── Legend ───────────────────────────────────────────────────────────────────
 
-function DiffView({ diff }: { diff: DiffToken[] }) {
+function DiffLegend() {
+  return (
+    <div className="text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+      <span className="flex items-center gap-1.5">
+        <span className="bg-foreground/70 h-2 w-2 rounded-full" /> Correct
+      </span>
+      <span className="flex items-center gap-2">
+        <span className="text-sm font-medium text-red-500 line-through">
+          wrong
+        </span>
+        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+          correct
+        </span>
+        — Substitution
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-sm font-bold text-red-500">word</span> — Missing
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-sm text-red-500 line-through">word</span> — Extra
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="mx-0.5 rounded-sm bg-orange-700/50 p-0.5 text-sm text-orange-500">
+          ␣
+        </span>
+        — Extra space
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="rounded-sm bg-red-500/20 px-1 text-sm font-bold text-red-500">
+          ¶
+        </span>
+        — Missing paragraph break
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="rounded-sm bg-orange-500/20 px-1 text-sm font-bold text-orange-500 line-through">
+          ¶
+        </span>
+        — Extra paragraph break
+      </span>
+    </div>
+  );
+}
+
+// ─── DiffView ─────────────────────────────────────────────────────────────────
+
+function DiffView({ diff }: { diff: ExtendedDiffToken[] }) {
   if (!diff?.length)
     return (
       <p className="text-muted-foreground text-sm italic">
@@ -56,7 +115,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
     );
 
   return (
-    // ✅ <div> instead of <p> — <p> cannot contain <br> correctly in all browsers
     <div
       className="break-words select-none"
       style={{
@@ -66,12 +124,29 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
       }}
     >
       {diff.map((token, i) => {
-        // ✅ NEW — renders paragraph break
-        if (token.type === "paragraph_break") return <br key={i} />;
-
+        if (token.type === "paragraph") return <br key={i} />;
+        if (token.type === "delete" && token.original === "¶")
+          return (
+            <span
+              key={i}
+              className="mx-1 rounded-sm bg-red-500/20 px-1.5 py-0.5 text-sm font-bold text-red-500"
+              title="Paragraph break missing"
+            >
+              ¶
+            </span>
+          );
+        if (token.type === "insert" && token.typed === "¶")
+          return (
+            <span
+              key={i}
+              className="mx-1 rounded-sm bg-orange-500/20 px-1.5 py-0.5 text-sm font-bold text-orange-500 line-through"
+              title="Paragraph break not required here"
+            >
+              ¶
+            </span>
+          );
         if (token.type === "correct")
           return <span key={i}>{token.original}</span>;
-
         if (token.type === "replace")
           return (
             <span key={i}>
@@ -83,14 +158,12 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
               </span>
             </span>
           );
-
         if (token.type === "delete")
           return (
             <span key={i} className="font-extrabold text-red-500">
               {token.original}
             </span>
           );
-
         if (token.type === "insert")
           return (
             <span
@@ -100,7 +173,6 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
               {token.typed}
             </span>
           );
-
         if (token.type === "extra_space")
           return (
             <span
@@ -111,14 +183,13 @@ function DiffView({ diff }: { diff: DiffToken[] }) {
               ␣
             </span>
           );
-
         return null;
       })}
     </div>
   );
 }
 
-// ─── stat pill ────────────────────────────────────────────────────────────────
+// ─── Stat box ─────────────────────────────────────────────────────────────────
 
 function Stat({
   label,
@@ -137,7 +208,6 @@ function Stat({
         : highlight === "amber"
           ? "text-amber-500"
           : "text-foreground";
-
   return (
     <div className="bg-muted/40 flex flex-col gap-1 rounded-lg px-4 py-3 text-center">
       <p className={`text-lg font-bold tabular-nums ${color}`}>{value}</p>
@@ -148,7 +218,77 @@ function Stat({
   );
 }
 
-// ─── attempt card ─────────────────────────────────────────────────────────────
+// ─── RepetitionCard ───────────────────────────────────────────────────────────
+
+function RepetitionCard({
+  rep,
+  totalReps,
+}: {
+  rep: RepetitionResult;
+  totalReps: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const totalMistakes = rep.fullMistakes + rep.halfMistakes;
+
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <div
+        className="hover:bg-muted/20 flex cursor-pointer items-center justify-between px-4 py-2.5 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-semibold">
+            Repetition {rep.index}
+            {totalReps > 1 && (
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                / {totalReps}
+              </span>
+            )}
+          </span>
+          {!rep.isComplete && (
+            <Badge
+              variant="outline"
+              className="border-amber-500/40 text-[10px] text-amber-500"
+            >
+              Incomplete
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-xs">
+            {totalMistakes === 0 ? (
+              <span className="font-medium text-emerald-500">✓ Perfect</span>
+            ) : (
+              <>
+                <span className="font-medium text-red-500">
+                  {rep.fullMistakes} full
+                </span>
+                {rep.halfMistakes > 0 && (
+                  <span className="font-medium text-amber-500">
+                    {" "}
+                    · {rep.halfMistakes} half
+                  </span>
+                )}
+              </>
+            )}
+          </span>
+          <span className="text-muted-foreground text-xs">
+            {expanded ? "▲" : "▼"}
+          </span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t px-4 py-4">
+          <DiffView diff={rep.diff as ExtendedDiffToken[]} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AttemptCard ──────────────────────────────────────────────────────────────
 
 function AttemptCard({
   entry,
@@ -175,27 +315,36 @@ function AttemptCard({
     return () => clearTimeout(t);
   }, [highlight]);
 
-  // decode stored values
-  const grossErrors = entry.result.grossErrors / 2; // stored ×2
-  const marksOutOf50 = entry.result.marksOutOf50 / 100; // stored ×100
-  const marksOutOf25 = marksOutOf50 / 2;
   const correctWords = entry.test.correctTranscription
     .trim()
-    .split(/\s+/).length;
+    .split(/\s+/)
+    .filter((w) => w !== "¶").length;
   const typedWords =
-    entry.attempt.answerFinal?.trim().split(/\s+/).filter(Boolean).length ?? 0;
+    entry.attempt.answerFinal
+      ?.trim()
+      .split(/\s+/)
+      .filter((w) => Boolean(w) && w !== "¶").length ?? 0;
   const mins = Math.floor(entry.result.transcriptionTimeSeconds / 60);
   const secs = entry.result.transcriptionTimeSeconds % 60;
   const durationLabel = secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 
+  const {
+    fullMistakes,
+    halfMistakes,
+    marksOutOf50,
+    grossWpm,
+    netWpm,
+    accuracy,
+    repeatCount,
+    repetitions,
+  } = entry.result;
+
   return (
     <div
       ref={cardRef}
-      className={`bg-card overflow-hidden rounded-xl border transition-all duration-700 ${
-        flashing ? "ring-primary bg-primary/5 ring-2 ring-offset-2" : ""
-      }`}
+      className={`bg-card overflow-hidden rounded-xl border transition-all duration-700 ${flashing ? "ring-primary bg-primary/5 ring-2 ring-offset-2" : ""}`}
     >
-      {/* header */}
+      {/* ── header row ── */}
       <div
         className="hover:bg-muted/20 cursor-pointer px-5 py-4 transition-colors"
         onClick={() => setExpanded((v) => !v)}
@@ -220,6 +369,11 @@ function AttemptCard({
               <span className="text-muted-foreground text-xs">
                 {durationLabel}
               </span>
+              {repeatCount > 1 && (
+                <span className="text-muted-foreground text-xs">
+                  · {repeatCount}× repetitions
+                </span>
+              )}
             </div>
           </div>
           <span className="text-muted-foreground text-xs">
@@ -227,97 +381,31 @@ function AttemptCard({
           </span>
         </div>
 
-        {/* stats grid */}
-        <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
-          <Stat label="Total Strokes" value={entry.result.totalStrokes} />
-          <Stat
-            label="Error Strokes"
-            value={entry.result.errorStrokes}
-            highlight="red"
-          />
-          <Stat
-            label="Net Strokes"
-            value={entry.result.netStrokes}
-            highlight="green"
-          />
-          <Stat
-            label="Full Mistakes"
-            value={entry.result.fullMistakes}
-            highlight="red"
-          />
-          <Stat
-            label="Half Mistakes"
-            value={entry.result.halfMistakes}
-            highlight="amber"
-          />
-          <Stat
-            label="Gross Errors"
-            value={grossErrors.toFixed(1)}
-            highlight="red"
-          />
-          <Stat label="Net DPH" value={entry.result.netDph} />
-          <Stat
-            label="Marks / 50"
-            value={marksOutOf50.toFixed(2)}
-            highlight="green"
-          />
-        </div>
-
-        {/* second row */}
-        <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-4">
-          <Stat label="Gross WPM" value={entry.result.grossWpm} />
-          <Stat label="Net WPM" value={entry.result.netWpm} highlight="green" />
+        {/* ── stats grid ── */}
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <Stat label="Gross WPM" value={grossWpm} />
+          <Stat label="Net WPM" value={netWpm} highlight="green" />
+          <Stat label="Full Mistakes" value={fullMistakes} highlight="red" />
+          <Stat label="Half Mistakes" value={halfMistakes} highlight="amber" />
           <Stat
             label="Accuracy"
-            value={`${entry.result.accuracy}%`}
+            value={`${accuracy}%`}
             highlight={
-              entry.result.accuracy >= 90
-                ? "green"
-                : entry.result.accuracy >= 70
-                  ? "amber"
-                  : "red"
+              accuracy >= 90 ? "green" : accuracy >= 70 ? "amber" : "red"
             }
           />
           <Stat
-            label="Marks / 25"
-            value={marksOutOf25.toFixed(2)}
+            label="Marks / 50"
+            value={(marksOutOf50 / 100).toFixed(2)}
             highlight="green"
           />
         </div>
       </div>
 
-      {/* diff */}
+      {/* ── expanded diff section ── */}
       {expanded && (
         <div className="space-y-4 border-t px-5 py-5">
-          {/* legend */}
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="bg-foreground/70 h-2 w-2 rounded-full" /> Correct
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="text-sm font-medium text-red-500 line-through">
-                wrong
-              </span>
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                correct
-              </span>
-              — Substitution
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-red-500">word</span> —
-              Missing
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-sm text-red-500 line-through">word</span> —
-              Extra
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="mx-0.5 rounded-sm bg-orange-700/50 p-0.5 text-sm text-orange-500">
-                ␣
-              </span>{" "}
-              — Extra space
-            </span>
-          </div>
+          <DiffLegend />
           <Separator />
           <div className="text-muted-foreground mb-2 grid grid-cols-2 gap-4 text-xs">
             <span>
@@ -327,14 +415,29 @@ function AttemptCard({
               Typed words: <strong>{typedWords}</strong>
             </span>
           </div>
-          <DiffView diff={entry.diff} />
+
+          {/* Per-repetition cards */}
+          {repetitions && repetitions.length > 1 ? (
+            <div className="space-y-3">
+              {repetitions.map((rep) => (
+                <RepetitionCard
+                  key={rep.index}
+                  rep={rep}
+                  totalReps={repetitions.length}
+                />
+              ))}
+            </div>
+          ) : (
+            // Single rep or no repetitions data → flat diff view
+            <DiffView diff={entry.diff} />
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ─── skeleton ─────────────────────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function PageSkeleton() {
   return (
@@ -347,7 +450,7 @@ function PageSkeleton() {
   );
 }
 
-// ─── page ─────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function TypingTestResultsPage({
   userId,
@@ -402,8 +505,7 @@ export function TypingTestResultsPage({
   const isLoading = testLoading || attemptsLoading;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
-      {/* ── page header ── */}
+    <div className="mx-auto w-full max-w-5xl space-y-6 overflow-x-auto px-6 py-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Button
@@ -427,8 +529,6 @@ export function TypingTestResultsPage({
             </>
           )}
         </div>
-
-        {/* ── marks formula button — top right ── */}
         <div className="shrink-0 pt-8">
           <MarksCalculationDialog />
         </div>

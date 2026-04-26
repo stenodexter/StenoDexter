@@ -49,8 +49,7 @@ export function preparePassage(text: string): string {
   return normalizePunctuation(
     text
       .replace(/\r\n/g, "\n")
-      .replace(/\n{2,}/g, ` ${PARAGRAPH_SENTINEL} `) // paragraph break → ¶
-      .replace(/\n/g, " ") // single newline → space
+      .replace(/\n+/g, ` ${PARAGRAPH_SENTINEL} `)
       .replace(/\s+/g, " ")
       .trim(),
   );
@@ -65,12 +64,13 @@ export function preparePassage(text: string): string {
  * On the frontend, intercept Enter and insert "¶ " into the typed string,
  * OR just pass the raw typed string here and let this function convert \n → ¶.
  */
-export function prepareTyped(text: string): string {
+export function prepareTyped(text: string, originalHasParagraphs: boolean): string {
   return normalizePunctuation(
     text
       .replace(/\r\n/g, "\n")
-      .replace(/\n+/g, ` ${PARAGRAPH_SENTINEL} `) // any newline run → ¶
+      // ✅ Only treat \n as ¶ if passage actually has paragraph breaks
+      .replace(/\n+/g, originalHasParagraphs ? ` ${PARAGRAPH_SENTINEL} ` : " ")
       .replace(/\s+/g, " ")
-      .trim(),
+      .trim()
   );
 }
