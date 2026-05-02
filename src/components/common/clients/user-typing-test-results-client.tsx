@@ -10,11 +10,9 @@ import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronLeft, AlignLeft } from "lucide-react";
 import { format } from "date-fns";
-import type {
-  DiffToken,
-  RepetitionResult,
-} from "~/server/services/typing-scoring.service";
+import type { RepetitionResult } from "~/server/services/typing-scoring.service";
 import { MarksCalculationDialog } from "~/components/utils/marks-calculation-dialog";
+import type { DiffToken } from "~/server/services/scoring.service";
 
 type ExtendedDiffToken = DiffToken & {
   type:

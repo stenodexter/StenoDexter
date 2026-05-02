@@ -250,6 +250,8 @@ export function createTypingAttemptService(db: Db) {
         attempt.answerFinal ?? "",
       );
 
+      console.log("ATTEMPT ", attemptId, diff);
+
       return {
         attempt: {
           id: attempt.id,

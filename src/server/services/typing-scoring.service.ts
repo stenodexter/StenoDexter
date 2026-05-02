@@ -1,5 +1,14 @@
 // typing-scoring.engine.ts
 // Rajasthan HC formula engine — repetition-aware, paragraph-safe
+//
+// KEY DESIGN:
+//   • Passage has internal ¶ paragraph breaks — these are NOT rep boundaries.
+//   • Student types the passage N times continuously (no separator needed).
+//   • Engine detects rep boundaries algorithmically using multi-word alignment:
+//     after ≥ 80% of orig consumed, check if next 4 typed words match
+//     origWords[0..3] — only split if ≥ 3 of 4 match (strong signal).
+//   • Last rep (rep > 1) incomplete → trailing missing words FORGIVEN.
+//   • First rep incomplete → missing tail IS penalised.
 
 import {
   PARAGRAPH_SENTINEL,
@@ -7,6 +16,8 @@ import {
   prepareTyped,
   normalizePunctuation,
 } from "../lib/engine-utils";
+
+// ─── public types ─────────────────────────────────────────────────────────────
 
 export type DiffType =
   | "correct"
@@ -23,8 +34,8 @@ export type DiffToken = {
 };
 
 export type RepetitionResult = {
-  index: number; // 1-based
-  isComplete: boolean; // false if student stopped mid-way through this rep
+  index: number;
+  isComplete: boolean;
   fullMistakes: number;
   halfMistakes: number;
   diff: DiffToken[];
@@ -47,15 +58,21 @@ export type TypingEvaluation = {
   backspaceCount: number;
   repeatCount: number;
   repetitions: RepetitionResult[];
-  diff: DiffToken[]; // flat combined diff (legacy / summary use)
+  diff: DiffToken[];
 };
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── word normalization ───────────────────────────────────────────────────────
 
 function normalizeWord(w: string): string {
+  if (w === PARAGRAPH_SENTINEL) return w;
   return normalizePunctuation(w)
     .toLowerCase()
-    .replace(/[^a-z0-9'¶-]/g, "");
+    .replace(/[^a-z0-9'-]/g, "");
+}
+
+function wordsMatch(a: string, b: string): boolean {
+  if (a === PARAGRAPH_SENTINEL || b === PARAGRAPH_SENTINEL) return a === b;
+  return normalizeWord(a) === normalizeWord(b);
 }
 
 function classifyWord(
@@ -70,7 +87,77 @@ function classifyWord(
   return "full";
 }
 
-// ─── word diff (Wagner-Fischer) ───────────────────────────────────────────────
+// ─── rep boundary detector ────────────────────────────────────────────────────
+//
+// After consuming ≥ 80% of origWords, scan ahead in typedWords.
+// Compare the next LOOK_AHEAD typed words against origWords[0..LOOK_AHEAD-1].
+// If ≥ MIN_MATCH of them match → this position is a rep restart.
+// Skip ¶ tokens in orig[0..] when building the comparison window (a passage
+// that starts with a paragraph sentinel would be unusual, but be safe).
+
+const LOOK_AHEAD = 4; // how many words to check
+const MIN_MATCH = 3; // how many must match to confirm new rep
+
+function isRepStart(
+  origWords: string[],
+  typedWords: string[],
+  pos: number, // current position in typedWords
+  origIdx: number, // how many orig words consumed so far
+): boolean {
+  const origLen = origWords.length;
+  if (origIdx < Math.floor(origLen * 0.8)) return false;
+
+  // Build a comparison window from origWords[0..], skipping nothing —
+  // ¶ tokens are valid members of the window.
+  const origWindow = origWords.slice(0, LOOK_AHEAD);
+  let matches = 0;
+  for (let k = 0; k < origWindow.length; k++) {
+    const tw = typedWords[pos + k];
+    if (tw === undefined) break;
+    if (wordsMatch(origWindow[k]!, tw)) matches++;
+  }
+  return matches >= MIN_MATCH;
+}
+
+// ─── repetition splitter ──────────────────────────────────────────────────────
+
+function splitIntoRepetitions(
+  origWords: string[],
+  typedWords: string[],
+): { chunk: string[]; isComplete: boolean }[] {
+  const origLen = origWords.length;
+  const results: { chunk: string[]; isComplete: boolean }[] = [];
+  let pos = 0;
+
+  while (pos < typedWords.length) {
+    const chunk: string[] = [];
+    let origIdx = 0;
+
+    while (pos < typedWords.length && origIdx < origLen) {
+      // Check for rep restart before consuming this token
+      if (chunk.length > 0 && isRepStart(origWords, typedWords, pos, origIdx)) {
+        break; // end current rep here; next iteration starts new rep
+      }
+
+      chunk.push(typedWords[pos]!);
+      pos++;
+      origIdx++;
+    }
+
+    if (chunk.length === 0) {
+      pos++; // safety: prevent infinite loop
+      continue;
+    }
+
+    results.push({ chunk, isComplete: origIdx >= origLen });
+  }
+
+  return results.length > 0
+    ? results
+    : [{ chunk: typedWords, isComplete: false }];
+}
+
+// ─── Wagner-Fischer word diff ─────────────────────────────────────────────────
 
 type Op =
   | { op: "keep"; orig: string; typed: string }
@@ -98,8 +185,8 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
   }
 
   const ops: Op[] = [];
-  let i = m,
-    j = n;
+  let i = m;
+  let j = n;
 
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && origWords[i - 1] === typedWords[j - 1]) {
@@ -130,56 +217,49 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
   return ops.reverse();
 }
 
-// ─── build DiffToken[] from Op[] ─────────────────────────────────────────────
+// ─── ops → DiffToken[] ───────────────────────────────────────────────────────
 
 function opsToDiff(ops: Op[]): {
   diff: DiffToken[];
   fullMistakes: number;
   halfMistakes: number;
 } {
-  const diffTokens: DiffToken[] = [];
+  const tokens: DiffToken[] = [];
   let fullMistakes = 0;
   let halfMistakes = 0;
 
   for (const op of ops) {
     if (op.op === "keep") {
       const isPara = op.orig === PARAGRAPH_SENTINEL;
-      diffTokens.push({
+      tokens.push({
         type: isPara ? "paragraph" : "correct",
         original: op.orig,
         typed: op.typed,
       });
-      if (!isPara)
-        diffTokens.push({ type: "correct", original: " ", typed: " " });
+      if (!isPara) tokens.push({ type: "correct", original: " ", typed: " " });
     } else if (op.op === "replace") {
       const kind = classifyWord(op.orig, op.typed);
       kind === "half" ? halfMistakes++ : fullMistakes++;
-      diffTokens.push({ type: "replace", original: op.orig, typed: op.typed });
-      diffTokens.push({ type: "correct", original: " ", typed: " " });
+      tokens.push({ type: "replace", original: op.orig, typed: op.typed });
+      tokens.push({ type: "correct", original: " ", typed: " " });
     } else if (op.op === "delete") {
       fullMistakes++;
-      diffTokens.push({ type: "delete", original: op.orig });
-      diffTokens.push({ type: "correct", original: " ", typed: " " });
-    } else if (op.op === "insert") {
+      tokens.push({ type: "delete", original: op.orig });
+      tokens.push({ type: "correct", original: " ", typed: " " });
+    } else {
       fullMistakes++;
-      diffTokens.push({ type: "insert", typed: op.typed });
-      diffTokens.push({ type: "correct", original: " ", typed: " " });
+      tokens.push({ type: "insert", typed: op.typed });
+      tokens.push({ type: "correct", original: " ", typed: " " });
     }
   }
 
-  // trim trailing space token
-  if (diffTokens.at(-1)?.original === " ") diffTokens.pop();
+  if (tokens.at(-1)?.original === " ") tokens.pop();
 
-  return { diff: diffTokens, fullMistakes, halfMistakes };
+  return { diff: tokens, fullMistakes, halfMistakes };
 }
 
-// ─── trailing delete trimmer ─────────────────────────────────────────────────
+// ─── trim trailing deletes (forgive untyped tail for incomplete last rep) ─────
 
-/**
- * For incomplete repetitions (rep > 1): strip delete ops from the END of the
- * op list. These represent words the student never reached — not mistakes.
- * Stops trimming as soon as a non-delete op is encountered from the tail.
- */
 function trimTrailingDeletes(ops: Op[]): Op[] {
   let end = ops.length;
   while (end > 0 && ops[end - 1]!.op === "delete") end--;
@@ -203,61 +283,145 @@ function injectExtraSpaceTokens(typed: string, diff: DiffToken[]): DiffToken[] {
   return [...diff, ...extras];
 }
 
-// ─── repetition splitter ──────────────────────────────────────────────────────
+// ─── TypingScoringEngine ──────────────────────────────────────────────────────
 
-/**
- * Split typed words into repetition-sized chunks matching the original.
- * The ¶ tokens that appear BETWEEN repetitions (student pressed Enter
- * to separate reps) are consumed as boundaries and NOT passed into any rep.
- * ¶ tokens INSIDE a rep (matching passage paragraph breaks) are kept.
- */
-function splitIntoRepetitions(
-  origWords: string[],
-  typedWords: string[],
-): { chunk: string[]; isComplete: boolean }[] {
-  const origLen = origWords.length;
-  const results: { chunk: string[]; isComplete: boolean }[] = [];
+export class TypingScoringEngine {
+  evaluate(
+    correctTranscription: string,
+    typed: string,
+    durationSeconds: number,
+    backspaceCount = 0,
+  ): TypingEvaluation {
+    const totalStrokes = typed.length;
 
-  let pos = 0;
-
-  while (pos < typedWords.length) {
-    // Skip a boundary ¶ between repetitions (not counted as mistake)
-    if (typedWords[pos] === PARAGRAPH_SENTINEL && results.length > 0) {
-      pos++;
-      continue;
+    if (!typed.trim()) {
+      return {
+        fullMistakes: 0,
+        halfMistakes: 0,
+        penalties: 0,
+        grossErrors: 0,
+        errorStrokes: 0,
+        totalStrokes: 0,
+        netStrokes: 0,
+        grossWpm: 0,
+        netWpm: 0,
+        netDph: 0,
+        marksOutOf50: 0,
+        marksOutOf25: 0,
+        accuracy: 0,
+        backspaceCount,
+        repeatCount: 1,
+        repetitions: [],
+        diff: [],
+      };
     }
 
-    // Greedily consume up to origLen words for this repetition.
-    // Stop early if we hit a ¶ that is NOT in the original at that position
-    // (i.e. an extra paragraph break typed by the student between reps).
-    const chunk: string[] = [];
-    let origIdx = 0;
+    // ── prepare ONCE ─────────────────────────────────────────────────────────
+    const preparedOriginal = preparePassage(correctTranscription);
+    const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
+    const preparedTyped = prepareTyped(typed, hasParagraphs);
 
-    while (pos < typedWords.length && origIdx < origLen) {
-      const tw = typedWords[pos]!;
+    const origWords = preparedOriginal.split(/\s+/).filter(Boolean);
 
-      // If typed word is ¶ but original position is not ¶ → boundary sentinel
-      // between reps typed early — stop this rep here.
-      if (
-        tw === PARAGRAPH_SENTINEL &&
-        origWords[origIdx] !== PARAGRAPH_SENTINEL
-      ) {
-        break;
+    // Strip trailing ¶ from typed end (Enter after last rep = not a mistake)
+    const preparedTypedClean = preparedTyped.replace(/(\s*¶\s*)+$/, "").trim();
+    const typedWords = preparedTypedClean.split(/\s+/).filter(Boolean);
+
+    // ── split typed into per-rep chunks ───────────────────────────────────────
+    const repChunks = splitIntoRepetitions(origWords, typedWords);
+    const repeatCount = repChunks.length || 1;
+
+    // ── score each rep ────────────────────────────────────────────────────────
+    const repetitions: RepetitionResult[] = [];
+    let totalFullMistakes = 0;
+    let totalHalfMistakes = 0;
+    const flatDiff: DiffToken[] = [];
+
+    for (let ri = 0; ri < repChunks.length; ri++) {
+      const { chunk, isComplete } = repChunks[ri]!;
+      const isLastRep = ri === repChunks.length - 1;
+      const isFirstRep = ri === 0;
+
+      let ops = wordDiff(origWords, chunk);
+
+      // Forgive untyped tail for incomplete last rep when rep > 1
+      if (!isComplete && !isFirstRep && isLastRep) {
+        ops = trimTrailingDeletes(ops);
       }
 
-      chunk.push(tw);
-      pos++;
-      origIdx++;
+      const { diff, fullMistakes, halfMistakes } = opsToDiff(ops);
+
+      const chunkStr = chunk.join(" ");
+      const extraSpaces = countExtraSpaces(chunkStr);
+      const repHalfMistakes = halfMistakes + extraSpaces;
+      const repDiff = injectExtraSpaceTokens(chunkStr, diff);
+
+      totalFullMistakes += fullMistakes;
+      totalHalfMistakes += repHalfMistakes;
+
+      repetitions.push({
+        index: ri + 1,
+        isComplete,
+        fullMistakes,
+        halfMistakes: repHalfMistakes,
+        diff: repDiff,
+      });
+
+      if (ri > 0) flatDiff.push({ type: "paragraph" });
+      flatDiff.push(...repDiff);
     }
 
-    const isComplete = origIdx >= origLen;
-    results.push({ chunk, isComplete });
+    // ── Rajasthan HC scoring ──────────────────────────────────────────────────
+    const penalties = 0;
+    const grossErrors = totalFullMistakes + totalHalfMistakes / 2 + penalties;
+    const errorStrokes = grossErrors * 5;
+    const netStrokes = Math.max(0, totalStrokes - errorStrokes);
+    const durationMinutes = Math.max(durationSeconds / 60, 0.0001);
+
+    const grossWpm = parseFloat(
+      (totalStrokes / 5 / durationMinutes).toFixed(2),
+    );
+    const netWpm = parseFloat((netStrokes / 5 / durationMinutes).toFixed(2));
+    const netDph = Math.round((netStrokes / durationMinutes) * 60);
+    const marksOutOf50 = parseFloat(
+      Math.min(50, (20 / 8000) * netDph).toFixed(2),
+    );
+    const marksOutOf25 = parseFloat((marksOutOf50 / 2).toFixed(2));
+    const accuracy =
+      totalStrokes > 0
+        ? parseFloat(((netStrokes / totalStrokes) * 100).toFixed(2))
+        : 0;
+
+    return {
+      fullMistakes: totalFullMistakes,
+      halfMistakes: totalHalfMistakes,
+      penalties,
+      grossErrors,
+      errorStrokes,
+      totalStrokes,
+      netStrokes: Math.round(netStrokes),
+      grossWpm,
+      netWpm,
+      netDph,
+      marksOutOf50,
+      marksOutOf25,
+      accuracy,
+      backspaceCount,
+      repeatCount,
+      repetitions,
+      diff: flatDiff,
+    };
   }
 
-  return results;
+  compare(correctTranscription: string, typed: string): DiffToken[] {
+    if (!typed?.trim()) return [];
+    return this.evaluate(correctTranscription, typed, 300).diff;
+  }
 }
 
-// ─── main engine ──────────────────────────────────────────────────────────────
+export const typingScoringEngine = new TypingScoringEngine();
+
+// ─── drop-in function exports ─────────────────────────────────────────────────
 
 export function evaluateTypingTest(
   correctTranscription: string,
@@ -265,129 +429,17 @@ export function evaluateTypingTest(
   durationSeconds: number,
   backspaceCount = 0,
 ): TypingEvaluation {
-  const totalStrokes = typed.length;
-
-  if (!typed.trim()) {
-    return {
-      fullMistakes: 0,
-      halfMistakes: 0,
-      penalties: 0,
-      grossErrors: 0,
-      errorStrokes: 0,
-      totalStrokes: 0,
-      netStrokes: 0,
-      grossWpm: 0,
-      netWpm: 0,
-      netDph: 0,
-      marksOutOf50: 0,
-      marksOutOf25: 0,
-      accuracy: 0,
-      backspaceCount,
-      repeatCount: 1,
-      repetitions: [],
-      diff: [],
-    };
-  }
-
-  // ── prepare ────────────────────────────────────────────────────────────────
-  const preparedOriginal = preparePassage(correctTranscription);
-  const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
-  const preparedTyped = prepareTyped(typed, hasParagraphs);
-
-  const origWords = preparedOriginal.split(/\s+/);
-
-  // Strip trailing ¶ from typed (Enter pressed after last rep = not a mistake)
-  const preparedTypedClean = preparedTyped.replace(/(\s*¶\s*)+$/, "").trim();
-  const typedWords = preparedTypedClean.split(/\s+/);
-
-  // ── split typed into per-repetition chunks ─────────────────────────────────
-  const repChunks = splitIntoRepetitions(origWords, typedWords);
-  const repeatCount = repChunks.length || 1;
-
-  // ── score each repetition ──────────────────────────────────────────────────
-  const repetitions: RepetitionResult[] = [];
-  let totalFullMistakes = 0;
-  let totalHalfMistakes = 0;
-  const flatDiff: DiffToken[] = [];
-
-  for (let ri = 0; ri < repChunks.length; ri++) {
-    const { chunk, isComplete } = repChunks[ri]!;
-
-    // Always diff against full original.
-    // Incomplete last rep (ri > 0): trim trailing delete ops AFTER diff so
-    // untyped tail is forgiven without misaligning word positions mid-rep.
-    // First rep incomplete → keep all ops (penalize missing tail).
-    const ops = wordDiff(origWords, chunk);
-    const trimmedOps = !isComplete && ri > 0 ? trimTrailingDeletes(ops) : ops;
-    const { diff, fullMistakes, halfMistakes } = opsToDiff(trimmedOps);
-
-    // Extra spaces within this rep's typed chunk
-    const chunkStr = chunk.join(" ");
-    const extraSpaces = countExtraSpaces(chunkStr);
-    const repHalfMistakes = halfMistakes + extraSpaces;
-    const repDiff = injectExtraSpaceTokens(chunkStr, diff);
-
-    totalFullMistakes += fullMistakes;
-    totalHalfMistakes += repHalfMistakes;
-
-    repetitions.push({
-      index: ri + 1,
-      isComplete,
-      fullMistakes,
-      halfMistakes: repHalfMistakes,
-      diff: repDiff,
-    });
-
-    // Append to flat diff with a separator between reps
-    if (ri > 0) flatDiff.push({ type: "paragraph" });
-    flatDiff.push(...repDiff);
-  }
-
-  // ── scoring (Rajasthan HC) ─────────────────────────────────────────────────
-  const penalties = 0;
-  const grossErrors = totalFullMistakes + totalHalfMistakes / 2 + penalties;
-  const errorStrokes = grossErrors * 5;
-  const netStrokes = Math.max(0, totalStrokes - errorStrokes);
-  const durationMinutes = Math.max(durationSeconds / 60, 0.0001);
-
-  const grossWpm = parseFloat((totalStrokes / 5 / durationMinutes).toFixed(2));
-  const netWpm = parseFloat((netStrokes / 5 / durationMinutes).toFixed(2));
-  const netDph = Math.round((netStrokes / durationMinutes) * 60);
-  const marksOutOf50 = parseFloat(
-    Math.min(50, (20 / 8000) * netDph).toFixed(2),
-  );
-  const marksOutOf25 = parseFloat((marksOutOf50 / 2).toFixed(2));
-  const accuracy =
-    totalStrokes > 0
-      ? parseFloat(((netStrokes / totalStrokes) * 100).toFixed(2))
-      : 0;
-
-  return {
-    fullMistakes: totalFullMistakes,
-    halfMistakes: totalHalfMistakes,
-    penalties,
-    grossErrors,
-    errorStrokes,
-    totalStrokes,
-    netStrokes: Math.round(netStrokes),
-    grossWpm,
-    netWpm,
-    netDph,
-    marksOutOf50,
-    marksOutOf25,
-    accuracy,
+  return typingScoringEngine.evaluate(
+    correctTranscription,
+    typed,
+    durationSeconds,
     backspaceCount,
-    repeatCount,
-    repetitions,
-    diff: flatDiff,
-  };
+  );
 }
 
 export function compareTranscriptions(
   correct: string,
   typed: string,
 ): DiffToken[] {
-  if (!typed?.trim()) return [];
-  const { diff } = evaluateTypingTest(correct, typed, 300);
-  return diff;
+  return typingScoringEngine.compare(correct, typed);
 }

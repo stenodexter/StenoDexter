@@ -10,23 +10,29 @@ import z from "zod";
 export const typingResultRouter = createTRPCRouter({
   getResult: demoOrTypingUserProcedure
     .input(z.object({ attemptId: z.string() }))
-    .query(({ input, ctx }) =>
-      typingAttemptService.getResult(input.attemptId, ctx.user.id),
+    .query(
+      async ({ input, ctx }) =>
+        await typingAttemptService.getResult(input.attemptId, ctx.user.id),
     ),
 
   getResultAdmin: adminProcedure
     .input(z.object({ attemptId: z.string() }))
-    .query(({ input }) => typingAttemptService.getResultAdmin(input.attemptId)),
+    .query(
+      async ({ input }) =>
+        await typingAttemptService.getResultAdmin(input.attemptId),
+    ),
 
   getUserAttempts: demoOrTypingUserProcedure
     .input(z.object({ testId: z.string() }))
-    .query(({ input, ctx }) =>
-      typingAttemptService.getUserAttempts(input.testId, ctx.user.id),
+    .query(
+      async ({ input, ctx }) =>
+        await typingAttemptService.getUserAttempts(input.testId, ctx.user.id),
     ),
 
   getUserAttemptsAdmin: adminProcedure
     .input(z.object({ testId: z.string(), userId: z.string() }))
-    .query(({ input }) =>
-      typingAttemptService.getUserAttempts(input.testId, input.userId),
+    .query(
+      async ({ input }) =>
+        await typingAttemptService.getUserAttempts(input.testId, input.userId),
     ),
 });
