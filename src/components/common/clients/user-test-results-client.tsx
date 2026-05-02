@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { env } from "~/env";
+import { resultRouter } from "~/server/api/routers/results/results.router";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -705,7 +706,10 @@ export function TestResultsPage({
           variant="ghost"
           size="sm"
           className="text-muted-foreground mb-2 -ml-2"
-          onClick={() => router.push("/user/tests")}
+          onClick={() => {
+            if (!isAdmin) router.push("/user/tests");
+            router.push("/admin/tests");
+          }}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Back to Tests
