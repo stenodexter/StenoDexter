@@ -69,8 +69,33 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
   const GAP = -1;
   const EPS = 1e-6;
 
-  const matches = (a: string, b: string): boolean =>
-    a === b || normalizeForComparison(a) === normalizeForComparison(b);
+  function editDistance(a: string, b: string): number {
+    const m = a.length,
+      n = b.length;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [
+      i,
+      ...Array(n).fill(0),
+    ]);
+    for (let j = 0; j <= n; j++) dp[0]![j] = j;
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i]![j] =
+          a[i - 1] === b[j - 1]
+            ? dp[i - 1]![j - 1]!
+            : 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+    return dp[m]![n]!;
+  }
+
+  function matches(a: string, b: string): boolean {
+    if (a === b) return true;
+    const na = normalizeForComparison(a);
+    const nb = normalizeForComparison(b);
+    if (na === nb) return true;
+    // fuzzy: allow 1 edit per ~8 chars
+    const maxLen = Math.max(na.length, nb.length);
+    const threshold = maxLen >= 6 ? 2 : maxLen >= 3 ? 1 : 0;
+    return editDistance(na, nb) <= threshold;
+  }
 
   const diagScore = (a: string, b: string): number => {
     // Sentinel must match exactly

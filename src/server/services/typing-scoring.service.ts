@@ -2,13 +2,33 @@
 // Rajasthan HC formula engine — repetition-aware, paragraph-safe
 //
 // KEY DESIGN:
-//   • Passage has internal ¶ paragraph breaks — these are NOT rep boundaries.
-//   • Student types the passage N times continuously (no separator needed).
-//   • Engine detects rep boundaries algorithmically using multi-word alignment:
-//     after ≥ 80% of orig consumed, check if next 4 typed words match
-//     origWords[0..3] — only split if ≥ 3 of 4 match (strong signal).
-//   • Last rep (rep > 1) incomplete → trailing missing words FORGIVEN.
-//   • First rep incomplete → missing tail IS penalised.
+//   • Passage has internal ¶ paragraph breaks — NOT rep boundaries.
+//   • Student types passage N times continuously (no separator needed).
+//
+//   THE CORE INSIGHT (from bug diagnosis):
+//   ─────────────────────────────────────
+//   Old approach: split first → score each chunk.
+//   Problem: splits are inexact → chunks get PREFIX garbage.
+//
+//   Example of the bug:
+//     Rep 1 typed: "...caused the death of her husbnan. The present matter..."
+//                                           ^^^^^^^^^^^^^
+//                  findRepStarts detects "The present matter" as rep2 start.
+//                  But "of her husbnan." are BEFORE that signal → they get
+//                  assigned as PREFIX of rep2 chunk.
+//                  wordDiff then greedily matches "her"→"official", "husbnan."→"duty."
+//                  deep in the passage. Wrong scoring.
+//
+//   REAL FIX: for each non-first chunk, scan the first N words forward to find
+//   where origWords[0..] cleanly starts matching. Strip everything before that.
+//   Stripped words = tail of previous rep → append back to previous chunk.
+//   Previous rep scores them as mistakes (replace/insert at tail). Correct.
+//
+//   ALGORITHM:
+//   1. findRepStarts — sliding window score, min-gap enforced
+//   2. Build raw chunks from start positions
+//   3. For each chunk[1..N]: findTrueChunkStart → strip prefix → append to prev
+//   4. Score cleaned chunks; last rep(>1) gets trimTrailingDeletes forgiveness
 
 import {
   PARAGRAPH_SENTINEL,
@@ -87,76 +107,6 @@ function classifyWord(
   return "full";
 }
 
-// ─── rep boundary detector ────────────────────────────────────────────────────
-//
-// After consuming ≥ 80% of origWords, scan ahead in typedWords.
-// Compare the next LOOK_AHEAD typed words against origWords[0..LOOK_AHEAD-1].
-// If ≥ MIN_MATCH of them match → this position is a rep restart.
-// Skip ¶ tokens in orig[0..] when building the comparison window (a passage
-// that starts with a paragraph sentinel would be unusual, but be safe).
-
-const LOOK_AHEAD = 4; // how many words to check
-const MIN_MATCH = 3; // how many must match to confirm new rep
-
-function isRepStart(
-  origWords: string[],
-  typedWords: string[],
-  pos: number, // current position in typedWords
-  origIdx: number, // how many orig words consumed so far
-): boolean {
-  const origLen = origWords.length;
-  if (origIdx < Math.floor(origLen * 0.8)) return false;
-
-  // Build a comparison window from origWords[0..], skipping nothing —
-  // ¶ tokens are valid members of the window.
-  const origWindow = origWords.slice(0, LOOK_AHEAD);
-  let matches = 0;
-  for (let k = 0; k < origWindow.length; k++) {
-    const tw = typedWords[pos + k];
-    if (tw === undefined) break;
-    if (wordsMatch(origWindow[k]!, tw)) matches++;
-  }
-  return matches >= MIN_MATCH;
-}
-
-// ─── repetition splitter ──────────────────────────────────────────────────────
-
-function splitIntoRepetitions(
-  origWords: string[],
-  typedWords: string[],
-): { chunk: string[]; isComplete: boolean }[] {
-  const origLen = origWords.length;
-  const results: { chunk: string[]; isComplete: boolean }[] = [];
-  let pos = 0;
-
-  while (pos < typedWords.length) {
-    const chunk: string[] = [];
-    let origIdx = 0;
-
-    while (pos < typedWords.length && origIdx < origLen) {
-      // Check for rep restart before consuming this token
-      if (chunk.length > 0 && isRepStart(origWords, typedWords, pos, origIdx)) {
-        break; // end current rep here; next iteration starts new rep
-      }
-
-      chunk.push(typedWords[pos]!);
-      pos++;
-      origIdx++;
-    }
-
-    if (chunk.length === 0) {
-      pos++; // safety: prevent infinite loop
-      continue;
-    }
-
-    results.push({ chunk, isComplete: origIdx >= origLen });
-  }
-
-  return results.length > 0
-    ? results
-    : [{ chunk: typedWords, isComplete: false }];
-}
-
 // ─── Wagner-Fischer word diff ─────────────────────────────────────────────────
 
 type Op =
@@ -175,7 +125,7 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      if (origWords[i - 1] === typedWords[j - 1]) {
+      if (wordsMatch(origWords[i - 1]!, typedWords[j - 1]!)) {
         dp[i]![j] = dp[i - 1]![j - 1]!;
       } else {
         dp[i]![j] =
@@ -189,7 +139,7 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
   let j = n;
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && origWords[i - 1] === typedWords[j - 1]) {
+    if (i > 0 && j > 0 && wordsMatch(origWords[i - 1]!, typedWords[j - 1]!)) {
       ops.push({
         op: "keep",
         orig: origWords[i - 1]!,
@@ -215,6 +165,178 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
   }
 
   return ops.reverse();
+}
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const WINDOW_SIZE = 6;
+// Score threshold to confirm "origWords[0..] starts here"
+const START_THRESHOLD = 0.5;
+// Fraction of orig covered by keep+replace to call a rep "complete"
+const COMPLETE_THRESHOLD = 0.8;
+// Hard cap on how far into a chunk we scan for prefix garbage (words)
+const MAX_PREFIX_SCAN = 20;
+
+// ─── rep boundary detection ───────────────────────────────────────────────────
+
+/**
+ * Score how well typedWords[pos..pos+W] matches origWords[0..W].
+ * Returns 0.0–1.0.
+ */
+function windowMatchScore(
+  origWords: string[],
+  typedWords: string[],
+  pos: number,
+  windowSize: number = WINDOW_SIZE,
+): number {
+  const w = Math.min(windowSize, origWords.length, typedWords.length - pos);
+  if (w <= 0) return 0;
+  let matches = 0;
+  for (let k = 0; k < w; k++) {
+    if (wordsMatch(origWords[k]!, typedWords[pos + k]!)) matches++;
+  }
+  return matches / w;
+}
+
+/**
+ * Pass 1: find candidate rep-start positions in typedWords.
+ *
+ * - Always starts with [0].
+ * - Enforces minimum gap = 60% of origLen between consecutive starts.
+ * - In each scan window picks the BEST scoring position (score peak).
+ */
+function findRepStarts(origWords: string[], typedWords: string[]): number[] {
+  const origLen = origWords.length;
+  const starts: number[] = [0];
+  const minGap = Math.max(Math.floor(origLen * 0.6), 1);
+
+  let scanFrom = minGap;
+
+  while (scanFrom < typedWords.length) {
+    const scanEnd = Math.min(
+      scanFrom + Math.floor(origLen * 0.4) + 1,
+      typedWords.length,
+    );
+
+    let bestPos = -1;
+    let bestScore = START_THRESHOLD;
+
+    for (let i = scanFrom; i < scanEnd; i++) {
+      const score = windowMatchScore(origWords, typedWords, i);
+      if (score > bestScore) {
+        bestScore = score;
+        bestPos = i;
+      }
+    }
+
+    if (bestPos !== -1) {
+      starts.push(bestPos);
+      scanFrom = bestPos + minGap;
+    } else {
+      scanFrom += Math.max(Math.floor(minGap * 0.5), 1);
+    }
+  }
+
+  return starts;
+}
+
+/**
+ * Pass 2: find the true start of a chunk (strip prefix garbage).
+ *
+ * Scans FORWARD from position 0 up to MAX_PREFIX_SCAN.
+ * First position p where origWords[0..W] matches chunk[p..p+W] with
+ * sufficient confidence = true start. Return p.
+ *
+ * If p=0 → no prefix to strip.
+ * If p>0 → chunk[0..p) is garbage that belongs to previous rep.
+ */
+function findTrueChunkStart(origWords: string[], chunk: string[]): number {
+  const w = Math.min(WINDOW_SIZE, origWords.length);
+  // Need at least 3 matches OR ceil(w * threshold), whichever is smaller
+  const needed = Math.min(Math.max(3, Math.ceil(w * START_THRESHOLD)), w);
+  const maxScan = Math.min(MAX_PREFIX_SCAN, Math.floor(chunk.length * 0.2));
+
+  for (let p = 0; p <= maxScan; p++) {
+    const window = Math.min(w, chunk.length - p);
+    if (window < 2) break; // not enough words to test
+
+    let matches = 0;
+    for (let k = 0; k < window; k++) {
+      if (wordsMatch(origWords[k]!, chunk[p + k]!)) matches++;
+    }
+    if (matches >= needed) {
+      return p;
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Determine if chunk "completes" the passage.
+ * Uses NW keep+replace count vs origLen.
+ */
+function chunkIsComplete(origWords: string[], chunk: string[]): boolean {
+  if (chunk.length === 0) return false;
+  const ops = wordDiff(origWords, chunk);
+  const origCovered = ops.filter(
+    (o) => o.op === "keep" || o.op === "replace",
+  ).length;
+  return origCovered >= origWords.length * COMPLETE_THRESHOLD;
+}
+
+/**
+ * Main splitter.
+ *
+ * 1. findRepStarts → raw boundaries
+ * 2. Build raw chunks
+ * 3. For each non-first chunk: findTrueChunkStart
+ *    - prefix (before true start) → append to previous chunk
+ *    - chunk starts clean at origWords[0]
+ * 4. Return { chunk, isComplete }[]
+ */
+function splitIntoRepetitions(
+  origWords: string[],
+  typedWords: string[],
+): { chunk: string[]; isComplete: boolean }[] {
+  if (typedWords.length === 0) {
+    return [{ chunk: [], isComplete: false }];
+  }
+
+  // Step 1
+  const repStarts = findRepStarts(origWords, typedWords);
+
+  // Step 2: raw chunks
+  const rawChunks: string[][] = repStarts.map((start, ri) => {
+    const end = repStarts[ri + 1] ?? typedWords.length;
+    return typedWords.slice(start, end);
+  });
+
+  // Step 3: clean prefix garbage from each non-first chunk
+  // Work on mutable copies so we can append to previous
+  const cleanedChunks: string[][] = rawChunks.map((c) => [...c]);
+
+  for (let ri = 1; ri < cleanedChunks.length; ri++) {
+    const chunk = cleanedChunks[ri]!;
+    const trueStart = findTrueChunkStart(origWords, chunk);
+
+    if (trueStart > 0) {
+      // prefix belongs to previous rep
+      const prefix = chunk.splice(0, trueStart); // mutates chunk in-place
+      cleanedChunks[ri - 1]!.push(...prefix);
+    }
+  }
+
+  // Step 4: build results
+  const results: { chunk: string[]; isComplete: boolean }[] = [];
+  for (const chunk of cleanedChunks) {
+    if (chunk.length === 0) continue;
+    results.push({ chunk, isComplete: chunkIsComplete(origWords, chunk) });
+  }
+
+  return results.length > 0
+    ? results
+    : [{ chunk: typedWords, isComplete: false }];
 }
 
 // ─── ops → DiffToken[] ───────────────────────────────────────────────────────
@@ -258,7 +380,7 @@ function opsToDiff(ops: Op[]): {
   return { diff: tokens, fullMistakes, halfMistakes };
 }
 
-// ─── trim trailing deletes (forgive untyped tail for incomplete last rep) ─────
+// ─── trim trailing deletes (forgive untyped tail, last rep > 1 only) ─────────
 
 function trimTrailingDeletes(ops: Op[]): Op[] {
   let end = ops.length;
@@ -316,7 +438,7 @@ export class TypingScoringEngine {
       };
     }
 
-    // ── prepare ONCE ─────────────────────────────────────────────────────────
+    // ── prepare ───────────────────────────────────────────────────────────────
     const preparedOriginal = preparePassage(correctTranscription);
     const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
     const preparedTyped = prepareTyped(typed, hasParagraphs);
@@ -327,7 +449,7 @@ export class TypingScoringEngine {
     const preparedTypedClean = preparedTyped.replace(/(\s*¶\s*)+$/, "").trim();
     const typedWords = preparedTypedClean.split(/\s+/).filter(Boolean);
 
-    // ── split typed into per-rep chunks ───────────────────────────────────────
+    // ── split into reps ───────────────────────────────────────────────────────
     const repChunks = splitIntoRepetitions(origWords, typedWords);
     const repeatCount = repChunks.length || 1;
 
@@ -344,7 +466,7 @@ export class TypingScoringEngine {
 
       let ops = wordDiff(origWords, chunk);
 
-      // Forgive untyped tail for incomplete last rep when rep > 1
+      // Forgive untyped tail ONLY for last rep when there are multiple reps
       if (!isComplete && !isFirstRep && isLastRep) {
         ops = trimTrailingDeletes(ops);
       }
