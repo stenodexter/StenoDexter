@@ -230,6 +230,21 @@ export function createDusService(db: Db) {
       return { ok: true };
     },
 
+    async delete(id: string) {
+      const existing = await db.query.user.findFirst({
+        where: and(eq(user.id, id), eq(user.isDemo, true)),
+      });
+      if (!existing) throw new Error("Demo user not found");
+
+      await db.transaction(async (tx) => {
+        await tx.delete(session).where(eq(session.userId, id));
+        await tx.delete(account).where(eq(account.userId, id));
+        await tx.delete(user).where(eq(user.id, id));
+      });
+
+      return { ok: true };
+    },
+
     // ── reset password ────────────────────────────────────────────────────────
     // Admin can regenerate credentials if demo user loses access
 

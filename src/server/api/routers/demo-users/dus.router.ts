@@ -25,15 +25,19 @@ export const dusRouter = createTRPCRouter({
     .input(createDemoUserSchema)
     .mutation(({ input, ctx }) => dusService.create(input, ctx.admin.id)),
 
-  edit: superAdminProcedure
+  edit: adminProcedure
     .input(editDemoUserSchema)
     .mutation(({ input }) => dusService.edit(input)),
 
-  revoke: superAdminProcedure
+  revoke: adminProcedure
     .input(revokeDemoUserSchema)
     .mutation(({ input }) => dusService.revoke(input.id)),
 
-  resetPassword: superAdminProcedure
+  delete: adminProcedure
+    .input(getDemoUserSchema)
+    .mutation(({ input }) => dusService.delete(input.id)),
+
+  resetPassword: adminProcedure
     .input(getDemoUserSchema)
     .mutation(({ input }) => dusService.resetPassword(input.id)),
 });

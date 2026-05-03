@@ -20,86 +20,128 @@ import R2Service from "~/server/services/r2.service";
 import type { GetUsersInput } from "./analytics.schema";
 
 import type { db as dbInstance } from "~/server/db";
+import { redisService } from "~/server/services/redis.service";
 type Db = typeof dbInstance;
+
+const PLATFORM_OVERWIEV_STALE = 60 * 3;
 
 export function createAnalyticsService(db: Db) {
   return {
     // ── 1. Platform overview ─────────────────────────────────────────────────
 
     async getPlatformOverview() {
-      const [
-        usersCount,
-        paidUsersCount,
-        testsCount,
-        attemptsCount,
-        active1d,
-        active7d,
-        active30d,
-      ] = await Promise.all([
-        db
-          .select({ count: count() })
-          .from(user)
-          .then(([r]) => r),
+      return redisService.cache(
+        "global:analytics:platform-overview",
+        async () => {
+          const nonDemo = and(
+            eq(user.isDemo, false),
+            // also excludes revoked demo users that somehow have isDemo=false
+          );
 
-        db
-          .select({ count: count() })
-          .from(user)
-          .innerJoin(
-            subscription,
-            and(
-              eq(subscription.userId, user.id),
-              eq(subscription.status, "active"),
-              gt(subscription.currentPeriodEnd, new Date()),
-            ),
-          )
-          .then(([r]) => r),
+          const realUser = and(eq(user.isDemo, false));
 
-        db
-          .select({ count: count() })
-          .from(tests)
-          .then(([r]) => r),
+          const [
+            usersCount,
+            paidUsersCount,
+            active1d,
+            active7d,
+            active30d,
+            testsCount,
+            attemptsCount,
+          ] = await Promise.all([
+            // total registered (non-demo only)
+            db
+              .select({ count: count() })
+              .from(user)
+              .where(realUser)
+              .then(([r]) => r),
 
-        db
-          .select({ count: count() })
-          .from(testAttempts)
-          .then(([r]) => r),
+            // paid = active sub + non-demo + non-revoked
+            db
+              .select({ count: count() })
+              .from(user)
+              .innerJoin(
+                subscription,
+                and(
+                  eq(subscription.userId, user.id),
+                  eq(subscription.status, "active"),
+                  gt(subscription.currentPeriodEnd, new Date()),
+                ),
+              )
+              .where(and(eq(user.isDemo, false), eq(user.demoRevoked, false)))
+              .then(([r]) => r),
 
-        db
-          .select({
-            count: sql<number>`count(distinct ${testAttempts.userId})`,
-          })
-          .from(testAttempts)
-          .where(sql`${testAttempts.createdAt} >= now() - interval '1 day'`)
-          .then(([r]) => r),
+            // active users — join user to filter demo/revoked
+            db
+              .select({
+                count: sql<number>`count(distinct ${testAttempts.userId})`,
+              })
+              .from(testAttempts)
+              .innerJoin(user, eq(user.id, testAttempts.userId))
+              .where(
+                and(
+                  sql`${testAttempts.createdAt} >= now() - interval '1 day'`,
+                  eq(user.isDemo, false),
+                  eq(user.demoRevoked, false),
+                ),
+              )
+              .then(([r]) => r),
 
-        db
-          .select({
-            count: sql<number>`count(distinct ${testAttempts.userId})`,
-          })
-          .from(testAttempts)
-          .where(sql`${testAttempts.createdAt} >= now() - interval '7 day'`)
-          .then(([r]) => r),
+            db
+              .select({
+                count: sql<number>`count(distinct ${testAttempts.userId})`,
+              })
+              .from(testAttempts)
+              .innerJoin(user, eq(user.id, testAttempts.userId))
+              .where(
+                and(
+                  sql`${testAttempts.createdAt} >= now() - interval '7 days'`,
+                  eq(user.isDemo, false),
+                  eq(user.demoRevoked, false),
+                ),
+              )
+              .then(([r]) => r),
 
-        db
-          .select({
-            count: sql<number>`count(distinct ${testAttempts.userId})`,
-          })
-          .from(testAttempts)
-          .where(sql`${testAttempts.createdAt} >= now() - interval '30 day'`)
-          .then(([r]) => r),
-      ]);
+            db
+              .select({
+                count: sql<number>`count(distinct ${testAttempts.userId})`,
+              })
+              .from(testAttempts)
+              .innerJoin(user, eq(user.id, testAttempts.userId))
+              .where(
+                and(
+                  sql`${testAttempts.createdAt} >= now() - interval '30 days'`,
+                  eq(user.isDemo, false),
+                  eq(user.demoRevoked, false),
+                ),
+              )
+              .then(([r]) => r),
 
-      return {
-        totalUsers: usersCount?.count ?? 0,
-        paidUsers: paidUsersCount?.count ?? 0,
-        totalTests: testsCount?.count ?? 0,
-        totalAttempts: attemptsCount?.count ?? 0,
-        activeUsers: {
-          last1d: active1d?.count ?? 0,
-          last7d: active7d?.count ?? 0,
-          last30d: active30d?.count ?? 0,
+            db
+              .select({ count: count() })
+              .from(tests)
+              .then(([r]) => r),
+
+            db
+              .select({ count: count() })
+              .from(testAttempts)
+              .then(([r]) => r),
+          ]);
+
+          return {
+            totalUsers: usersCount?.count ?? 0,
+            paidUsers: paidUsersCount?.count ?? 0,
+            totalTests: testsCount?.count ?? 0,
+            totalAttempts: attemptsCount?.count ?? 0,
+            activeUsers: {
+              last1d: active1d?.count ?? 0,
+              last7d: active7d?.count ?? 0,
+              last30d: active30d?.count ?? 0,
+            },
+          };
         },
-      };
+        PLATFORM_OVERWIEV_STALE,
+      );
     },
 
     // ── 2. Growth analytics ──────────────────────────────────────────────────

@@ -36,7 +36,7 @@ import {
   Copy,
   Check,
   Loader2,
-  X,
+  Trash2,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
@@ -261,6 +261,7 @@ export function DemoUserActionsDialog({
 }) {
   const utils = trpc.useUtils();
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { mutate: revoke, isPending: revoking } = trpc.dus.revoke.useMutation({
     onSuccess: () => {
@@ -271,6 +272,17 @@ export function DemoUserActionsDialog({
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const { mutate: deleteUser, isPending: deleting } =
+    trpc.dus.delete.useMutation({
+      onSuccess: () => {
+        toast.success("Demo user deleted");
+        void utils.dus.list.invalidate();
+        setConfirmDelete(false);
+        onClose();
+      },
+      onError: (err) => toast.error(err.message),
+    });
 
   if (!user) return null;
 
@@ -306,26 +318,37 @@ export function DemoUserActionsDialog({
               </p>
               <ResetPasswordSection userId={user.id} userEmail={user.email} />
             </section>
+            <div className="border-t" />
+            <span className="flex items-center justify-between">
+              {/* Revoke access — only if not already revoked */}
+              {!user.demoRevoked && (
+                <>
+                  <section>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmRevoke(true)}
+                      disabled={revoking}
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />
+                      Revoke demo access
+                    </Button>
+                  </section>
+                </>
+              )}
 
-            
-            {/* Revoke access — only if not already revoked */}
-            {!user.demoRevoked && (
-              <>
-                <div className="border-t" />
-                <section>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 border-red-500/30 text-red-500 hover:bg-red-500/10"
-                    onClick={() => setConfirmRevoke(true)}
-                    disabled={revoking}
-                  >
-                    <ShieldOff className="h-3.5 w-3.5" />
-                    Revoke demo access
-                  </Button>
-                </section>
-              </>
-            )}
+              <section>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={deleting}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete demo user
+                </Button>
+              </section>
+            </span>
           </div>
         </DialogContent>
       </Dialog>
@@ -348,6 +371,29 @@ export function DemoUserActionsDialog({
               onClick={() => revoke({ id: user.id })}
             >
               {revoking ? "Revoking…" : "Revoke access"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete all sessions, credentials, and the account for{" "}
+              <span className="text-foreground font-mono">{user.email}</span>.{" "}
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={() => deleteUser({ id: user.id })}
+            >
+              {deleting ? "Deleting…" : "Delete permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

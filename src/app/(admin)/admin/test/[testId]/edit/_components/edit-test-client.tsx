@@ -612,16 +612,24 @@ function SpeedCard({
               <div>
                 <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
                   <Mic className="h-3 w-3 text-blue-500" />
-                  Listening (sec)
+                  Listening (min)
                 </p>
                 <Input
                   type="number"
                   min={0}
-                  value={speed.dictationSeconds || ""}
+                  step={0.5}
+                  value={
+                    speed.dictationSeconds
+                      ? +(speed.dictationSeconds / 60).toFixed(2)
+                      : ""
+                  }
                   readOnly={!!speed.audioKey}
                   disabled={locked && isExisting}
                   onChange={(e) =>
-                    u("dictationSeconds", Number(e.target.value))
+                    u(
+                      "dictationSeconds",
+                      Math.round(Number(e.target.value) * 60),
+                    )
                   }
                 />
                 {speed.audioKey && (
@@ -631,34 +639,48 @@ function SpeedCard({
               <div>
                 <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
                   <PauseCircle className="h-3 w-3 text-amber-400" />
-                  Break (sec)
+                  Break (min)
                 </p>
                 <Input
                   type="number"
                   min={0}
-                  value={speed.breakSeconds ?? ""}
+                  step={0.5}
+                  value={
+                    speed.breakSeconds != null
+                      ? +(speed.breakSeconds / 60).toFixed(2)
+                      : ""
+                  }
                   disabled={locked && isExisting}
-                  onChange={(e) => u("breakSeconds", Number(e.target.value))}
+                  onChange={(e) =>
+                    u("breakSeconds", Math.round(Number(e.target.value) * 60))
+                  }
                 />
               </div>
               <div>
                 <p className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
                   <Keyboard className="h-3 w-3 text-emerald-500" />
-                  Writing (sec)
+                  Writing (min)
                 </p>
                 <Input
                   type="number"
                   min={0}
-                  value={speed.writtenDurationSeconds || ""}
+                  step={0.5}
+                  value={
+                    speed.writtenDurationSeconds
+                      ? +(speed.writtenDurationSeconds / 60).toFixed(2)
+                      : ""
+                  }
                   disabled={locked && isExisting}
                   onChange={(e) =>
-                    u("writtenDurationSeconds", Number(e.target.value))
+                    u(
+                      "writtenDurationSeconds",
+                      Math.round(Number(e.target.value) * 60),
+                    )
                   }
                 />
               </div>
             </div>
           </div>
-
           {speed.dictationSeconds +
             speed.breakSeconds +
             speed.writtenDurationSeconds >
@@ -1389,8 +1411,8 @@ function EditTestFormInner({ testId }: { testId: string }) {
             >
               <Rocket className="mr-2 h-4 w-4" />
               {updateTest.isPending && submitModeRef.current === "launch"
-                ? "Launching…"
-                : "Launch Test"}
+                ? "Uploading..."
+                : "Upload Test"}
             </Button>
           )}
         </div>
