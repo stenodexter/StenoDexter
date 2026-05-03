@@ -99,6 +99,7 @@ export class RedisService {
     ttlSec: number,
   ): Promise<T> {
     const cached = await this.client.get<T>(key);
+
     if (cached !== null) return cached;
 
     const fresh = await fn();

@@ -7,67 +7,77 @@ import { scoringEngine } from "~/server/services/scoring.service";
 import type { GetResultsAdminInput, GetTestResults } from "./results.schema";
 
 import type { db as dbInstance } from "~/server/db";
+import { redisService } from "~/server/services/redis.service";
 type Db = typeof dbInstance;
+
+const ATTEMPT_RESULTS_CACHE_TTL = 12 * 60 * 60;
 
 export function createResultService(db: Db) {
   return {
     async getResult(attemptId: string, userId: string) {
-      const attempt = await db.query.testAttempts.findFirst({
-        where: and(
-          eq(testAttempts.id, attemptId),
-          eq(testAttempts.userId, userId),
-        ),
-        with: { test: true, speed: true },
-      });
+      return redisService.cache(
+        `result:test:${attemptId}`,
+        async () => {
+          const attempt = await db.query.testAttempts.findFirst({
+            where: and(
+              eq(testAttempts.id, attemptId),
+              eq(testAttempts.userId, userId),
+            ),
+            with: { test: true, speed: true },
+          });
 
-      if (!attempt) throw new Error("Attempt not found");
-      if (!attempt.isSubmitted) throw new Error("Attempt not yet submitted");
+          if (!attempt) throw new Error("Attempt not found");
+          if (!attempt.isSubmitted)
+            throw new Error("Attempt not yet submitted");
 
-      const result = await db.query.results.findFirst({
-        where: eq(results.attemptId, attempt.id),
-      });
+          const result = await db.query.results.findFirst({
+            where: eq(results.attemptId, attempt.id),
+          });
 
-      if (!result) throw new Error("Result not found");
+          if (!result) throw new Error("Result not found");
 
-      // ✅ Pass RAW correctAnswer to compare() — preserves paragraph \n
-      const diff = scoringEngine.compare(
-        attempt.test.correctAnswer,
-        attempt.answerFinal ?? "",
+          // ✅ Pass RAW correctAnswer to compare() — preserves paragraph \n
+          const diff = scoringEngine.compare(
+            attempt.test.correctAnswer,
+            attempt.answerFinal ?? "",
+          );
+
+          return {
+            attempt: {
+              id: attempt.id,
+              type: attempt.type,
+              submittedAt: attempt.submittedAt,
+              answerFinal: attempt.answerFinal,
+            },
+            test: {
+              id: attempt.test.id,
+              title: attempt.test.title,
+              type: attempt.test.type,
+              correctAnswer: attempt.test.correctAnswer,
+              matterPdfUrl: R2Service.getPublicUrl(attempt.test.matterPdfKey),
+              outlinePdfUrl: attempt.test.outlinePdfKey
+                ? R2Service.getPublicUrl(attempt.test.outlinePdfKey)
+                : null,
+              solutionAudioUrl: attempt.test.solutionAudioKey
+                ? R2Service.getPublicUrl(attempt.test.solutionAudioKey)
+                : null,
+            },
+            speed: {
+              id: attempt.speed.id,
+              wpm: attempt.speed.wpm,
+              audioUrl: R2Service.getPublicUrl(attempt.speed.audioKey),
+            },
+            result: {
+              score: result.score,
+              wpm: result.wpm,
+              accuracy: result.accuracy,
+              mistakes: result.mistakes ?? 0,
+            },
+            diff,
+          };
+        },
+        ATTEMPT_RESULTS_CACHE_TTL,
       );
-
-      return {
-        attempt: {
-          id: attempt.id,
-          type: attempt.type,
-          submittedAt: attempt.submittedAt,
-          answerFinal: attempt.answerFinal,
-        },
-        test: {
-          id: attempt.test.id,
-          title: attempt.test.title,
-          type: attempt.test.type,
-          correctAnswer: attempt.test.correctAnswer,
-          matterPdfUrl: R2Service.getPublicUrl(attempt.test.matterPdfKey),
-          outlinePdfUrl: attempt.test.outlinePdfKey
-            ? R2Service.getPublicUrl(attempt.test.outlinePdfKey)
-            : null,
-          solutionAudioUrl: attempt.test.solutionAudioKey
-            ? R2Service.getPublicUrl(attempt.test.solutionAudioKey)
-            : null,
-        },
-        speed: {
-          id: attempt.speed.id,
-          wpm: attempt.speed.wpm,
-          audioUrl: R2Service.getPublicUrl(attempt.speed.audioKey),
-        },
-        result: {
-          score: result.score,
-          wpm: result.wpm,
-          accuracy: result.accuracy,
-          mistakes: result.mistakes ?? 0,
-        },
-        diff,
-      };
     },
 
     async getTestResults(input: GetTestResults) {
@@ -143,46 +153,54 @@ export function createResultService(db: Db) {
     },
 
     async getResultAdmin(attemptId: string) {
-      const attempt = await db.query.testAttempts.findFirst({
-        where: eq(testAttempts.id, attemptId),
-        with: { test: true, speed: true },
-      });
+      return await redisService.cache(
+        `result:test:admin:${attemptId}`,
+        async () => {
+          const attempt = await db.query.testAttempts.findFirst({
+            where: eq(testAttempts.id, attemptId),
+            with: { test: true, speed: true },
+          });
 
-      if (!attempt) throw new Error("Attempt not found");
-      if (!attempt.isSubmitted) throw new Error("Attempt not yet submitted");
+          if (!attempt) throw new Error("Attempt not found");
+          if (!attempt.isSubmitted)
+            throw new Error("Attempt not yet submitted");
 
-      const result = await db.query.results.findFirst({
-        where: eq(results.attemptId, attempt.id),
-      });
+          const result = await db.query.results.findFirst({
+            where: eq(results.attemptId, attempt.id),
+          });
 
-      if (!result) throw new Error("Result not found");
+          if (!result) throw new Error("Result not found");
 
-      // ✅ Raw correctAnswer — paragraph breaks preserved
-      const diff = scoringEngine.compare(
-        attempt.test.correctAnswer,
-        attempt.answerFinal ?? "",
+          // ✅ Raw correctAnswer — paragraph breaks preserved
+          const diff = scoringEngine.compare(
+            attempt.test.correctAnswer,
+            attempt.answerFinal ?? "",
+          );
+
+          return {
+            attempt: {
+              id: attempt.id,
+              type: attempt.type,
+              submittedAt: attempt.submittedAt,
+              answerFinal: attempt.answerFinal,
+            },
+            speed: {
+              id: attempt.speed.id,
+              wpm: attempt.speed.wpm,
+              audioUrl: R2Service.getPublicUrl(attempt.speed.audioKey),
+            },
+            result: {
+              score: result.score,
+              wpm: result.wpm,
+              accuracy: result.accuracy,
+              mistakes: result.mistakes ?? 0,
+            },
+            diff,
+          };
+        },
+
+        ATTEMPT_RESULTS_CACHE_TTL,
       );
-
-      return {
-        attempt: {
-          id: attempt.id,
-          type: attempt.type,
-          submittedAt: attempt.submittedAt,
-          answerFinal: attempt.answerFinal,
-        },
-        speed: {
-          id: attempt.speed.id,
-          wpm: attempt.speed.wpm,
-          audioUrl: R2Service.getPublicUrl(attempt.speed.audioKey),
-        },
-        result: {
-          score: result.score,
-          wpm: result.wpm,
-          accuracy: result.accuracy,
-          mistakes: result.mistakes ?? 0,
-        },
-        diff,
-      };
     },
 
     async getResultsAdmin(input: GetResultsAdminInput) {

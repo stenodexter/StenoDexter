@@ -16,6 +16,16 @@ import type {
 import type { db as dbInstance } from "~/server/db";
 type Db = typeof dbInstance;
 
+const RESULT_CACHE_TTL = 60 * 60 * 12;
+
+function resultCacheKey(attemptId: string) {
+  return `result:typing-test:${attemptId}`;
+}
+
+function resultAdminCacheKey(attemptId: string) {
+  return `result:typing-test:admin:${attemptId}`;
+}
+
 export function createTypingAttemptService(db: Db) {
   return {
     async create(input: CreateTypingAttemptInput, userId: string) {
@@ -202,72 +212,84 @@ export function createTypingAttemptService(db: Db) {
     },
 
     async getResult(attemptId: string, userId: string) {
-      const attempt = await db.query.typingAttempts.findFirst({
-        where: and(
-          eq(typingAttempts.id, attemptId),
-          eq(typingAttempts.userId, userId),
-        ),
-        with: { test: true, result: true },
-      });
-      if (!attempt) throw new Error("Attempt not found");
-      if (!attempt.isSubmitted) throw new Error("Not submitted");
-      if (!attempt.result) throw new Error("Result not found");
+      // CDN-style: same cache key for same attemptId — result is immutable
+      // after submission. First caller populates, everyone else hits cache.
+      return redisService.cache(
+        resultCacheKey(attemptId),
+        async () => {
+          const attempt = await db.query.typingAttempts.findFirst({
+            where: and(
+              eq(typingAttempts.id, attemptId),
+              eq(typingAttempts.userId, userId),
+            ),
+            with: { test: true, result: true },
+          });
+          if (!attempt) throw new Error("Attempt not found");
+          if (!attempt.isSubmitted) throw new Error("Not submitted");
+          if (!attempt.result) throw new Error("Result not found");
 
-      const diff = compareTranscriptions(
-        attempt.test.correctTranscription,
-        attempt.answerFinal ?? "",
+          const diff = compareTranscriptions(
+            attempt.test.correctTranscription,
+            attempt.answerFinal ?? "",
+          );
+
+          return {
+            attempt: {
+              id: attempt.id,
+              type: attempt.type,
+              submittedAt: attempt.submittedAt,
+              answerFinal: attempt.answerFinal,
+            },
+            test: {
+              id: attempt.test.id,
+              title: attempt.test.title,
+              correctTranscription: attempt.test.correctTranscription,
+              durationSeconds: attempt.test.durationSeconds,
+            },
+            result: attempt.result,
+            diff,
+          };
+        },
+        RESULT_CACHE_TTL,
       );
-
-      return {
-        attempt: {
-          id: attempt.id,
-          type: attempt.type,
-          submittedAt: attempt.submittedAt,
-          answerFinal: attempt.answerFinal,
-        },
-        test: {
-          id: attempt.test.id,
-          title: attempt.test.title,
-          correctTranscription: attempt.test.correctTranscription,
-          durationSeconds: attempt.test.durationSeconds,
-        },
-        result: attempt.result,
-        diff,
-      };
     },
 
     async getResultAdmin(attemptId: string) {
-      const attempt = await db.query.typingAttempts.findFirst({
-        where: eq(typingAttempts.id, attemptId),
-        with: { test: true, result: true },
-      });
-      if (!attempt) throw new Error("Attempt not found");
-      if (!attempt.isSubmitted) throw new Error("Not submitted");
-      if (!attempt.result) throw new Error("Result not found");
+      return redisService.cache(
+        resultAdminCacheKey(attemptId),
+        async () => {
+          const attempt = await db.query.typingAttempts.findFirst({
+            where: eq(typingAttempts.id, attemptId),
+            with: { test: true, result: true },
+          });
+          if (!attempt) throw new Error("Attempt not found");
+          if (!attempt.isSubmitted) throw new Error("Not submitted");
+          if (!attempt.result) throw new Error("Result not found");
 
-      const diff = compareTranscriptions(
-        attempt.test.correctTranscription,
-        attempt.answerFinal ?? "",
+          const diff = compareTranscriptions(
+            attempt.test.correctTranscription,
+            attempt.answerFinal ?? "",
+          );
+
+          return {
+            attempt: {
+              id: attempt.id,
+              type: attempt.type,
+              submittedAt: attempt.submittedAt,
+              answerFinal: attempt.answerFinal,
+            },
+            test: {
+              id: attempt.test.id,
+              title: attempt.test.title,
+              correctTranscription: attempt.test.correctTranscription,
+              durationSeconds: attempt.test.durationSeconds,
+            },
+            result: attempt.result,
+            diff,
+          };
+        },
+        RESULT_CACHE_TTL,
       );
-
-      console.log("ATTEMPT ", attemptId, diff);
-
-      return {
-        attempt: {
-          id: attempt.id,
-          type: attempt.type,
-          submittedAt: attempt.submittedAt,
-          answerFinal: attempt.answerFinal,
-        },
-        test: {
-          id: attempt.test.id,
-          title: attempt.test.title,
-          correctTranscription: attempt.test.correctTranscription,
-          durationSeconds: attempt.test.durationSeconds,
-        },
-        result: attempt.result,
-        diff,
-      };
     },
 
     async getUserAttempts(testId: string, userId: string) {
@@ -291,4 +313,5 @@ import {
   compareTranscriptions,
   evaluateTypingTest,
 } from "~/server/services/typing-scoring.service";
+import { redisService } from "~/server/services/redis.service";
 export const typingAttemptService = createTypingAttemptService(db);

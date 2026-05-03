@@ -1,34 +1,6 @@
 // typing-scoring.engine.ts
 // Rajasthan HC formula engine — repetition-aware, paragraph-safe
-//
-// KEY DESIGN:
-//   • Passage has internal ¶ paragraph breaks — NOT rep boundaries.
-//   • Student types passage N times continuously (no separator needed).
-//
-//   THE CORE INSIGHT (from bug diagnosis):
-//   ─────────────────────────────────────
-//   Old approach: split first → score each chunk.
-//   Problem: splits are inexact → chunks get PREFIX garbage.
-//
-//   Example of the bug:
-//     Rep 1 typed: "...caused the death of her husbnan. The present matter..."
-//                                           ^^^^^^^^^^^^^
-//                  findRepStarts detects "The present matter" as rep2 start.
-//                  But "of her husbnan." are BEFORE that signal → they get
-//                  assigned as PREFIX of rep2 chunk.
-//                  wordDiff then greedily matches "her"→"official", "husbnan."→"duty."
-//                  deep in the passage. Wrong scoring.
-//
-//   REAL FIX: for each non-first chunk, scan the first N words forward to find
-//   where origWords[0..] cleanly starts matching. Strip everything before that.
-//   Stripped words = tail of previous rep → append back to previous chunk.
-//   Previous rep scores them as mistakes (replace/insert at tail). Correct.
-//
-//   ALGORITHM:
-//   1. findRepStarts — sliding window score, min-gap enforced
-//   2. Build raw chunks from start positions
-//   3. For each chunk[1..N]: findTrueChunkStart → strip prefix → append to prev
-//   4. Score cleaned chunks; last rep(>1) gets trimTrailingDeletes forgiveness
+// Uses NW (Needleman-Wunsch) alignment per rep for accurate within-rep diff
 
 import {
   PARAGRAPH_SENTINEL,
@@ -86,28 +58,54 @@ export type TypingEvaluation = {
 function normalizeWord(w: string): string {
   if (w === PARAGRAPH_SENTINEL) return w;
   return normalizePunctuation(w)
-    .toLowerCase()
-    .replace(/[^a-z0-9'-]/g, "");
+    .replace(/^[^a-zA-Z0-9¶]+|[^a-zA-Z0-9¶]+$/g, "")
+    .toLowerCase();
 }
 
-function wordsMatch(a: string, b: string): boolean {
-  if (a === PARAGRAPH_SENTINEL || b === PARAGRAPH_SENTINEL) return a === b;
-  return normalizeWord(a) === normalizeWord(b);
+function editDistance(a: string, b: string): number {
+  const m = a.length,
+    n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i]![j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1]![j - 1]!
+          : 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+  return dp[m]![n]!;
 }
 
+/**
+ * Classify relationship between original and typed word:
+ * - "correct": exact match
+ * - "half": same after normalization (case/punct diff) OR within fuzzy threshold
+ * - "full": clearly wrong
+ */
 function classifyWord(
-  original: string,
+  orig: string,
   typed: string,
 ): "correct" | "half" | "full" {
-  if (original === PARAGRAPH_SENTINEL || typed === PARAGRAPH_SENTINEL) {
-    return original === typed ? "correct" : "full";
-  }
-  if (original === typed) return "correct";
-  if (normalizeWord(original) === normalizeWord(typed)) return "half";
+  if (orig === PARAGRAPH_SENTINEL || typed === PARAGRAPH_SENTINEL)
+    return orig === typed ? "correct" : "full";
+  if (orig === typed) return "correct";
+  const no = normalizeWord(orig);
+  const nt = normalizeWord(typed);
+  if (no === nt) return "half";
+  const maxLen = Math.max(no.length, nt.length);
+  const threshold = maxLen >= 6 ? 2 : maxLen >= 3 ? 1 : 0;
+  if (editDistance(no, nt) <= threshold) return "half";
   return "full";
 }
 
-// ─── Wagner-Fischer word diff ─────────────────────────────────────────────────
+function wordsMatch(a: string, b: string): boolean {
+  return classifyWord(a, b) !== "full";
+}
+
+// ─── NW alignment ─────────────────────────────────────────────────────────────
+// NW with fuzzy diagScore keeps mistyped words aligned to correct passage
+// position instead of skipping ahead greedily like Wagner-Fischer does.
 
 type Op =
   | { op: "keep"; orig: string; typed: string }
@@ -115,47 +113,88 @@ type Op =
   | { op: "insert"; typed: string }
   | { op: "delete"; orig: string };
 
-function wordDiff(origWords: string[], typedWords: string[]): Op[] {
+function nwAlign(origWords: string[], typedWords: string[]): Op[] {
   const m = origWords.length;
   const n = typedWords.length;
 
-  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  const MATCH = 2;
+  const MISMATCH = -1;
+  const GAP = -1;
+  const EPS = 1e-6;
+
+  function diagScore(a: string, b: string): number {
+    if (a === PARAGRAPH_SENTINEL || b === PARAGRAPH_SENTINEL)
+      return a === b ? MATCH : MISMATCH;
+    const cls = classifyWord(a, b);
+    if (cls !== "full") return MATCH; // correct or half — align here
+    // partial prefix: softer penalty to keep alignment anchored
+    const na = normalizeWord(a),
+      nb = normalizeWord(b);
+    if (
+      na.length > 0 &&
+      nb.length > 0 &&
+      (nb.startsWith(na) || na.startsWith(nb))
+    )
+      return 0;
+    return MISMATCH;
+  }
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
   );
+  for (let i = 0; i <= m; i++) dp[i]![0] = i * GAP;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j * GAP;
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      if (wordsMatch(origWords[i - 1]!, typedWords[j - 1]!)) {
-        dp[i]![j] = dp[i - 1]![j - 1]!;
-      } else {
-        dp[i]![j] =
-          1 + Math.min(dp[i - 1]![j - 1]!, dp[i - 1]![j]!, dp[i]![j - 1]!);
-      }
+      const bias = EPS * (m + n - i - j + 1);
+      dp[i]![j] = Math.max(
+        dp[i - 1]![j - 1]! +
+          diagScore(origWords[i - 1]!, typedWords[j - 1]!) +
+          bias,
+        dp[i - 1]![j]! + GAP,
+        dp[i]![j - 1]! + GAP,
+      );
     }
   }
 
   const ops: Op[] = [];
-  let i = m;
-  let j = n;
+  let i = m,
+    j = n;
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && wordsMatch(origWords[i - 1]!, typedWords[j - 1]!)) {
-      ops.push({
-        op: "keep",
-        orig: origWords[i - 1]!,
-        typed: typedWords[j - 1]!,
-      });
-      i--;
-      j--;
-    } else if (i > 0 && j > 0 && dp[i]![j] === dp[i - 1]![j - 1]! + 1) {
-      ops.push({
-        op: "replace",
-        orig: origWords[i - 1]!,
-        typed: typedWords[j - 1]!,
-      });
-      i--;
-      j--;
-    } else if (i > 0 && dp[i]![j] === dp[i - 1]![j]! + 1) {
+    if (i > 0 && j > 0) {
+      const bias = EPS * (m + n - i - j + 1);
+      const diagVal =
+        dp[i - 1]![j - 1]! +
+        diagScore(origWords[i - 1]!, typedWords[j - 1]!) +
+        bias;
+      const delVal = dp[i - 1]![j]! + GAP;
+      const insVal = dp[i]![j - 1]! + GAP;
+      const best = Math.max(diagVal, delVal, insVal);
+
+      if (diagVal >= best - EPS * 0.1) {
+        const cls = classifyWord(origWords[i - 1]!, typedWords[j - 1]!);
+        ops.push(
+          cls === "correct"
+            ? { op: "keep", orig: origWords[i - 1]!, typed: typedWords[j - 1]! }
+            : {
+                op: "replace",
+                orig: origWords[i - 1]!,
+                typed: typedWords[j - 1]!,
+              },
+        );
+        i--;
+        j--;
+        continue;
+      }
+      if (insVal >= best - EPS * 0.1) {
+        ops.push({ op: "insert", typed: typedWords[j - 1]! });
+        j--;
+        continue;
+      }
+    }
+    if (i > 0 && (j === 0 || dp[i]![j]! <= dp[i - 1]![j]! + GAP + EPS * 0.1)) {
       ops.push({ op: "delete", orig: origWords[i - 1]! });
       i--;
     } else {
@@ -167,22 +206,16 @@ function wordDiff(origWords: string[], typedWords: string[]): Op[] {
   return ops.reverse();
 }
 
-// ─── constants ────────────────────────────────────────────────────────────────
+// ─── constants for rep boundary detection ─────────────────────────────────────
 
 const WINDOW_SIZE = 6;
-// Score threshold to confirm "origWords[0..] starts here"
-const START_THRESHOLD = 0.5;
-// Fraction of orig covered by keep+replace to call a rep "complete"
+const START_THRESHOLD = 0.4;
 const COMPLETE_THRESHOLD = 0.8;
-// Hard cap on how far into a chunk we scan for prefix garbage (words)
-const MAX_PREFIX_SCAN = 20;
+const MAX_PREFIX_SCAN = 30;
+const CONFIDENT_THRESHOLD = 0.65;
 
 // ─── rep boundary detection ───────────────────────────────────────────────────
 
-/**
- * Score how well typedWords[pos..pos+W] matches origWords[0..W].
- * Returns 0.0–1.0.
- */
 function windowMatchScore(
   origWords: string[],
   typedWords: string[],
@@ -198,23 +231,16 @@ function windowMatchScore(
   return matches / w;
 }
 
-/**
- * Pass 1: find candidate rep-start positions in typedWords.
- *
- * - Always starts with [0].
- * - Enforces minimum gap = 60% of origLen between consecutive starts.
- * - In each scan window picks the BEST scoring position (score peak).
- */
 function findRepStarts(origWords: string[], typedWords: string[]): number[] {
   const origLen = origWords.length;
   const starts: number[] = [0];
-  const minGap = Math.max(Math.floor(origLen * 0.6), 1);
+  const minGap = Math.max(Math.floor(origLen * 0.5), 1);
 
   let scanFrom = minGap;
 
   while (scanFrom < typedWords.length) {
     const scanEnd = Math.min(
-      scanFrom + Math.floor(origLen * 0.4) + 1,
+      scanFrom + Math.floor(origLen * 0.6) + 1,
       typedWords.length,
     );
 
@@ -223,6 +249,10 @@ function findRepStarts(origWords: string[], typedWords: string[]): number[] {
 
     for (let i = scanFrom; i < scanEnd; i++) {
       const score = windowMatchScore(origWords, typedWords, i);
+      if (score >= CONFIDENT_THRESHOLD) {
+        bestPos = i;
+        break;
+      }
       if (score > bestScore) {
         bestScore = score;
         bestPos = i;
@@ -240,94 +270,56 @@ function findRepStarts(origWords: string[], typedWords: string[]): number[] {
   return starts;
 }
 
-/**
- * Pass 2: find the true start of a chunk (strip prefix garbage).
- *
- * Scans FORWARD from position 0 up to MAX_PREFIX_SCAN.
- * First position p where origWords[0..W] matches chunk[p..p+W] with
- * sufficient confidence = true start. Return p.
- *
- * If p=0 → no prefix to strip.
- * If p>0 → chunk[0..p) is garbage that belongs to previous rep.
- */
 function findTrueChunkStart(origWords: string[], chunk: string[]): number {
   const w = Math.min(WINDOW_SIZE, origWords.length);
-  // Need at least 3 matches OR ceil(w * threshold), whichever is smaller
   const needed = Math.min(Math.max(3, Math.ceil(w * START_THRESHOLD)), w);
   const maxScan = Math.min(MAX_PREFIX_SCAN, Math.floor(chunk.length * 0.2));
 
   for (let p = 0; p <= maxScan; p++) {
     const window = Math.min(w, chunk.length - p);
-    if (window < 2) break; // not enough words to test
-
+    if (window < 2) break;
     let matches = 0;
     for (let k = 0; k < window; k++) {
       if (wordsMatch(origWords[k]!, chunk[p + k]!)) matches++;
     }
-    if (matches >= needed) {
-      return p;
-    }
+    if (matches >= needed) return p;
   }
-
   return 0;
 }
 
-/**
- * Determine if chunk "completes" the passage.
- * Uses NW keep+replace count vs origLen.
- */
 function chunkIsComplete(origWords: string[], chunk: string[]): boolean {
   if (chunk.length === 0) return false;
-  const ops = wordDiff(origWords, chunk);
+  const ops = nwAlign(origWords, chunk);
   const origCovered = ops.filter(
     (o) => o.op === "keep" || o.op === "replace",
   ).length;
   return origCovered >= origWords.length * COMPLETE_THRESHOLD;
 }
 
-/**
- * Main splitter.
- *
- * 1. findRepStarts → raw boundaries
- * 2. Build raw chunks
- * 3. For each non-first chunk: findTrueChunkStart
- *    - prefix (before true start) → append to previous chunk
- *    - chunk starts clean at origWords[0]
- * 4. Return { chunk, isComplete }[]
- */
 function splitIntoRepetitions(
   origWords: string[],
   typedWords: string[],
 ): { chunk: string[]; isComplete: boolean }[] {
-  if (typedWords.length === 0) {
-    return [{ chunk: [], isComplete: false }];
-  }
+  if (typedWords.length === 0) return [{ chunk: [], isComplete: false }];
 
-  // Step 1
   const repStarts = findRepStarts(origWords, typedWords);
 
-  // Step 2: raw chunks
   const rawChunks: string[][] = repStarts.map((start, ri) => {
     const end = repStarts[ri + 1] ?? typedWords.length;
     return typedWords.slice(start, end);
   });
 
-  // Step 3: clean prefix garbage from each non-first chunk
-  // Work on mutable copies so we can append to previous
   const cleanedChunks: string[][] = rawChunks.map((c) => [...c]);
 
   for (let ri = 1; ri < cleanedChunks.length; ri++) {
     const chunk = cleanedChunks[ri]!;
     const trueStart = findTrueChunkStart(origWords, chunk);
-
     if (trueStart > 0) {
-      // prefix belongs to previous rep
-      const prefix = chunk.splice(0, trueStart); // mutates chunk in-place
+      const prefix = chunk.splice(0, trueStart);
       cleanedChunks[ri - 1]!.push(...prefix);
     }
   }
 
-  // Step 4: build results
   const results: { chunk: string[]; isComplete: boolean }[] = [];
   for (const chunk of cleanedChunks) {
     if (chunk.length === 0) continue;
@@ -339,7 +331,7 @@ function splitIntoRepetitions(
     : [{ chunk: typedWords, isComplete: false }];
 }
 
-// ─── ops → DiffToken[] ───────────────────────────────────────────────────────
+// ─── ops → DiffToken[] with Rajasthan HC half/full classification ─────────────
 
 function opsToDiff(ops: Op[]): {
   diff: DiffToken[];
@@ -360,8 +352,9 @@ function opsToDiff(ops: Op[]): {
       });
       if (!isPara) tokens.push({ type: "correct", original: " ", typed: " " });
     } else if (op.op === "replace") {
-      const kind = classifyWord(op.orig, op.typed);
-      kind === "half" ? halfMistakes++ : fullMistakes++;
+      const cls = classifyWord(op.orig, op.typed);
+      if (cls === "half") halfMistakes++;
+      else fullMistakes++;
       tokens.push({ type: "replace", original: op.orig, typed: op.typed });
       tokens.push({ type: "correct", original: " ", typed: " " });
     } else if (op.op === "delete") {
@@ -438,22 +431,18 @@ export class TypingScoringEngine {
       };
     }
 
-    // ── prepare ───────────────────────────────────────────────────────────────
     const preparedOriginal = preparePassage(correctTranscription);
     const hasParagraphs = preparedOriginal.includes(PARAGRAPH_SENTINEL);
     const preparedTyped = prepareTyped(typed, hasParagraphs);
 
     const origWords = preparedOriginal.split(/\s+/).filter(Boolean);
 
-    // Strip trailing ¶ from typed end (Enter after last rep = not a mistake)
     const preparedTypedClean = preparedTyped.replace(/(\s*¶\s*)+$/, "").trim();
     const typedWords = preparedTypedClean.split(/\s+/).filter(Boolean);
 
-    // ── split into reps ───────────────────────────────────────────────────────
     const repChunks = splitIntoRepetitions(origWords, typedWords);
     const repeatCount = repChunks.length || 1;
 
-    // ── score each rep ────────────────────────────────────────────────────────
     const repetitions: RepetitionResult[] = [];
     let totalFullMistakes = 0;
     let totalHalfMistakes = 0;
@@ -464,9 +453,8 @@ export class TypingScoringEngine {
       const isLastRep = ri === repChunks.length - 1;
       const isFirstRep = ri === 0;
 
-      let ops = wordDiff(origWords, chunk);
+      let ops = nwAlign(origWords, chunk);
 
-      // Forgive untyped tail ONLY for last rep when there are multiple reps
       if (!isComplete && !isFirstRep && isLastRep) {
         ops = trimTrailingDeletes(ops);
       }
@@ -493,7 +481,6 @@ export class TypingScoringEngine {
       flatDiff.push(...repDiff);
     }
 
-    // ── Rajasthan HC scoring ──────────────────────────────────────────────────
     const penalties = 0;
     const grossErrors = totalFullMistakes + totalHalfMistakes / 2 + penalties;
     const errorStrokes = grossErrors * 5;
@@ -542,8 +529,6 @@ export class TypingScoringEngine {
 }
 
 export const typingScoringEngine = new TypingScoringEngine();
-
-// ─── drop-in function exports ─────────────────────────────────────────────────
 
 export function evaluateTypingTest(
   correctTranscription: string,

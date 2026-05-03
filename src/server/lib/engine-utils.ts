@@ -1,4 +1,4 @@
-// typing-utils.ts
+// engine-utils.ts
 // Shared utilities used by both scoring engines
 
 export const PARAGRAPH_SENTINEL = "¶";
