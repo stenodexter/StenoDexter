@@ -244,6 +244,7 @@ export function createResultService(db: Db) {
         user_id: string;
         user_name: string | null;
         user_email: string;
+        user_code: string;
         test_id: string;
         test_title: string;
         test_type: string;
@@ -258,6 +259,7 @@ export function createResultService(db: Db) {
           r.submitted_at, r.user_id,
           u.name        AS user_name,
           u.email       AS user_email,
+          
           ta.test_id,
           t.title       AS test_title,
           t.type        AS test_type,
@@ -288,7 +290,11 @@ export function createResultService(db: Db) {
         data: rows.map((r) => ({
           attemptId: r.attempt_id,
           type: r.type,
-          user: { id: r.user_id, name: r.user_name, email: r.user_email },
+          user: {
+            id: r.user_id,
+            name: r.user_name,
+            email: r.user_email,
+          },
           test: { id: r.test_id, title: r.test_title, type: r.test_type },
           speed: { id: r.speed_id, wpm: r.speed_wpm },
           result: {

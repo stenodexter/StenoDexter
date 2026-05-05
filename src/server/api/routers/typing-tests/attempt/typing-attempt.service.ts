@@ -54,7 +54,6 @@ export function createTypingAttemptService(db: Db) {
           testId: input.testId,
           type,
           stage: "writing",
-          writingStartedAt: new Date(),
         })
         .returning();
 

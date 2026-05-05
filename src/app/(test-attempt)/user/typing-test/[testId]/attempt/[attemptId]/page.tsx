@@ -1,4 +1,3 @@
-// app/(user)/typing-tests/[testId]/attempt/[attemptId]/page.tsx
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -8,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
-import { useLeaveGuard } from "~/hooks/use-leave-guard"; // ← add this
+import { useLeaveGuard } from "~/hooks/use-leave-guard";
 import {
   Send,
   CheckCircle2,
@@ -110,19 +109,24 @@ export default function TypingAttemptPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [answer, setAnswer] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+  // ── deferred start: timer only runs after first keypress ──────────────────
+  const [started, setStarted] = useState(false);
+  const startedRef = useRef(false);
+  // ── space-lock: cursor cannot move before last space position ─────────────
+  const lastSpacePosRef = useRef(0);
 
   // ── Leave guard ──────────────────────────────────────────────────────────────
-  // Reload/close  → browser "Leave site?" warning (no submit)
-  // Navigate away → silently submit current draft, then proceed
   const onNavigateAway = useCallback(async () => {
     if (submittedRef.current) return;
     stopIntervals();
     saveLocal();
-    await submitMutation.mutateAsync({
-      attemptId: params.attemptId,
-      answerFinal: answerRef.current,
-    }).catch(() => null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    await submitMutation
+      .mutateAsync({
+        attemptId: params.attemptId,
+        answerFinal: answerRef.current,
+      })
+      .catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { override: navigateSafe } = useLeaveGuard(!submitted, onNavigateAway);
@@ -150,6 +154,7 @@ export default function TypingAttemptPage() {
   const lastServerSyncRef = useRef("");
   const localTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
 
   const lineHeightPx = Math.round(fontSize * 1.8);
@@ -196,6 +201,30 @@ export default function TypingAttemptPage() {
       clearInterval(serverTimer.current);
       serverTimer.current = null;
     }
+    if (countdownTimer.current) {
+      clearInterval(countdownTimer.current);
+      countdownTimer.current = null;
+    }
+  }, []);
+
+  const startCountdown = useCallback(() => {
+    if (countdownTimer.current) return; // already running
+    countdownTimer.current = setInterval(() => setTimeLeft((s) => s - 1), 1000);
+  }, []);
+
+  // Called on very first keypress to kick off timer + server mark
+  const handleFirstKey = useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    setStarted(true);
+    startCountdown();
+    startIntervals();
+    // Tell server writing has begun so it stamps writingStartedAt
+    syncMutation.mutate({
+      attemptId: params.attemptId,
+      markWritingStarted: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doSubmit = useCallback(() => {
@@ -211,6 +240,7 @@ export default function TypingAttemptPage() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Block clipboard / navigation shortcuts
       if (
         (e.ctrlKey || e.metaKey) &&
         ["v", "x", "z", "y", "a"].includes(e.key.toLowerCase())
@@ -229,9 +259,23 @@ export default function TypingAttemptPage() {
         ].includes(e.key)
       ) {
         e.preventDefault();
+        return;
+      }
+
+      // Trigger deferred start on first real keystroke
+      if (!startedRef.current) {
+        handleFirstKey();
+      }
+
+      // Space-lock: block Backspace if it would cross the last committed space
+      if (e.key === "Backspace") {
+        if (answerRef.current.length <= lastSpacePosRef.current) {
+          e.preventDefault();
+          return;
+        }
       }
     },
-    [],
+    [handleFirstKey],
   );
 
   const handleMouseDown = useCallback(
@@ -261,7 +305,21 @@ export default function TypingAttemptPage() {
 
   const handleChange = useCallback((val: string) => {
     const prev = answerRef.current;
+    // Only allow appending or deleting from end (no mid-string edits)
     if (!val.startsWith(prev) && !prev.startsWith(val)) return;
+
+    // Space-lock: reject deletions that go before lastSpacePos
+    if (val.length < lastSpacePosRef.current) return;
+
+    // Track last space position when a space is appended
+    if (val.length > prev.length) {
+      const appended = val.slice(prev.length);
+      if (appended.includes(" ")) {
+        // Find the last space in the new value
+        lastSpacePosRef.current = val.lastIndexOf(" ") + 1;
+      }
+    }
+
     answerRef.current = val;
     setAnswer(val);
   }, []);
@@ -289,12 +347,22 @@ export default function TypingAttemptPage() {
     answerRef.current = initial;
     lastServerSyncRef.current = data.attempt.answerDraft ?? "";
     setAnswer(initial);
+
     if (data.attempt.isSubmitted) {
       setSubmitted(true);
       return;
     }
+
     setTimeLeft(data.secondsLeft);
-    startIntervals();
+
+    // If writingStartedAt already set (resumed mid-test), start immediately
+    if (data.attempt.writingStartedAt) {
+      startedRef.current = true;
+      setStarted(true);
+      startCountdown();
+      startIntervals();
+    }
+    // Otherwise wait for first keypress (handleFirstKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -302,14 +370,10 @@ export default function TypingAttemptPage() {
     document.documentElement.requestFullscreen().catch(() => null);
   }, []);
 
-  useEffect(() => {
-    if (submitted || timeLeft <= 0) return;
-    const t = setInterval(() => setTimeLeft((s) => s - 1), 1000);
-    return () => clearInterval(t);
-  }, [submitted, timeLeft]);
-
+  // Auto-submit when countdown hits zero
   useEffect(() => {
     if (
+      started &&
       timeLeft === 0 &&
       !submittedRef.current &&
       data &&
@@ -318,7 +382,7 @@ export default function TypingAttemptPage() {
       doSubmit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
+  }, [timeLeft, started]);
 
   useEffect(() => {
     return () => {
@@ -342,7 +406,6 @@ export default function TypingAttemptPage() {
         <p className="font-medium">Test not found</p>
         <Button
           variant="outline"
-          // use navigateSafe so even error-state navigation respects the guard
           onClick={() => navigateSafe(() => router.push("/user/typing-tests"))}
         >
           Back
@@ -359,11 +422,14 @@ export default function TypingAttemptPage() {
     );
   }
 
-  const isLow = timeLeft < 60;
-  const pct = Math.min(
-    100,
-    ((data.test.durationSeconds - timeLeft) / data.test.durationSeconds) * 100,
-  );
+  const isLow = started && timeLeft < 60;
+  const pct = !started
+    ? 0
+    : Math.min(
+        100,
+        ((data.test.durationSeconds - timeLeft) / data.test.durationSeconds) *
+          100,
+      );
   const R = 11;
   const circ = 2 * Math.PI * R;
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
@@ -418,11 +484,18 @@ export default function TypingAttemptPage() {
             <span
               className={`text-lg leading-none font-semibold tabular-nums ${isLow ? "text-destructive" : ""}`}
             >
-              {formatTime(timeLeft)}
+              {started
+                ? formatTime(timeLeft)
+                : formatTime(data.test.durationSeconds)}
             </span>
             {isLow && (
               <Badge variant="destructive" className="text-[10px]">
                 Low time
+              </Badge>
+            )}
+            {!started && (
+              <Badge variant="secondary" className="text-[10px]">
+                Press any key to start
               </Badge>
             )}
           </div>

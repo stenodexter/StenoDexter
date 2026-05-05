@@ -455,7 +455,7 @@ export class TypingScoringEngine {
 
       let ops = nwAlign(origWords, chunk);
 
-      if (!isComplete && !isFirstRep && isLastRep) {
+      if (!isFirstRep && isLastRep) {
         ops = trimTrailingDeletes(ops);
       }
 

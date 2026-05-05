@@ -553,19 +553,6 @@ export default function AdminUsersPage() {
         <p className="text-muted-foreground my-1 text-xs">
           Click on any user to view full report
         </p>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          {total !== null ? (
-            <>
-              <span className="text-foreground font-semibold tabular-nums">
-                {total}
-              </span>{" "}
-              {filter === "active" ? "active" : "registered"} user
-              {total !== 1 ? "s" : ""}
-            </>
-          ) : (
-            "Manage your platform users"
-          )}
-        </p>
       </div>
 
       {/* KPI cards — clicking sets filter */}

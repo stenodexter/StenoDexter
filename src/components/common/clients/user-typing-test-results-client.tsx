@@ -405,14 +405,6 @@ function AttemptCard({
         <div className="space-y-4 border-t px-5 py-5">
           <DiffLegend />
           <Separator />
-          <div className="text-muted-foreground mb-2 grid grid-cols-2 gap-4 text-xs">
-            <span>
-              Total words: <strong>{correctWords}</strong>
-            </span>
-            <span>
-              Typed words: <strong>{typedWords}</strong>
-            </span>
-          </div>
 
           {/* Per-repetition cards */}
           {repetitions && repetitions.length > 1 ? (

@@ -66,8 +66,7 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
 
   const MATCH = 2;
   const MISMATCH = -1;
-  // FIX: GAP raised to -2 so a single replace (-1) always beats insert+delete (-4)
-  const GAP = -2;
+  const GAP = -1;
   const EPS = 1e-6;
 
   function editDistance(a: string, b: string): number {
@@ -94,30 +93,27 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
     if (na === nb) return true;
     // fuzzy: allow 1 edit per ~8 chars
     const maxLen = Math.max(na.length, nb.length);
+    const minLen = Math.min(na.length, nb.length);
+
+    if (maxLen - minLen > 2) return false;
     const threshold = maxLen >= 6 ? 2 : maxLen >= 3 ? 1 : 0;
     return editDistance(na, nb) <= threshold;
   }
 
   const diagScore = (a: string, b: string): number => {
-    // Sentinel must match exactly
     if (a === PARAGRAPH_SENTINEL || b === PARAGRAPH_SENTINEL) {
       return a === b ? MATCH : MISMATCH;
     }
     if (matches(a, b)) return MATCH;
     const na = normalizeForComparison(a);
     const nb = normalizeForComparison(b);
+    const dist = editDistance(na, nb);
+    const maxLen = Math.max(na.length, nb.length);
+    if (dist > maxLen * 0.4) return MISMATCH * 2; // ← heavier penalty
     if (na.length > 0 && nb.length > 0) {
       if (nb.startsWith(na) || na.startsWith(nb)) return 0;
     }
-    // FIX: graduated similarity — more similar words score higher so NW
-    // aligns the closest pair rather than an arbitrary mismatch.
-    // Score range: (MISMATCH, 0) = (-1, 0). Always < GAP*2 (-4) so
-    // replace still beats insert+delete, but similar words beat dissimilar.
-    const maxLen = Math.max(na.length, nb.length);
-    if (maxLen === 0) return MISMATCH;
-    const ed = editDistance(na, nb);
-    const sim = 1.0 - ed / maxLen; // 0..1
-    return MISMATCH + sim; // -1..0
+    return MISMATCH;
   };
 
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
@@ -153,12 +149,10 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
       if (diagVal >= best - EPS * 0.1) {
         const exactMatch = A[i - 1] === B[j - 1];
         const isPara = A[i - 1] === PARAGRAPH_SENTINEL;
-        // FIX: use matches() to determine correct vs replace — not just exactMatch
-        const isCorrect = isPara ? exactMatch : matches(A[i - 1]!, B[j - 1]!);
         result.push({
           original: A[i - 1],
           typed: B[j - 1],
-          type: isPara ? "paragraph" : isCorrect ? "correct" : "replace",
+          type: isPara ? "paragraph" : exactMatch ? "correct" : "replace",
         });
         i--;
         j--;
@@ -192,7 +186,7 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
 
   const typedTokensList = tokenize(typed);
 
-  // Collect space run counts between typed words (index i = spaces BEFORE typed word i)
+  // Collect space run counts between typed words
   const typedSpaceCounts: number[] = [];
   let spaceRun = 0;
   for (const t of typedTokensList) {
@@ -205,21 +199,17 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
   }
 
   const result: DiffToken[] = [];
-  // FIX: track typedWordIdx separately and only advance BEFORE accessing space for current token
   let typedWordIdx = 0;
 
   for (let wi = 0; wi < diff.length; wi++) {
     const tok = diff[wi]!;
-    const consumesTyped = tok.type !== "delete";
 
     if (wi > 0) {
-      // Insert extra_space tokens for multiple consecutive spaces before this typed word
-      if (consumesTyped) {
-        const spacesTyped = typedSpaceCounts[typedWordIdx] ?? 1;
-        if (spacesTyped > 1) {
-          for (let s = 1; s < spacesTyped; s++) {
-            result.push({ typed: " ", type: "extra_space" });
-          }
+      // Insert extra_space tokens for multiple consecutive spaces
+      const spacesTyped = typedSpaceCounts[typedWordIdx] ?? 1;
+      if (tok.type !== "delete" && spacesTyped > 1) {
+        for (let s = 1; s < spacesTyped; s++) {
+          result.push({ typed: " ", type: "extra_space" });
         }
       }
 
@@ -231,7 +221,7 @@ function buildFullDiff(original: string, typed: string): DiffToken[] {
 
     result.push(tok);
 
-    if (consumesTyped) {
+    if (tok.type !== "delete") {
       typedWordIdx++;
     }
   }

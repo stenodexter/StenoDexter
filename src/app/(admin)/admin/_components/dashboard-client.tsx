@@ -32,6 +32,14 @@ import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import { RejectDialog } from "../admissions/_components/rejection-dialog";
 import { ScreenshotDialog } from "../admissions/_components/screenshot-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -472,139 +480,152 @@ function PendingAdmissions() {
 
 // ─── Recent Attempts ──────────────────────────────────────────────────────────
 
-function RecentAttempts() {
-  const [{ data }] = trpc.result.getResults.useSuspenseQuery({
-    page: 0,
-    limit: 8,
-    sortBy: "time",
-    sortOrder: "desc",
-  });
+export function RecentAttempts() {
+  const [page, setPage] = useState(0);
+  const limit = 10;
 
-  const gridCols = "grid-cols-[1fr_1.4fr_80px_80px_100px_40px]";
+  const [{ data, meta }, { isFetching }] =
+    trpc.result.getResults.useSuspenseQuery({
+      page,
+      limit,
+      sortBy: "time",
+      sortOrder: "desc",
+    });
 
-  if (data.length === 0) {
-    return (
-      <div>
-        <SectionHeader icon={TrendingUp} title="Recent Attempts" />
-        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border py-14 text-center">
-          <Activity className="text-muted-foreground/20 h-8 w-8" />
-          <p className="text-muted-foreground text-sm">No submissions yet</p>
-        </div>
-      </div>
-    );
-  }
+  const rows = data;
+  const totalPages = meta.totalPages;
 
   return (
-    <div>
-      <SectionHeader icon={TrendingUp} title="Recent Attempts" />
+    <div className="space-y-4">
+      {/* Table */}
+      <div className="overflow-hidden rounded-xl border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Test</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">WPM</TableHead>
+              <TableHead className="text-right">When</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
 
-      <div className="overflow-hidden rounded-2xl border">
-        {/* Header */}
-        <div
-          className={cn(
-            "bg-muted/30 grid items-center gap-3 border-b px-5 py-2.5",
-            gridCols,
-          )}
-        >
-          {["User", "Test", "Type", "WPM", "When", ""].map((h, i) => (
-            <span
-              key={i}
-              className={cn(
-                "text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase",
-                i >= 3 && i <= 4 && "text-right",
-              )}
-            >
-              {h}
-            </span>
-          ))}
-        </div>
-
-        {/* Rows */}
-        {data.map((row, idx) => (
-          <div
-            key={row.attemptId}
-            className={cn(
-              "group hover:bg-muted/30 grid items-center gap-3 px-5 py-3 transition-colors",
-              gridCols,
-              idx !== data.length - 1 && "border-b",
-            )}
-          >
-            {/* User */}
-            <div className="flex min-w-0 items-center gap-2">
-              <Avatar className="h-6 w-6 shrink-0">
-                <AvatarImage src="" />
-                <AvatarFallback className="text-[9px] font-semibold">
-                  {(row.user.name ?? row.user.email ?? "?")[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-
-              <div className="min-w-0">
-                <p className="truncate text-sm leading-none font-medium">
-                  {row.user.name ?? row.user.email}
-                </p>
-                {row.user.name && (
-                  <p className="text-muted-foreground mt-0.5 truncate text-[11px]">
-                    {row.user.email}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Test */}
-            <Link
-              href={`/admin/test/${row.test?.id}`}
-              className="hover:text-primary min-w-0 truncate text-sm transition-colors"
-            >
-              {row.test?.title ?? "—"}
-            </Link>
-
-            {/* Type */}
-            <div>
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
-                  row.type === "assessment"
-                    ? "bg-foreground/8 text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {row.type === "assessment" ? "test" : "practice"}
-              </span>
-            </div>
-
-            {/* WPM */}
-            <p className="text-muted-foreground text-right text-sm tabular-nums">
-              {row.speed.wpm}
-            </p>
-
-            {/* When */}
-            <p className="text-muted-foreground text-right text-[11px] tabular-nums">
-              {formatDistanceToNow(new Date(row.result.submittedAt), {
-                addSuffix: true,
-                
-              })}
-            </p>
-
-            {/* Link */}
-            <div className="flex justify-end">
-              <Link
-                href={`/admin/test/${row.test.id}/user/${row.user.id}/results?attemptId=${row.attemptId}`}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-muted-foreground py-10 text-center"
                 >
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        ))}
+                  No submissions yet
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row) => (
+                <TableRow key={row.attemptId}>
+                  {/* User */}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="text-xs">
+                          {(
+                            row?.user?.name?.[0] ??
+                            row?.user?.email?.[0] ??
+                            "?"
+                          ).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {row.user.name ?? row.user.email}
+                        </p>
+                        {row.user.name && (
+                          <p className="text-muted-foreground truncate text-xs">
+                            {row.user.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  {/* Test */}
+                  <TableCell>
+                    <Link
+                      href={`/admin/test/${row.test.id}`}
+                      className="hover:text-primary text-sm"
+                    >
+                      {row.test.title}
+                    </Link>
+                  </TableCell>
+
+                  {/* Type */}
+                  <TableCell>
+                    <span className="text-xs uppercase">
+                      {row.type === "assessment" ? "test" : "practice"}
+                    </span>
+                  </TableCell>
+
+                  {/* WPM */}
+                  <TableCell className="text-right tabular-nums">
+                    {row.result.wpm}
+                  </TableCell>
+
+                  {/* When */}
+                  <TableCell className="text-muted-foreground text-right text-xs">
+                    {formatDistanceToNow(new Date(row.result.submittedAt), {
+                      addSuffix: true,
+                    })}
+                  </TableCell>
+
+                  {/* Action */}
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/admin/test/${row.test.id}/user/${row.user.id}/results?attemptId=${row.attemptId}`}
+                    >
+                      <Button size="sm" variant="ghost">
+                        View
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-sm">
+          Page {page + 1} of {totalPages}
+        </p>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 0 || isFetching}
+            onClick={() => setPage((p) => Math.max(p - 1, 0))}
+          >
+            Previous
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page + 1 >= totalPages || isFetching}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
+
 // ─── Active Tests ─────────────────────────────────────────────────────────────
 
 function ActiveTests() {
