@@ -569,7 +569,7 @@ export function RecentAttempts() {
 
                   {/* WPM */}
                   <TableCell className="text-right tabular-nums">
-                    {row.result.wpm}
+                    {row.speed.wpm}
                   </TableCell>
 
                   {/* When */}
