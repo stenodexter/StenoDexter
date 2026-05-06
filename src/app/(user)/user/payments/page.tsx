@@ -68,7 +68,7 @@ const PLAN_CONFIG: Record<
   }
 > = {
   app: {
-    label: "App Access",
+    label: "Advanced Speed Batch",
     icon: <Layout className="h-4 w-4" />,
     iconLg: <Layout className="h-5 w-5" />,
     accent: "text-blue-600 dark:text-blue-400",
@@ -80,7 +80,7 @@ const PLAN_CONFIG: Record<
     renewPlan: "app",
   },
   typing: {
-    label: "Typing Tests",
+    label: "Advanced Speed Batch For Typing Tests",
     icon: <KeyboardIcon className="h-4 w-4" />,
     iconLg: <KeyboardIcon className="h-5 w-5" />,
     accent: "text-violet-600 dark:text-violet-400",
@@ -454,7 +454,7 @@ export default function UserSubscriptionPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 px-6 py-8">
+    <div className="mx-auto w-full max-w-4xl space-y-8 px-6 py-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

@@ -14,7 +14,7 @@ export interface Plan {
 export const PLANS: Record<PlanId, Plan> = {
   app: {
     id: "app",
-    label: "App",
+    label: "Advanced Speed Batch",
     amount: 1500,
     duration: "31 days",
     description: "Full app access, everything except typing tests.",
@@ -23,7 +23,7 @@ export const PLANS: Record<PlanId, Plan> = {
   },
   typing: {
     id: "typing",
-    label: "Typing Tests",
+    label: "Advanced Speed Batch For Typing Tests",
     amount: 500,
     duration: "31 days",
     description: "Typing test feature only.",

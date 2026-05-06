@@ -68,7 +68,7 @@ function SubmittedScreen({
       <div className="space-y-1.5 text-center">
         <h2 className="text-xl font-semibold">Submitted</h2>
         <p className="text-muted-foreground text-sm">
-          Your transcription has been recorded.
+          Your typing has been recorded.
         </p>
       </div>
       <div className="flex items-center gap-3">
@@ -594,7 +594,7 @@ export default function TypingAttemptPage() {
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 px-8 pt-4">
             <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
-              Your transcription
+              Your typing
             </p>
           </div>
 
