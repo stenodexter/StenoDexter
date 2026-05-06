@@ -708,7 +708,7 @@ export function TestResultsPage({
           className="text-muted-foreground mb-2 -ml-2"
           onClick={() => {
             if (!isAdmin) router.push("/user/tests");
-            router.push("/admin/tests");
+            else router.push("/admin/tests");
           }}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
