@@ -234,18 +234,19 @@ const PLAN_STYLES: Record<
 // Features list per plan — explicit include/exclude for scanability
 const PLAN_FEATURES: Record<PlanId, { label: string; included: boolean }[]> = {
   app: [
-    { label: "Full app access", included: true },
+    { label: "Full batch access", included: true },
     { label: "All core features", included: true },
     { label: "Typing tests", included: false },
   ],
   typing: [
-    { label: "All test modes", included: true },
+    { label: "Typing tests", included: true },
     { label: "Leaderboards", included: true },
-    { label: "App features", included: false },
+    { label: "Batch features", included: false },
   ],
   full: [
-    { label: "Full app access", included: true },
+    { label: "Full batch access", included: true },
     { label: "Typing tests", included: true },
+    { label: "Performance Report", included: true },
   ],
 };
 

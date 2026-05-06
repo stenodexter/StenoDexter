@@ -27,7 +27,7 @@ export const PLANS: Record<PlanId, Plan> = {
     amount: 500,
     duration: "31 days",
     description: "Typing test feature only.",
-    features: ["Typing test feature", "All test modes", "31 days validity"],
+    features: ["Typing test feature", "Typing tests", "31 days validity"],
     accent: "violet",
   },
   full: {
