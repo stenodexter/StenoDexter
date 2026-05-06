@@ -11,32 +11,62 @@ import {
   getTestStatsSchema,
   getUsersSchema,
 } from "./analytics.schema";
+import { redisService } from "~/server/services/redis.service";
+
+const TTL = 60 * 60 * 5;
 
 export const analyticsRouter = createTRPCRouter({
   getPlatformOverview: adminProcedure.query(() =>
-    analyticsService.getPlatformOverview(),
+    redisService.cache(
+      "analytics:platformOverview",
+      () => analyticsService.getPlatformOverview(),
+      TTL,
+    ),
   ),
 
   getGrowthAnalytics: adminProcedure
     .input(dateRangeSchema.optional())
-    .query(({ input }) =>
-      analyticsService.getGrowthAnalytics(input?.from, input?.to),
-    ),
+    .query(({ input }) => {
+      const key = `analytics:growth:${input?.from ?? "all"}:${input?.to ?? "all"}`;
+      return redisService.cache(
+        key,
+        () => analyticsService.getGrowthAnalytics(input?.from, input?.to),
+        TTL,
+      );
+    }),
 
   getEngagementMetrics: adminProcedure.query(() =>
-    analyticsService.getEngagementMetrics(),
+    redisService.cache(
+      "analytics:engagement",
+      () => analyticsService.getEngagementMetrics(),
+      TTL,
+    ),
   ),
 
   getTestStats: secureProcedure
     .input(getTestStatsSchema)
-    .query(({ input }) => analyticsService.getTestStats(input.testId)),
+    .query(({ input }) =>
+      redisService.cache(
+        `analytics:testStats:${input.testId}`,
+        () => analyticsService.getTestStats(input.testId),
+        TTL,
+      ),
+    ),
 
   getTestPerformance: adminProcedure.query(() =>
-    analyticsService.getTestPerformance(),
+    redisService.cache(
+      "analytics:testPerformance",
+      () => analyticsService.getTestPerformance(),
+      TTL,
+    ),
   ),
 
   getLeaderboardAnalytics: adminProcedure.query(() =>
-    analyticsService.getLeaderboardAnalytics(),
+    redisService.cache(
+      "analytics:leaderboard",
+      () => analyticsService.getLeaderboardAnalytics(),
+      TTL,
+    ),
   ),
 
   getUsers: adminProcedure

@@ -6,18 +6,20 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { trpc } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
 import {
   Camera,
   Check,
   Loader2,
   Eye,
   EyeOff,
-  User,
-  Lock,
   AlertCircle,
+  RefreshCw,
+  ChevronRight,
+  Shield,
+  Sparkles,
+  Database,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
@@ -32,39 +34,11 @@ function initials(name: string) {
     .slice(0, 2);
 }
 
-// ─── section wrapper ──────────────────────────────────────────────────────────
-
-function Section({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-[240px_1fr]">
-      <div>
-        <div className="flex items-center gap-2">
-          <Icon className="text-muted-foreground h-4 w-4" />
-          <h2 className="text-sm font-semibold">{title}</h2>
-        </div>
-        <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
-          {description}
-        </p>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
-
-// ─── status feedback ──────────────────────────────────────────────────────────
+// ─── save status ──────────────────────────────────────────────────────────────
 
 function SaveStatus({
   state,
+  error,
 }: {
   state: "idle" | "saving" | "saved" | "error";
   error?: string;
@@ -72,19 +46,97 @@ function SaveStatus({
   if (state === "idle") return null;
   if (state === "saving")
     return (
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
-      </div>
+      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+      </span>
     );
   if (state === "saved")
     return (
-      <div className="flex items-center gap-1.5 text-xs text-emerald-500">
-        <Check className="h-3.5 w-3.5" /> Saved
-      </div>
+      <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+        <Check className="h-3 w-3" /> Saved
+      </span>
     );
   return (
-    <div className="text-destructive flex items-center gap-1.5 text-xs">
-      <AlertCircle className="h-3.5 w-3.5" /> {"Something went wrong"}
+    <span className="text-destructive flex items-center gap-1.5 text-xs">
+      <AlertCircle className="h-3 w-3" /> {error ?? "Something went wrong"}
+    </span>
+  );
+}
+
+// ─── field ────────────────────────────────────────────────────────────────────
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-muted-foreground block text-[10px] font-semibold tracking-[0.12em] uppercase">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ─── card ─────────────────────────────────────────────────────────────────────
+
+function Card({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "border-border bg-card rounded-2xl border p-6 shadow-sm",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({
+  icon: Icon,
+  title,
+  description,
+  badge,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  badge?: string;
+}) {
+  return (
+    <div className="mb-6 flex items-start gap-3">
+      <div className="bg-muted ring-border flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1">
+        <Icon className="text-muted-foreground h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-card-foreground text-sm font-semibold">
+            {title}
+          </h2>
+          {badge && (
+            <Badge
+              variant="secondary"
+              className="h-4 rounded-full px-1.5 text-[10px]"
+            >
+              {badge}
+            </Badge>
+          )}
+        </div>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+          {description}
+        </p>
+      </div>
     </div>
   );
 }
@@ -96,7 +148,7 @@ function AvatarUpload({
   name,
   onUploadComplete,
 }: {
-  currentUrl: string | null; // already-resolved public URL from me.profilePicUrl
+  currentUrl: string | null;
   name: string;
   onUploadComplete: (key: string) => void;
 }) {
@@ -104,28 +156,23 @@ function AvatarUpload({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
   const presign = trpc.store.generatePresignedUrl.useMutation();
 
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) {
-        setUploadError("Please select an image file");
+        setUploadError("Select an image file");
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setUploadError("Image must be under 5MB");
+        setUploadError("Max 5MB");
         return;
       }
-
       setUploadError(null);
       setUploading(true);
-
-      // Optimistic preview
       const reader = new FileReader();
       reader.onload = (e) => setPreviewUrl(e.target?.result as string);
       reader.readAsDataURL(file);
-
       try {
         const ext = file.name.split(".").pop() ?? "jpg";
         const { uploadUrl, key } = await presign.mutateAsync({
@@ -133,15 +180,12 @@ function AvatarUpload({
           contentType: file.type,
           ext,
         });
-
         const res = await fetch(uploadUrl, {
           method: "PUT",
           body: file,
           headers: { "Content-Type": file.type },
         });
-
         if (!res.ok) throw new Error("Upload failed");
-
         onUploadComplete(key);
       } catch (e) {
         setUploadError(e instanceof Error ? e.message : "Upload failed");
@@ -153,35 +197,32 @@ function AvatarUpload({
     [presign, onUploadComplete],
   );
 
-  // Prefer local preview, then fall back to the resolved URL from server
   const displayUrl = previewUrl ?? currentUrl ?? undefined;
 
   return (
-    <div className="flex items-center gap-5">
-      <div className="relative">
-        <Avatar className="h-16 w-16">
+    <div className="border-border mb-6 flex items-center gap-4 border-b pb-6">
+      <div className="relative shrink-0">
+        <Avatar className="ring-border h-14 w-14 ring-2">
           <AvatarImage src={displayUrl} />
-          <AvatarFallback className="text-lg font-bold">
+          <AvatarFallback className="bg-muted text-muted-foreground text-sm font-bold">
             {initials(name)}
           </AvatarFallback>
         </Avatar>
-
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className={cn(
-            "absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity",
+            "absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-all duration-150",
             "hover:opacity-100 focus-visible:opacity-100",
             uploading && "cursor-wait opacity-100",
           )}
         >
           {uploading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-white" />
+            <Loader2 className="h-4 w-4 animate-spin text-white" />
           ) : (
-            <Camera className="h-5 w-5 text-white" />
+            <Camera className="h-4 w-4 text-white" />
           )}
         </button>
-
         <input
           ref={inputRef}
           type="file"
@@ -193,24 +234,20 @@ function AvatarUpload({
           }}
         />
       </div>
-
-      <div className="space-y-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs"
+      <div>
+        <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
+          className="text-foreground hover:text-muted-foreground text-xs font-medium transition-colors disabled:opacity-50"
         >
           {uploading ? "Uploading…" : "Change photo"}
-        </Button>
-        <p className="text-muted-foreground text-xs">
-          JPG, PNG or WebP · max 5MB
+        </button>
+        <p className="text-muted-foreground mt-0.5 text-[11px]">
+          JPG, PNG, WebP · max 5MB
         </p>
         {uploadError && (
-          <p className="text-destructive flex items-center gap-1 text-xs">
-            <AlertCircle className="h-3 w-3" />
-            {uploadError}
+          <p className="text-destructive mt-1 flex items-center gap-1 text-[11px]">
+            <AlertCircle className="h-3 w-3" /> {uploadError}
           </p>
         )}
       </div>
@@ -218,9 +255,9 @@ function AvatarUpload({
   );
 }
 
-// ─── profile section ──────────────────────────────────────────────────────────
+// ─── profile card ─────────────────────────────────────────────────────────────
 
-function ProfileSection() {
+function ProfileCard() {
   const utils = trpc.useUtils();
   const { data: me, isLoading } = trpc.admin.auth.me.useQuery();
 
@@ -232,13 +269,12 @@ function ProfileSection() {
   >("idle");
   const [saveError, setSaveError] = useState<string | undefined>();
 
-  // Seed form fields once me loads (or re-seed if it changes after save)
   useEffect(() => {
     if (!me) return;
     setName(me.name);
     setUsername(me.username);
     setImageKey(me.image ?? null);
-  }, [me?.id]); // only re-seed when the identity changes, not on every refetch
+  }, [me?.id]);
 
   const { data: availability } = trpc.admin.checkUsernameAvailability.useQuery(
     { username },
@@ -264,7 +300,7 @@ function ProfileSection() {
     },
   });
 
-  const handleSaveProfile = () => {
+  const handleSave = () => {
     if (!me || usernameConflict) return;
     const patch: { name?: string; username?: string; image?: string } = {};
     if (name !== me.name) patch.name = name;
@@ -276,87 +312,85 @@ function ProfileSection() {
 
   if (isLoading || !me) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-5">
-          <Skeleton className="h-16 w-16 rounded-full" />
+      <Card>
+        <div className="border-border mb-6 flex animate-pulse items-center gap-4 border-b pb-6">
+          <div className="bg-muted h-14 w-14 rounded-full" />
           <div className="space-y-2">
-            <Skeleton className="h-8 w-28" />
-            <Skeleton className="h-3 w-36" />
+            <div className="bg-muted h-3 w-24 rounded" />
+            <div className="bg-muted/60 h-2.5 w-32 rounded" />
           </div>
         </div>
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-      </div>
+        <div className="space-y-4">
+          <div className="bg-muted h-9 animate-pulse rounded-lg" />
+          <div className="bg-muted h-9 animate-pulse rounded-lg" />
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Pass the already-resolved profilePicUrl — no extra query needed */}
+    <Card>
+      <CardHeader
+        icon={Sparkles}
+        title="Profile"
+        description="Name, username, and photo shown across the admin panel."
+      />
       <AvatarUpload
         currentUrl={me.profilePicUrl ?? null}
         name={me.name}
         onUploadComplete={(key) => setImageKey(key)}
       />
-
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          Display name
-        </label>
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          className="text-sm"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          Username
-        </label>
-        <div className="relative">
-          <span className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 text-sm">
-            @
-          </span>
+      <div className="space-y-4">
+        <Field label="Display name">
           <Input
-            value={username}
-            onChange={(e) =>
-              setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))
-            }
-            placeholder="username"
-            className={cn(
-              "pl-7 text-sm",
-              usernameConflict &&
-                "border-destructive focus-visible:ring-destructive",
-            )}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            className="h-9 text-sm"
           />
+        </Field>
+        <Field label="Username">
+          <div className="relative">
+            <span className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 text-sm select-none">
+              @
+            </span>
+            <Input
+              value={username}
+              onChange={(e) =>
+                setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))
+              }
+              placeholder="username"
+              className={cn(
+                "h-9 pl-7 text-sm",
+                usernameConflict &&
+                  "border-destructive focus-visible:ring-destructive",
+              )}
+            />
+          </div>
+          {usernameConflict && (
+            <p className="text-destructive mt-1 flex items-center gap-1 text-[11px]">
+              <AlertCircle className="h-3 w-3" /> Username taken
+            </p>
+          )}
+        </Field>
+        <div className="flex items-center justify-between pt-2">
+          <SaveStatus state={saveState} error={saveError} />
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={edit.isPending || usernameConflict}
+          >
+            Save profile
+          </Button>
         </div>
-        {usernameConflict && (
-          <p className="text-destructive flex items-center gap-1 text-xs">
-            <AlertCircle className="h-3 w-3" />
-            Username already taken
-          </p>
-        )}
       </div>
-
-      <div className="flex items-center justify-between pt-1">
-        <SaveStatus state={saveState} error={saveError} />
-        <Button
-          size="sm"
-          onClick={handleSaveProfile}
-          disabled={edit.isPending || usernameConflict}
-        >
-          Save profile
-        </Button>
-      </div>
-    </div>
+    </Card>
   );
 }
 
-// ─── password section ─────────────────────────────────────────────────────────
+// ─── password card ────────────────────────────────────────────────────────────
 
-function PasswordSection() {
+function PasswordCard() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -387,12 +421,6 @@ function PasswordSection() {
     },
   });
 
-  const handleSave = () => {
-    if (!canSubmit) return;
-    edit.mutate({ oldPassword, newPassword });
-  };
-
-  // Password strength
   const strength =
     newPassword.length === 0
       ? 0
@@ -404,27 +432,44 @@ function PasswordSection() {
             ? 4
             : 3;
 
-  const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"][strength];
-  const strengthColor = [
-    "",
-    "bg-red-500",
-    "bg-amber-500",
-    "bg-blue-500",
-    "bg-emerald-500",
+  const strengthMeta = [
+    null,
+    {
+      label: "Weak",
+      barColor: "bg-red-500",
+      textColor: "text-red-600 dark:text-red-400",
+    },
+    {
+      label: "Fair",
+      barColor: "bg-amber-500",
+      textColor: "text-amber-600 dark:text-amber-400",
+    },
+    {
+      label: "Good",
+      barColor: "bg-blue-500",
+      textColor: "text-blue-600 dark:text-blue-400",
+    },
+    {
+      label: "Strong",
+      barColor: "bg-emerald-500",
+      textColor: "text-emerald-600 dark:text-emerald-400",
+    },
   ][strength];
 
-  function PasswordInput({
+  function PwInput({
     value,
     onChange,
     show,
     onToggle,
     placeholder,
+    error,
   }: {
     value: string;
     onChange: (v: string) => void;
     show: boolean;
     onToggle: () => void;
     placeholder: string;
+    error?: boolean;
   }) {
     return (
       <div className="relative">
@@ -433,109 +478,222 @@ function PasswordSection() {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="pr-9 text-sm"
+          className={cn(
+            "h-9 pr-9 text-sm",
+            error && "border-destructive focus-visible:ring-destructive",
+          )}
         />
         <button
           type="button"
           onClick={onToggle}
           className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
         >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {show ? (
+            <EyeOff className="h-3.5 w-3.5" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          Current password
-        </label>
-        <PasswordInput
-          value={oldPassword}
-          onChange={setOldPassword}
-          show={showOld}
-          onToggle={() => setShowOld((v) => !v)}
-          placeholder="Enter current password"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          New password
-        </label>
-        <PasswordInput
-          value={newPassword}
-          onChange={setNewPassword}
-          show={showNew}
-          onToggle={() => setShowNew((v) => !v)}
-          placeholder="At least 6 characters"
-        />
-        {/* Strength bar */}
-        {newPassword.length > 0 && (
-          <div className="space-y-1">
-            <div className="flex gap-1">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "h-1 flex-1 rounded-full transition-colors",
-                    i <= strength ? strengthColor : "bg-muted",
-                  )}
-                />
-              ))}
+    <Card>
+      <CardHeader
+        icon={Shield}
+        title="Password"
+        description="Use a strong, unique password you don't use elsewhere."
+      />
+      <div className="space-y-4">
+        <Field label="Current password">
+          <PwInput
+            value={oldPassword}
+            onChange={setOldPassword}
+            show={showOld}
+            onToggle={() => setShowOld((v) => !v)}
+            placeholder="Enter current password"
+          />
+        </Field>
+        <Field label="New password">
+          <PwInput
+            value={newPassword}
+            onChange={setNewPassword}
+            show={showNew}
+            onToggle={() => setShowNew((v) => !v)}
+            placeholder="At least 6 characters"
+            error={tooShort}
+          />
+          {newPassword.length > 0 && strengthMeta && (
+            <div className="mt-2 space-y-1">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "h-0.5 flex-1 rounded-full transition-all duration-300",
+                      i <= strength ? strengthMeta.barColor : "bg-muted",
+                    )}
+                  />
+                ))}
+              </div>
+              <p
+                className={cn(
+                  "text-[10px] font-semibold tracking-widest uppercase",
+                  strengthMeta.textColor,
+                )}
+              >
+                {strengthMeta.label}
+              </p>
             </div>
-            <p
-              className={cn(
-                "text-[10px] font-semibold tracking-widest uppercase",
-                {
-                  "text-red-500": strength === 1,
-                  "text-amber-500": strength === 2,
-                  "text-blue-500": strength === 3,
-                  "text-emerald-500": strength === 4,
-                },
-              )}
-            >
-              {strengthLabel}
+          )}
+          {tooShort && (
+            <p className="text-destructive text-[11px]">Minimum 6 characters</p>
+          )}
+        </Field>
+        <Field label="Confirm new password">
+          <PwInput
+            value={confirmPass}
+            onChange={setConfirmPass}
+            show={showNew}
+            onToggle={() => setShowNew((v) => !v)}
+            placeholder="Repeat new password"
+            error={mismatch}
+          />
+          {mismatch && (
+            <p className="text-destructive mt-1 text-[11px]">
+              Passwords don't match
             </p>
+          )}
+        </Field>
+        <div className="flex items-center justify-between pt-2">
+          <SaveStatus state={saveState} error={saveError} />
+          <Button
+            size="sm"
+            onClick={() =>
+              canSubmit && edit.mutate({ oldPassword, newPassword })
+            }
+            disabled={!canSubmit || edit.isPending}
+          >
+            Update password
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── recheck card ─────────────────────────────────────────────────────────────
+
+function RecheckCard() {
+  const [ran, setRan] = useState(false);
+
+  const recheck = trpc.attempt.recheckAll.useMutation({
+    onSuccess: () => setRan(true),
+  });
+
+  const progress = trpc.attempt.recheckAllProgress.useQuery(undefined, {
+    refetchInterval: recheck.isPending ? 1500 : false,
+    enabled: recheck.isPending || ran,
+  });
+
+  const data = progress.data;
+  const processed = data ? data.succeeded + data.failed.length : 0;
+  const pct = data?.total ? Math.round((processed / data.total) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader
+        icon={Database}
+        title="Score Engine"
+        description="Re-evaluate all submitted attempts against the current scoring algorithm."
+        badge="Admin"
+      />
+
+      <div className="space-y-4">
+        {data && (
+          <div className="border-border bg-muted/40 space-y-3 rounded-xl border p-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {data.status === "running" ? "Processing…" : "Complete"}
+              </span>
+              <span className="text-foreground font-mono tabular-nums">
+                {processed}
+                <span className="text-muted-foreground"> / {data.total}</span>
+              </span>
+            </div>
+            <div className="bg-muted h-1 overflow-hidden rounded-full">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  data.status === "done" ? "bg-emerald-500" : "bg-primary",
+                )}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="flex items-center gap-4 text-[11px]">
+              <span className="text-emerald-600 dark:text-emerald-400">
+                <Check className="mr-0.5 inline h-3 w-3" />
+                {data.succeeded} succeeded
+              </span>
+              {data.failed.length > 0 && (
+                <span className="text-destructive">
+                  <AlertCircle className="mr-0.5 inline h-3 w-3" />
+                  {data.failed.length} failed
+                </span>
+              )}
+              {data.status === "done" && (
+                <span className="text-muted-foreground ml-auto">Done</span>
+              )}
+            </div>
           </div>
         )}
-        {tooShort && (
-          <p className="text-destructive text-xs">Minimum 6 characters</p>
-        )}
-      </div>
 
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          Confirm new password
-        </label>
-        <Input
-          type={showNew ? "text" : "password"}
-          value={confirmPass}
-          onChange={(e) => setConfirmPass(e.target.value)}
-          placeholder="Repeat new password"
-          className={cn(
-            "text-sm",
-            mismatch && "border-destructive focus-visible:ring-destructive",
-          )}
-        />
-        {mismatch && (
-          <p className="text-destructive text-xs">Passwords don't match</p>
+        {data?.failed && data.failed.length > 0 && (
+          <div className="border-destructive/20 bg-destructive/5 max-h-32 space-y-1.5 overflow-y-auto rounded-xl border p-3">
+            {data.failed.map((f) => (
+              <div
+                key={f.attemptId}
+                className="flex items-start gap-2 text-[11px]"
+              >
+                <span className="text-muted-foreground shrink-0 font-mono">
+                  {f.attemptId}
+                </span>
+                <ChevronRight className="text-muted-foreground/40 mt-px h-3 w-3 shrink-0" />
+                <span className="text-destructive truncate">{f.error}</span>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
 
-      <div className="flex items-center justify-between pt-1">
-        <SaveStatus state={saveState} error={saveError} />
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={!canSubmit || edit.isPending}
-        >
-          Update password
-        </Button>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-muted-foreground max-w-[220px] text-[11px] leading-relaxed">
+            Re-scores every submitted attempt and updates results + leaderboard.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setRan(false);
+              recheck.mutate();
+            }}
+            disabled={recheck.isPending}
+          >
+            {recheck.isPending ? (
+              <>
+                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                Running…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-1.5 h-3 w-3" />
+                Recheck all
+              </>
+            )}
+          </Button>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -543,32 +701,23 @@ function PasswordSection() {
 
 export default function AdminSettingsPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          Manage your account details and security.
-        </p>
-      </div>
+    <div>
+      <div className="mx-auto w-full max-w-3xl px-4 py-10">
+        <div className="mb-8">
+          <p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-[0.16em] uppercase">
+            Admin
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Account, security, and system controls.
+          </p>
+        </div>
 
-      <div className="space-y-10">
-        <Section
-          icon={User}
-          title="Profile"
-          description="Your display name, username, and profile photo visible across the admin panel."
-        >
-          <ProfileSection />
-        </Section>
-
-        <Separator />
-
-        <Section
-          icon={Lock}
-          title="Password"
-          description="Use a strong password you don't use elsewhere."
-        >
-          <PasswordSection />
-        </Section>
+        <div className="space-y-4">
+          <ProfileCard />
+          <PasswordCard />
+          <RecheckCard />
+        </div>
       </div>
     </div>
   );

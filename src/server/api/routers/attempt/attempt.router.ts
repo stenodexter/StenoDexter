@@ -1,4 +1,8 @@
-import { createTRPCRouter, demoOrPaidUserProcedure } from "~/server/api/trpc";
+import {
+  adminProcedure,
+  createTRPCRouter,
+  demoOrPaidUserProcedure,
+} from "~/server/api/trpc";
 import {
   createAttemptSchema,
   syncAttemptSchema,
@@ -6,6 +10,7 @@ import {
   getAttemptSchema,
 } from "./attempt.schema";
 import { attemptService } from "./attempt.service";
+import z from "zod";
 
 export const attemptRouter = createTRPCRouter({
   create: demoOrPaidUserProcedure
@@ -19,6 +24,20 @@ export const attemptRouter = createTRPCRouter({
   submit: demoOrPaidUserProcedure
     .input(submitAttemptSchema)
     .mutation(({ input, ctx }) => attemptService.submit(input, ctx.user)),
+
+  recheck: adminProcedure
+    .input(
+      z.object({
+        attemptId: z.string(),
+      }),
+    )
+    .mutation(({ input }) => attemptService.recheck(input.attemptId)),
+
+  recheckAll: adminProcedure.mutation(() => attemptService.recheckAll()),
+
+  recheckAllProgress: adminProcedure.query(() =>
+    attemptService.recheckAllProgress(),
+  ),
 
   getResume: demoOrPaidUserProcedure
     .input(getAttemptSchema)

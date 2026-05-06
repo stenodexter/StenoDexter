@@ -11,6 +11,7 @@ import {
   desc,
   eq,
   gt,
+  exists,
 } from "drizzle-orm";
 import { db as globalDb } from "~/server/db";
 import { user } from "~/server/db/schema/user";
@@ -33,12 +34,10 @@ export function createAnalyticsService(db: Db) {
       return redisService.cache(
         "global:analytics:platform-overview",
         async () => {
-          const nonDemo = and(
+          const realUser = and(
             eq(user.isDemo, false),
-            // also excludes revoked demo users that somehow have isDemo=false
+            eq(user.demoRevoked, false),
           );
-
-          const realUser = and(eq(user.isDemo, false));
 
           const [
             usersCount,
@@ -49,29 +48,34 @@ export function createAnalyticsService(db: Db) {
             testsCount,
             attemptsCount,
           ] = await Promise.all([
-            // total registered (non-demo only)
             db
               .select({ count: count() })
               .from(user)
-              .where(realUser)
+              .where(eq(user.isDemo, false))
               .then(([r]) => r),
 
-            // paid = active sub + non-demo + non-revoked
             db
               .select({ count: count() })
               .from(user)
-              .innerJoin(
-                subscription,
+              .where(
                 and(
-                  eq(subscription.userId, user.id),
-                  eq(subscription.status, "active"),
-                  gt(subscription.currentPeriodEnd, new Date()),
+                  realUser,
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(subscription)
+                      .where(
+                        and(
+                          eq(subscription.userId, user.id),
+                          eq(subscription.status, "active"),
+                          gt(subscription.currentPeriodEnd, new Date()),
+                        ),
+                      ),
+                  ),
                 ),
               )
-              .where(and(eq(user.isDemo, false), eq(user.demoRevoked, false)))
               .then(([r]) => r),
 
-            // active users — join user to filter demo/revoked
             db
               .select({
                 count: sql<number>`count(distinct ${testAttempts.userId})`,
@@ -81,8 +85,7 @@ export function createAnalyticsService(db: Db) {
               .where(
                 and(
                   sql`${testAttempts.createdAt} >= now() - interval '1 day'`,
-                  eq(user.isDemo, false),
-                  eq(user.demoRevoked, false),
+                  realUser,
                 ),
               )
               .then(([r]) => r),
@@ -96,8 +99,7 @@ export function createAnalyticsService(db: Db) {
               .where(
                 and(
                   sql`${testAttempts.createdAt} >= now() - interval '7 days'`,
-                  eq(user.isDemo, false),
-                  eq(user.demoRevoked, false),
+                  realUser,
                 ),
               )
               .then(([r]) => r),
@@ -111,8 +113,7 @@ export function createAnalyticsService(db: Db) {
               .where(
                 and(
                   sql`${testAttempts.createdAt} >= now() - interval '30 days'`,
-                  eq(user.isDemo, false),
-                  eq(user.demoRevoked, false),
+                  realUser,
                 ),
               )
               .then(([r]) => r),
@@ -493,6 +494,23 @@ export function createAnalyticsService(db: Db) {
               : [desc(user.createdAt)]
             : [desc(user.createdAt)];
 
+      // One sub row per user — no duplicates, orderBy unrestricted
+      const latestSub = db
+        .selectDistinctOn([subscription.userId], {
+          userId: subscription.userId,
+          status: subscription.status,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        })
+        .from(subscription)
+        .where(
+          and(
+            eq(subscription.status, "active"),
+            gt(subscription.currentPeriodEnd, now),
+          ),
+        )
+        .orderBy(subscription.userId, desc(subscription.currentPeriodEnd))
+        .as("latest_sub");
+
       const [[countRow], rows] = await Promise.all([
         db.select({ count: count() }).from(user).where(whereClause),
 
@@ -507,18 +525,11 @@ export function createAnalyticsService(db: Db) {
             isDemo: user.isDemo,
             demoRevoked: user.demoRevoked,
             demoExpiresAt: user.demoExpiresAt,
-            subStatus: subscription.status,
-            subEnd: subscription.currentPeriodEnd,
+            subStatus: latestSub.status,
+            subEnd: latestSub.currentPeriodEnd,
           })
           .from(user)
-          .leftJoin(
-            subscription,
-            and(
-              eq(subscription.userId, user.id),
-              eq(subscription.status, "active"),
-              gt(subscription.currentPeriodEnd, now),
-            ),
-          )
+          .leftJoin(latestSub, eq(latestSub.userId, user.id))
           .where(whereClause)
           .orderBy(...dbOrderBy)
           .limit(pageSize)
@@ -553,7 +564,7 @@ export function createAnalyticsService(db: Db) {
         renewCounts.map((r) => [String(r.user_id), Number(r.renew_count)]),
       );
 
-      let shaped = rows.map((u) => ({
+      const shaped = rows.map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,

@@ -19,9 +19,14 @@ import { scoringEngine } from "~/server/services/scoring.service";
 
 import type { db as dbInstance } from "~/server/db";
 import type { AuthUser } from "~/server/better-auth/config";
+import { redisService } from "~/server/services/redis.service";
 type Db = typeof dbInstance;
 
 // ── factory ───────────────────────────────────────────────────────────────────
+
+const RECHECK_LOCK_KEY = "recheck:lock";
+const RECHECK_PROGRESS_KEY = "recheck:progress";
+const RECHECK_TTL = 60 * 30;
 
 export function createAttemptService(db: Db) {
   return {
@@ -295,6 +300,159 @@ export function createAttemptService(db: Db) {
         secondsLeft,
         elapsedSeconds,
       };
+    },
+
+    async recheck(attemptId: string) {
+      console.log("RECHECKING :: ", attemptId);
+
+      return db.transaction(async (tx) => {
+        const attempt = await tx.query.testAttempts.findFirst({
+          where: and(eq(testAttempts.id, attemptId)),
+          with: { speed: true, test: true },
+        });
+
+        if (!attempt) throw new Error("Attempt not found");
+        if (!attempt.isSubmitted) throw new Error("Attempt not submitted");
+
+        const answerFinal = attempt.answerFinal ?? "";
+
+        const durationSeconds =
+          attempt.writingStartedAt && attempt.submittedAt
+            ? Math.min(
+                Math.floor(
+                  (attempt.submittedAt.getTime() -
+                    attempt.writingStartedAt.getTime()) /
+                    1000,
+                ),
+                attempt.speed.writtenDurationSeconds,
+              )
+            : attempt.speed.writtenDurationSeconds;
+
+        const evaluation = scoringEngine.evaluate(
+          attempt.test.correctAnswer,
+          answerFinal,
+          durationSeconds,
+        );
+
+        const now = new Date();
+
+        // 1. Update attempt score
+        await tx
+          .update(testAttempts)
+          .set({ score: evaluation.score, updatedAt: now })
+          .where(eq(testAttempts.id, attemptId));
+
+        // 2. Update result row (joined via attemptId)
+        await tx
+          .update(results)
+          .set({
+            score: evaluation.score,
+            wpm: evaluation.wpm,
+            accuracy: Math.round(evaluation.accuracy),
+            mistakes: evaluation.mistakes,
+          })
+          .where(eq(results.attemptId, attemptId));
+
+        // 3. Leaderboard — assessment only, update if record exists
+        // uniqueIndex is (testId, userId, speedId) — must match all 3
+        if (attempt.type === "assessment") {
+          const existing = await tx.query.leaderboard.findFirst({
+            where: and(
+              eq(leaderboard.testId, attempt.testId),
+              eq(leaderboard.userId, attempt.userId),
+              eq(leaderboard.speedId, attempt.speedId),
+            ),
+          });
+
+          if (existing) {
+            await tx
+              .update(leaderboard)
+              .set({
+                score: evaluation.score,
+                wpm: evaluation.wpm,
+                accuracy: Math.round(evaluation.accuracy),
+                mistakes: evaluation.mistakes,
+              })
+              .where(eq(leaderboard.id, existing.id)); // PK update — safe
+          }
+        }
+
+        return { attemptId, evaluation };
+      });
+    },
+
+    async recheckAll() {
+      // Prevent concurrent runs
+      const locked = await redisService.get<boolean>(RECHECK_LOCK_KEY);
+      if (locked) throw new Error("recheckAll already in progress");
+
+      await redisService.set(RECHECK_LOCK_KEY, true, RECHECK_TTL);
+      await redisService.set(
+        RECHECK_PROGRESS_KEY,
+        { status: "running", total: 0, succeeded: 0, failed: [] },
+        RECHECK_TTL,
+      );
+
+      try {
+        const allSubmitted = await db.query.testAttempts.findMany({
+          where: eq(testAttempts.isSubmitted, true),
+          with: { speed: true, test: true },
+        });
+
+        const progress = {
+          status: "running" as "running" | "done",
+          total: allSubmitted.length,
+          succeeded: 0,
+          failed: [] as { attemptId: string; error: string }[],
+        };
+
+        // Update total now that we know it
+        await redisService.set(RECHECK_PROGRESS_KEY, progress, RECHECK_TTL);
+
+        const outcomes = await Promise.allSettled(
+          allSubmitted.map((attempt) =>
+            createAttemptService(db)
+              .recheck(attempt.id)
+              .then((res) => {
+                progress.succeeded++;
+                void redisService.set(
+                  RECHECK_PROGRESS_KEY,
+                  progress,
+                  RECHECK_TTL,
+                );
+                return res;
+              })
+              .catch((err: unknown) => {
+                progress.failed.push({
+                  attemptId: attempt.id,
+                  error: err instanceof Error ? err.message : "unknown",
+                });
+                void redisService.set(
+                  RECHECK_PROGRESS_KEY,
+                  progress,
+                  RECHECK_TTL,
+                );
+                throw err;
+              }),
+          ),
+        );
+
+        progress.status = "done";
+        await redisService.set(RECHECK_PROGRESS_KEY, progress, RECHECK_TTL);
+
+        return progress;
+      } finally {
+        await redisService.del(RECHECK_LOCK_KEY);
+      }
+    },
+
+    async recheckAllProgress() {
+      return redisService.get<{
+        status: "running" | "done";
+        total: number;
+        succeeded: number;
+        failed: { attemptId: string; error: string }[];
+      }>(RECHECK_PROGRESS_KEY);
     },
   };
 }
