@@ -107,12 +107,19 @@ function nwWords(A: string[], B: string[]): DiffToken[] {
     if (matches(a, b)) return MATCH;
     const na = normalizeForComparison(a);
     const nb = normalizeForComparison(b);
+    // AFTER (fixed):
     const dist = editDistance(na, nb);
     const maxLen = Math.max(na.length, nb.length);
-    if (dist > maxLen * 0.4) return MISMATCH * 2; // ← heavier penalty
+    const minLen = Math.min(na.length, nb.length);
     if (na.length > 0 && nb.length > 0) {
-      if (nb.startsWith(na) || na.startsWith(nb)) return 0;
+      const lenDiff = maxLen - minLen;
+      const [shorter, longer] = na.length <= nb.length ? [na, nb] : [nb, na];
+      const stem = shorter.slice(0, -1); // drop inflection char
+      if (lenDiff <= 3 && stem.length >= 3 && longer.startsWith(stem))
+        return MATCH;
+      if (nb.startsWith(na) || na.startsWith(nb)) return MATCH;
     }
+    if (dist > maxLen * 0.4) return MISMATCH * 2;
     return MISMATCH;
   };
 

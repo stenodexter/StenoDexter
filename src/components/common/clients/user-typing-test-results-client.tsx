@@ -352,7 +352,7 @@ function AttemptCard({
             <p className="text-sm font-semibold">
               {format(
                 new Date(entry.attempt.submittedAt),
-                "do MMMM yyyy, hh:mm a",
+                "do MMMM, yyyy, hh:mm a",
               )}
             </p>
             <div className="flex items-center gap-2">

@@ -23,7 +23,7 @@ import {
   Zap,
   Lock,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { SolutionAudioDialog } from "~/components/common/admin/add-explanation-audio-dialog";
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -71,7 +71,10 @@ function TestCard({ test }: { test: Test }) {
             </Badge>
 
             {test.lockedCursor && (
-              <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="text-muted-foreground gap-1 text-xs"
+              >
                 <Lock /> cursor
               </Badge>
             )}
@@ -103,9 +106,7 @@ function TestCard({ test }: { test: Test }) {
           <span className="font-medium tabular-nums">{test.attemptCount}</span>
           <span>attempts</span>
           <span className="text-muted-foreground/50 ml-auto">
-            {formatDistanceToNow(new Date(test.createdAt), {
-              addSuffix: true,
-            })}
+            {format(new Date(test.createdAt), "do MMMM, yyyy")}
           </span>
         </div>
       </div>
@@ -171,7 +172,10 @@ function TestRow({ test }: { test: Test }) {
           {test.type.charAt(0).toUpperCase() + test.type.slice(1)}
         </Badge>
         {test.lockedCursor && (
-          <Badge variant="outline" className="shrink-0 gap-1 text-xs text-muted-foreground">
+          <Badge
+            variant="outline"
+            className="text-muted-foreground shrink-0 gap-1 text-xs"
+          >
             <Lock /> cursor
           </Badge>
         )}
@@ -200,7 +204,7 @@ function TestRow({ test }: { test: Test }) {
 
       {/* Created */}
       <p className="text-muted-foreground/60 hidden text-xs lg:block">
-        {formatDistanceToNow(new Date(test.createdAt), { addSuffix: true })}
+        {format(new Date(test.createdAt), "do MMMM, yyyy")}
       </p>
 
       {/* Actions */}

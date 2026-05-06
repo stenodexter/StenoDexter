@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -184,9 +184,6 @@ function TestRow({
   const router = useRouter();
 
   const within24h = isWithin24h(test.createdAt);
-  const uniqueTimes = [
-    ...new Set(test.speeds.map((s) => s.writtenDurationSeconds)),
-  ];
 
   return (
     <TableRow
@@ -195,7 +192,6 @@ function TestRow({
     >
       <TableCell className="py-3.5">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Title with truncation + wrap */}
           <div className="flex flex-wrap items-center gap-2">
             <p className="line-clamp-2 max-w-[280px] text-sm leading-snug font-semibold sm:max-w-xs md:max-w-lg">
               {test.title}
@@ -217,7 +213,6 @@ function TestRow({
           {formatDate(new Date(test.createdAt))}
         </p>
       </TableCell>
-      {/* Speeds — center-aligned to header */}
       <TableCell className="py-3.5 text-center">
         <div className="flex flex-wrap items-center justify-center gap-1">
           {test.speeds.map((s) => (
@@ -233,7 +228,6 @@ function TestRow({
           <span className="text-muted-foreground ml-0.5 text-[10px]">WPM</span>
         </div>
       </TableCell>
-      {/* Transcription time — center-aligned to header */}
       <TableCell className="py-3.5 text-center">
         {(() => {
           const times = test.speeds
@@ -364,26 +358,43 @@ export default function UserTestsPage() {
     if (urlQ !== queryInput) setQueryInput(urlQ);
   }, [searchParams.get("q")]);
 
-  // Push debounced search to URL
+  // Push debounced search to URL — resets page to 1 on new query
+  const prevQueryRef = useRef(searchParams.get("q") ?? "");
   useEffect(() => {
+    if (debouncedQuery === prevQueryRef.current) return;
+    prevQueryRef.current = debouncedQuery;
     const p = new URLSearchParams(searchParams.toString());
     if (debouncedQuery) p.set("q", debouncedQuery);
     else p.delete("q");
-    p.set("page", "1");
+    p.set("page", "1"); // reset page only on search change
     router.push(`${pathname}?${p.toString()}`);
   }, [debouncedQuery]);
 
-  const setParam = (updates: Record<string, string | null>) => {
+  /**
+   * Update arbitrary params WITHOUT resetting page.
+   * Pass `resetPage: true` explicitly when a filter change should go back to page 1.
+   */
+  const setParam = (
+    updates: Record<string, string | null>,
+    resetPage = false,
+  ) => {
     const p = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (value === null) p.delete(key);
       else p.set(key, value);
     }
-    p.set("page", "1");
+    if (resetPage) p.set("page", "1");
     router.push(`${pathname}?${p.toString()}`);
   };
 
-  // ── Query — all filters server-side ───────────────────────────────────────
+  /** Dedicated page navigation — never touches other params */
+  const goToPage = (next: number) => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("page", String(next));
+    router.push(`${pathname}?${p.toString()}`);
+  };
+
+  // ── Query ─────────────────────────────────────────────────────────────────
   const { data, isLoading } = trpc.test.listForUser.useQuery(
     {
       page,
@@ -397,7 +408,7 @@ export default function UserTestsPage() {
 
   const tests = (data?.data ?? []) as unknown as TestItem[];
 
-  // Client-side date filter only (date isn't a server param)
+  // Client-side date filter only
   const filtered = isToday
     ? tests
     : tests.filter((t) =>
@@ -416,6 +427,8 @@ export default function UserTestsPage() {
     selectedDate && !isToday,
     debouncedQuery,
   ].filter(Boolean).length;
+
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <TooltipProvider>
@@ -477,7 +490,7 @@ export default function UserTestsPage() {
                       "text-xs",
                       sort === o.value && "font-semibold",
                     )}
-                    onClick={() => setParam({ sort: o.value })}
+                    onClick={() => setParam({ sort: o.value }, true)}
                   >
                     {o.label}
                     {sort === o.value && <span className="ml-auto">✓</span>}
@@ -506,8 +519,9 @@ export default function UserTestsPage() {
                   selected={selectedDate ?? new Date()}
                   onSelect={(date) => {
                     if (!date) return;
-                    if (isSameDay(date, new Date())) setParam({ date: null });
-                    else setParam({ date: format(date, "yyyy-MM-dd") });
+                    if (isSameDay(date, new Date()))
+                      setParam({ date: null }, true);
+                    else setParam({ date: format(date, "yyyy-MM-dd") }, true);
                     setCalendarOpen(false);
                   }}
                   disabled={(date) => date > new Date()}
@@ -590,17 +604,17 @@ export default function UserTestsPage() {
           )}
 
           {/* Pagination */}
-          {(data?.totalPages ?? 1) > 1 && (
+          {totalPages > 1 && (
             <div className="mt-5 flex items-center justify-between border-t pt-4">
               <p className="text-muted-foreground/60 text-xs tabular-nums">
-                Page {page} of {data?.totalPages}
+                Page {page} of {totalPages}
               </p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={page <= 1}
-                  onClick={() => setParam({ page: String(page - 1) })}
+                  onClick={() => goToPage(page - 1)}
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                   Prev
@@ -608,8 +622,8 @@ export default function UserTestsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page >= (data?.totalPages ?? 1)}
-                  onClick={() => setParam({ page: String(page + 1) })}
+                  disabled={page >= totalPages}
+                  onClick={() => goToPage(page + 1)}
                 >
                   Next
                   <ChevronRight className="h-3.5 w-3.5" />
