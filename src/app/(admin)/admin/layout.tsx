@@ -1,4 +1,3 @@
-
 import type { Metadata } from "next";
 import { requireAdmin } from "~/server/guards";
 import { AdminLayoutClient } from "./_components/layout-client";
@@ -6,6 +5,11 @@ import { AdminLayoutClient } from "./_components/layout-client";
 export const metadata: Metadata = {
   title: "Steno Dexter Admin",
   description: "Admin panel for StenoDexter",
+
+  robots: {
+    follow: false,
+    index: false,
+  },
 };
 
 export default async function AdminLayout({
@@ -15,9 +19,5 @@ export default async function AdminLayout({
 }) {
   const admin = await requireAdmin();
 
-  return (
-    <AdminLayoutClient admin={admin}>
-      {children}
-    </AdminLayoutClient>
-  );
+  return <AdminLayoutClient admin={admin}>{children}</AdminLayoutClient>;
 }
