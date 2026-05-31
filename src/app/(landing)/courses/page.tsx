@@ -27,8 +27,8 @@ const courses = [
       "Comprehensive Pitman Shorthand course instructed by experienced trainers from basics to advanced levels.",
     level: "Beginner",
     students: 100,
-
     image: "/images/stuff/steno1.jpeg",
+    href: "https://docs.google.com/forms/d/e/1FAIpQLSe_OIAJzgSlWQqp6AOOqsvSp4pDjQzZgKFCjqdgnEoZJk8dIw/viewform",
   },
   {
     id: 2,
@@ -103,21 +103,14 @@ export default function CoursesPage() {
 
                   {/* Footer */}
                   <div className="border-border mt-auto flex items-center justify-between pt-4">
-                    {course.id === 1 ? (
-                      <Button onClick={() => setOpenContact(true)}>
-                        Enroll
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    ) : (
-                      <a
-                        href={course.href}
-                        target="_blank"
-                        className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-                      >
-                        Enroll
-                        <ArrowRight className="h-3 w-3" />
-                      </a>
-                    )}
+                    <a
+                      href={course.href}
+                      target="_blank"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                    >
+                      Enroll
+                      <ArrowRight className="h-3 w-3" />
+                    </a>
                   </div>
                 </div>
               </div>
