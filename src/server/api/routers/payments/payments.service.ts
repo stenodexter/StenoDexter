@@ -35,28 +35,52 @@ async function upsertSubscription(
   });
 
   const now = new Date();
-  let start: Date;
+  const end = new Date();
 
   if (existing && existing.currentPeriodEnd > now) {
-    start = new Date(existing.currentPeriodEnd);
-  } else {
-    start = now;
-  }
+    console.log("New service out here haha");
 
-  const end = new Date(start);
-  end.setDate(end.getDate() + 30);
+    // Active sub: extend from its current end
+    end.setTime(existing.currentPeriodEnd.getTime());
+    end.setDate(end.getDate() + 30);
 
-  if (existing) {
     await tx
       .update(subscription)
-      .set({ currentPeriodEnd: end, updatedAt: new Date() })
+      .set({
+        currentPeriodEnd: end,
+        paymentProofId: paymentId,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(subscription.id, existing.id));
+  } else if (existing) {
+    // Expired/revoked sub: reset the window starting now
+    const start = new Date();
+    end.setTime(start.getTime());
+    end.setDate(end.getDate() + 30);
+
+    await tx
+      .update(subscription)
+      .set({
+        currentPeriodStart: start,
+        currentPeriodEnd: end,
+        paymentProofId: paymentId,
+        status: "active", // ← this was the missing piece
+        updatedAt: new Date(),
+      })
       .where(eq(subscription.id, existing.id));
   } else {
+    // No record at all: insert fresh
+    const start = new Date();
+    end.setTime(start.getTime());
+    end.setDate(end.getDate() + 30);
+
     await tx.insert(subscription).values({
       id: crypto.randomUUID(),
       userId,
       paymentProofId: paymentId,
       type: subType,
+      status: "active",
       currentPeriodStart: start,
       currentPeriodEnd: end,
     });
@@ -75,9 +99,15 @@ export function createPaymentService(db: Db) {
         throw new Error("You already have a pending payment.");
       }
 
+      const existingSub = await db.query.subscription.findFirst({
+        where: (s, { eq }) => eq(s.userId, userId),
+      });
+
+      const resolvedType = existingSub ? "renew" : "fresh";
+
       await db.insert(payment).values({
         userId,
-        type: data.type,
+        type: resolvedType,
         plan: data.plan,
         amount: data.amount,
         fromUPIId: data.fromUPIId,
