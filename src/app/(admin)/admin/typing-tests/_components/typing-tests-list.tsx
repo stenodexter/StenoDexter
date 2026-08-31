@@ -30,6 +30,8 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { useState, useTransition, useCallback, useEffect } from "react";
 import { DeleteTypingTestDialog } from "./delete-typing-test-dialog";
+import { useCurrentReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import { cn } from "~/lib/utils";
 import { useDebounce } from "~/hooks/use-debounce";
 
@@ -54,10 +56,13 @@ function TestRow({
   onDelete: (id: string, title: string) => void;
 }) {
   const router = useRouter();
+  const returnTo = useCurrentReturnTo();
 
   return (
     <div
-      onClick={() => router.push(`/admin/typing-tests/${test.id}`)}
+      onClick={() =>
+        router.push(withReturnTo(`/admin/typing-tests/${test.id}`, returnTo))
+      }
       className="bg-card hover:bg-muted/30 flex cursor-pointer items-center gap-4 rounded-xl border px-5 py-3.5 transition-all"
     >
       <p className="min-w-0 flex-1 truncate text-sm font-semibold">
@@ -78,13 +83,23 @@ function TestRow({
         onClick={(e) => e.stopPropagation()}
       >
         <Button asChild variant="ghost" size="sm">
-          <Link href={`/admin/typing-tests/${test.id}/attempts`}>
+          <Link
+            href={withReturnTo(
+              `/admin/typing-tests/${test.id}/attempts`,
+              returnTo,
+            )}
+          >
             <Users className="h-3.5 w-3.5" />
             Attempts
           </Link>
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <Link href={`/admin/typing-tests/${test.id}/leaderboard`}>
+          <Link
+            href={withReturnTo(
+              `/admin/typing-tests/${test.id}/leaderboard`,
+              returnTo,
+            )}
+          >
             <Trophy className="h-3.5 w-3.5" />
             Leaderboard
           </Link>
@@ -223,6 +238,8 @@ function FilterBar({
 export function TypingTestList() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Deleting from the list keeps the admin on this list, filters intact.
+  const returnTo = useCurrentReturnTo();
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const sort = (searchParams.get("sort") === "oldest" ? "oldest" : "newest") as
@@ -349,6 +366,7 @@ export function TypingTestList() {
           onClose={() => setDeleteTarget(null)}
           testId={deleteTarget.id}
           testTitle={deleteTarget.title}
+          returnTo={returnTo}
         />
       )}
     </div>

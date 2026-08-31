@@ -19,11 +19,14 @@ export function DeleteTypingTestDialog({
   onClose,
   testId,
   testTitle,
+  returnTo = "/admin/typing-tests",
 }: {
   open: boolean;
   onClose: () => void;
   testId: string;
   testTitle: string;
+  /** Where to land after deleting — the filtered list the admin came from. */
+  returnTo?: string;
 }) {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -33,7 +36,7 @@ export function DeleteTypingTestDialog({
       toast.success("Test deleted");
       utils.typingTest.manage.list.invalidate();
       onClose();
-      router.push("/admin/typing-tests");
+      router.push(returnTo);
     },
     onError: (e) => toast.error(e.message),
   });

@@ -25,6 +25,7 @@ import {
 import { useRouter } from "next/navigation";
 import { trpc } from "~/trpc/react";
 import { toast } from "sonner";
+import { withReturnTo } from "~/lib/return-to";
 
 function fmtSec(s: number) {
   if (s < 60) return `${s}s`;
@@ -52,6 +53,8 @@ interface TestStartDialogProps {
   lockedCursor: boolean;
   speeds: Speed[];
   selectedSpeedId?: string;
+  /** Filtered list to return to from inside the attempt. */
+  returnTo?: string;
 }
 
 const warnings = [
@@ -74,6 +77,7 @@ export function TestStartDialog({
   lockedCursor,
   speeds,
   selectedSpeedId: propSpeedId,
+  returnTo,
 }: TestStartDialogProps) {
   const router = useRouter();
   const [selectedSpeedId, setSelectedSpeedId] = useState<string | null>(
@@ -100,7 +104,12 @@ export function TestStartDialog({
   const createAttempt = trpc.attempt.create.useMutation({
     onSuccess: (attempt) => {
       onOpenChange(false);
-      router.push(`/user/test/${testId}/attempt/${attempt.id}`);
+      router.push(
+        withReturnTo(
+          `/user/test/${testId}/attempt/${attempt.id}`,
+          returnTo ?? null,
+        ),
+      );
     },
     onError: (err) =>
       toast.error(err.message ?? "Failed to start test. Please try again."),

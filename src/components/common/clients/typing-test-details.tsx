@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { DeleteTypingTestDialog } from "~/app/(admin)/admin/typing-tests/_components/delete-typing-test-dialog";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import { TypingTestStartDialog } from "../user/typing-test-start-dialog";
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -105,24 +107,41 @@ function AdminView({
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const utils = trpc.useUtils();
+  // Back / delete return to the filtered list the admin drilled in from.
+  const returnTo = useReturnTo("/admin/typing-tests");
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/admin/typing-tests/${testId}/attempts`}>
+          <Link
+            href={withReturnTo(
+              `/admin/typing-tests/${testId}/attempts`,
+              returnTo,
+            )}
+          >
             <Users className="h-3.5 w-3.5" />
             Attempts
           </Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/admin/typing-tests/${testId}/leaderboard`}>
+          <Link
+            href={withReturnTo(
+              `/admin/typing-tests/${testId}/leaderboard`,
+              returnTo,
+            )}
+          >
             <Trophy className="h-3.5 w-3.5" />
             Leaderboard
           </Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/admin/typing-tests/${testId}/edit`}>
+          <Link
+            href={withReturnTo(
+              `/admin/typing-tests/${testId}/edit`,
+              returnTo,
+            )}
+          >
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </Link>
@@ -145,6 +164,7 @@ function AdminView({
         onClose={() => setDeleteOpen(false)}
         testId={testId}
         testTitle={test.title}
+        returnTo={returnTo}
       />
     </>
   );

@@ -22,6 +22,8 @@ interface DeleteTestDialogProps {
   onClose: () => void;
   testId: string;
   testTitle: string;
+  /** Where to land after deleting — the filtered list the admin came from. */
+  returnTo?: string;
 }
 
 export function DeleteTestDialog({
@@ -29,6 +31,7 @@ export function DeleteTestDialog({
   onClose,
   testId,
   testTitle,
+  returnTo = "/admin/tests",
 }: DeleteTestDialogProps) {
   const router = useRouter();
   const [confirmValue, setConfirmValue] = useState("");
@@ -36,7 +39,7 @@ export function DeleteTestDialog({
   const { mutate: deleteTest, isPending } = trpc.test.delete.useMutation({
     onSuccess: () => {
       toast.success("Test deleted successfully");
-      router.push("/admin/tests");
+      router.push(returnTo);
     },
     onError: (err) => {
       toast.error(err.message ?? "Failed to delete test");

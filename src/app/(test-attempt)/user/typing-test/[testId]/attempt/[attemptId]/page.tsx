@@ -8,6 +8,8 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
 import { useLeaveGuard } from "~/hooks/use-leave-guard";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import {
   Send,
   CheckCircle2,
@@ -52,9 +54,11 @@ function LiveClock() {
 function SubmittedScreen({
   testId,
   attemptId,
+  returnTo,
 }: {
   testId: string;
   attemptId: string;
+  returnTo: string;
 }) {
   const router = useRouter();
   useEffect(() => {
@@ -75,7 +79,7 @@ function SubmittedScreen({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => router.push("/user/typing-tests")}
+          onClick={() => router.push(returnTo)}
         >
           Back to tests
         </Button>
@@ -83,7 +87,10 @@ function SubmittedScreen({
           size="sm"
           onClick={() =>
             router.push(
-              `/user/typing-tests/${testId}/results?attemptId=${attemptId}`,
+              withReturnTo(
+                `/user/typing-tests/${testId}/results?attemptId=${attemptId}`,
+                returnTo,
+              ),
             )
           }
         >
@@ -97,6 +104,8 @@ function SubmittedScreen({
 export default function TypingAttemptPage() {
   const params = useParams<{ testId: string; attemptId: string }>();
   const router = useRouter();
+  // Where "Back to tests" goes — the filtered list the attempt was started from.
+  const returnTo = useReturnTo("/user/typing-tests");
   const { get: getCookie, set: setCookie } = useCookie();
 
   const { data, isLoading, isError } =
@@ -406,7 +415,7 @@ export default function TypingAttemptPage() {
         <p className="font-medium">Test not found</p>
         <Button
           variant="outline"
-          onClick={() => navigateSafe(() => router.push("/user/typing-tests"))}
+          onClick={() => navigateSafe(() => router.push(returnTo))}
         >
           Back
         </Button>
@@ -417,7 +426,11 @@ export default function TypingAttemptPage() {
   if (submitted) {
     return (
       <div className="bg-background fixed inset-0">
-        <SubmittedScreen testId={params.testId} attemptId={params.attemptId} />
+        <SubmittedScreen
+          testId={params.testId}
+          attemptId={params.attemptId}
+          returnTo={returnTo}
+        />
       </div>
     );
   }

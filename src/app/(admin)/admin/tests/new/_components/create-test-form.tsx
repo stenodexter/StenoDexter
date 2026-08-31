@@ -8,6 +8,7 @@ import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { trpc } from "~/trpc/react";
+import { useReturnTo } from "~/hooks/use-return-to";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -629,6 +630,8 @@ function SpeedCard({
 
 export function CreateTestForm() {
   const router = useRouter();
+  // Creating from a filtered list returns to that list, not to All Tests.
+  const returnTo = useReturnTo("/admin/tests");
   const presign = trpc.store.generatePresignedUrl.useMutation();
   const submitModeRef = useRef<"draft" | "active">("draft");
   const solutionAudioRef = useRef<HTMLInputElement>(null);
@@ -662,7 +665,7 @@ export function CreateTestForm() {
           ? "Saved as draft"
           : "Test is now live!",
       );
-      router.push("/admin/tests");
+      router.push(returnTo);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -670,7 +673,7 @@ export function CreateTestForm() {
   const saveDraft = trpc.test.saveDraft.useMutation({
     onSuccess: () => {
       toast.success("Saved as draft");
-      router.push("/admin/tests");
+      router.push(returnTo);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1109,11 +1112,7 @@ export function CreateTestForm() {
       </Section>
       {/* ── Actions ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-t px-8 py-5">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.push("/admin/tests")}
-        >
+        <Button type="button" variant="ghost" onClick={() => router.push(returnTo)}>
           Cancel
         </Button>
 

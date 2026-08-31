@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "~/trpc/react";
+import { useReturnTo } from "~/hooks/use-return-to";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
@@ -692,6 +693,8 @@ export function TestResultsPage({
   const searchParams = useSearchParams();
   const { testId } = params;
   const router = useRouter();
+  // Back goes to the filtered list this result was reached from.
+  const returnTo = useReturnTo(isAdmin ? "/admin/tests" : "/user/tests");
   const highlightId = searchParams.get("attemptId");
 
   const { data: testData, isLoading: testLoading } = trpc.test.get.useQuery(
@@ -706,10 +709,7 @@ export function TestResultsPage({
           variant="ghost"
           size="sm"
           className="text-muted-foreground mb-2 -ml-2"
-          onClick={() => {
-            if (!isAdmin) router.push("/user/tests");
-            else router.push("/admin/tests");
-          }}
+          onClick={() => router.push(returnTo)}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Back to Tests

@@ -1,9 +1,7 @@
 // app/admin/typing-tests/page.tsx
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Button } from "~/components/ui/button";
-import { Plus } from "lucide-react";
 import { TypingTestList } from "./_components/typing-tests-list";
+import { CreateTypingTestButton } from "./_components/create-typing-test-button";
 
 export const metadata: Metadata = { title: "Typing Tests — Admin" };
 
@@ -17,12 +15,7 @@ export default function TypingTestsPage() {
             Manage typing test transcriptions here.
           </p>
         </div>
-        <Button asChild size="sm">
-          <Link href="/admin/typing-tests/new">
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Create Test
-          </Link>
-        </Button>
+        <CreateTypingTestButton />
       </div>
       <TypingTestList />
     </div>

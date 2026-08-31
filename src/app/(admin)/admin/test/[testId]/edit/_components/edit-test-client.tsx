@@ -8,6 +8,7 @@ import { useState, useRef, Suspense } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { trpc } from "~/trpc/react";
+import { useReturnTo } from "~/hooks/use-return-to";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -701,6 +702,8 @@ function SpeedCard({
 
 function EditTestFormInner({ testId }: { testId: string }) {
   const router = useRouter();
+  // Saving or cancelling returns to the filtered list this edit started from.
+  const returnTo = useReturnTo("/admin/tests");
   const utils = trpc.useUtils();
   const presign = trpc.store.generatePresignedUrl.useMutation();
 
@@ -755,7 +758,7 @@ function EditTestFormInner({ testId }: { testId: string }) {
           ? "Test is now live!"
           : "Saved as draft.",
       );
-      router.push("/admin/tests");
+      router.push(returnTo);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1358,11 +1361,7 @@ function EditTestFormInner({ testId }: { testId: string }) {
 
       {/* ── Actions ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-t px-8 py-5">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.push("/admin/tests")}
-        >
+        <Button type="button" variant="ghost" onClick={() => router.push(returnTo)}>
           Cancel
         </Button>
 

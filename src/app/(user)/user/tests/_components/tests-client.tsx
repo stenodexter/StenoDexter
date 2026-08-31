@@ -57,6 +57,8 @@ import {
 } from "~/components/ui/tooltip";
 import { isAfter, subHours } from "date-fns";
 import { cn } from "~/lib/utils";
+import { useCurrentReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -182,13 +184,14 @@ function TestRow({
   onSelect: (s: Selected) => void;
 }) {
   const router = useRouter();
+  const returnTo = useCurrentReturnTo();
 
   const within24h = isWithin24h(test.createdAt);
 
   return (
     <TableRow
       className="cursor-pointer"
-      onClick={() => router.push(`/user/tests/${test.id}`)}
+      onClick={() => router.push(withReturnTo(`/user/tests/${test.id}`, returnTo))}
     >
       <TableCell className="py-3.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -258,7 +261,12 @@ function TestRow({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button asChild variant="ghost" size="icon-sm">
-                <Link href={`/user/tests/${test.id}/leaderboard`}>
+                <Link
+                  href={withReturnTo(
+                    `/user/tests/${test.id}/leaderboard`,
+                    returnTo,
+                  )}
+                >
                   <Trophy className="h-4 w-4" />
                 </Link>
               </Button>
@@ -270,7 +278,12 @@ function TestRow({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button asChild variant="ghost" size="icon-sm">
-                  <Link href={`/user/tests/${test.id}/results`}>
+                  <Link
+                  href={withReturnTo(
+                    `/user/tests/${test.id}/results`,
+                    returnTo,
+                  )}
+                >
                     <BarChart2 className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -337,6 +350,8 @@ export default function UserTestsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Handed to the attempt so its "Back to tests" returns to this filtered list.
+  const listReturnTo = useCurrentReturnTo();
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const sort = (searchParams.get("sort") ?? "newest") as SortOrder;
@@ -642,6 +657,7 @@ export default function UserTestsPage() {
           testTitle={selected?.test.title ?? ""}
           lockedCursor={!!selected?.test.lockedCursor}
           speeds={selected?.test.speeds ?? []}
+          returnTo={listReturnTo}
         />
       </div>
     </TooltipProvider>

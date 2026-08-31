@@ -5,6 +5,7 @@ import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { trpc } from "~/trpc/react";
+import { useReturnTo } from "~/hooks/use-return-to";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -47,11 +48,13 @@ function Section({
 
 export function CreateTypingTestForm() {
   const router = useRouter();
+  // Creating from a filtered list returns to that list, not to All Tests.
+  const returnTo = useReturnTo("/admin/typing-tests");
 
   const createTest = trpc.typingTest.manage.create.useMutation({
     onSuccess: () => {
       toast.success("Typing test created!");
-      router.push("/admin/typing-tests");
+      router.push(returnTo);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -166,7 +169,7 @@ export function CreateTypingTestForm() {
         <Button
           type="button"
           variant="ghost"
-          onClick={() => router.push("/admin/typing-tests")}
+          onClick={() => router.push(returnTo)}
         >
           Cancel
         </Button>

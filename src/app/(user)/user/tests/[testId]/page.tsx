@@ -31,6 +31,8 @@ import { Suspense, useRef, useState } from "react";
 import { TestStartDialog } from "~/components/common/user/test-start-dialog";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -279,6 +281,8 @@ function PageSkeleton() {
 export default function TestDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  // Back returns to the filtered list the user came from (Legal / Special / …).
+  const returnTo = useReturnTo("/user/tests");
   const testId = params.testId as string;
 
   const selectedSpeedId = useRef<string | null>(null);
@@ -302,7 +306,7 @@ export default function TestDetailsPage() {
         <p className="text-muted-foreground mb-6 text-sm">
           This test doesn&apos;t exist or has been removed.
         </p>
-        <Button variant="outline" onClick={() => router.push("/user/tests")}>
+        <Button variant="outline" onClick={() => router.push(returnTo)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to tests
         </Button>
@@ -321,7 +325,7 @@ export default function TestDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/user/tests")}
+          onClick={() => router.push(returnTo)}
           className="text-muted-foreground hover:text-foreground mb-6 -ml-2 gap-1.5 text-xs"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -342,13 +346,13 @@ export default function TestDetailsPage() {
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="text-xs">
-              <Link href={`/user/tests/${test.id}/results`}>
+              <Link href={withReturnTo(`/user/tests/${test.id}/results`, returnTo)}>
                 <BarChart2 className="mr-1.5 h-3.5 w-3.5" />
                 My results
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="text-xs">
-              <Link href={`/user/tests/${test.id}/leaderboard`}>
+              <Link href={withReturnTo(`/user/tests/${test.id}/leaderboard`, returnTo)}>
                 <Trophy className="mr-1.5 h-3.5 w-3.5" />
                 Leaderboard
               </Link>
@@ -433,6 +437,7 @@ export default function TestDetailsPage() {
           testTitle={selected?.test.title ?? ""}
           speeds={selected?.test.speeds ?? []}
           selectedSpeedId={selectedSpeedId.current ?? undefined}
+          returnTo={returnTo}
         />
       </div>
     </Suspense>

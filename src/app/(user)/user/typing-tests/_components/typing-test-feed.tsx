@@ -29,6 +29,8 @@ import {
 import { format } from "date-fns";
 import { cn } from "~/lib/utils";
 import { useDebounce } from "~/hooks/use-debounce";
+import { useCurrentReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import { TypingTestStartDialog } from "~/components/common/user/typing-test-start-dialog";
 import {
   Tooltip,
@@ -61,10 +63,13 @@ function TestRow({
   onStart: (test: TypingTestCard) => void;
 }) {
   const router = useRouter();
+  const returnTo = useCurrentReturnTo();
 
   return (
     <div
-      onClick={() => router.push(`/user/typing-tests/${test.id}`)}
+      onClick={() => router.push(
+                withReturnTo(`/user/typing-tests/${test.id}`, returnTo),
+              )}
       className="bg-card hover:bg-muted/30 grid cursor-pointer grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-3 rounded-xl border px-5 py-3.5 transition-all"
     >
       {/* title */}
@@ -95,7 +100,9 @@ function TestRow({
             className="h-7 w-7 p-0"
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/user/typing-tests/${test.id}/results`);
+              router.push(
+                withReturnTo(`/user/typing-tests/${test.id}/results`, returnTo),
+              );
             }}
           >
             <BarChart2 className="h-3.5 w-3.5" />
@@ -113,7 +120,9 @@ function TestRow({
             className="h-7 w-7 p-0"
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/user/typing-tests/${test.id}/leaderboard`);
+              router.push(
+                withReturnTo(`/user/typing-tests/${test.id}/leaderboard`, returnTo),
+              );
             }}
           >
             <Trophy className="h-3.5 w-3.5" />
@@ -259,6 +268,8 @@ function FilterBar({
 export function TypingTestFeed() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Handed to the attempt so its "Back to tests" returns to this filtered list.
+  const listReturnTo = useCurrentReturnTo();
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const sort = (searchParams.get("sort") === "oldest" ? "oldest" : "newest") as
@@ -379,6 +390,7 @@ export function TypingTestFeed() {
           open={!!startTarget}
           onOpenChange={(o) => !o && setStartTarget(null)}
           test={startTarget}
+          returnTo={listReturnTo}
         />
       )}
     </div>

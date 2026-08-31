@@ -10,6 +10,8 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Save } from "lucide-react";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 
 function Label({ children }: { children: React.ReactNode }) {
   return <p className="mb-1.5 text-sm font-medium">{children}</p>;
@@ -33,12 +35,14 @@ function EditForm({
 }) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  // Carried forward so the detail page's own Back still reaches the right list.
+  const returnTo = useReturnTo("/admin/typing-tests");
 
   const update = trpc.typingTest.manage.update.useMutation({
     onSuccess: () => {
       toast.success("Test updated");
       utils.typingTest.manage.get.invalidate({ id: testId });
-      router.push(`/admin/typing-tests/${testId}`);
+      router.push(withReturnTo(`/admin/typing-tests/${testId}`, returnTo));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -135,7 +139,9 @@ function EditForm({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => router.push(`/admin/typing-tests/${testId}`)}
+          onClick={() =>
+            router.push(withReturnTo(`/admin/typing-tests/${testId}`, returnTo))
+          }
         >
           Cancel
         </Button>

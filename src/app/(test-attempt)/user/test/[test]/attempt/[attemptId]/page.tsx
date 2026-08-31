@@ -17,6 +17,8 @@ import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { useCookie } from "~/hooks/use-cookie";
 import { useLeaveGuard } from "~/hooks/use-leave-guard";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import {
   SkipForward,
   Send,
@@ -624,9 +626,11 @@ function LiveClock() {
 function SubmittedScreen({
   testId,
   attemptId,
+  returnTo,
 }: {
   testId: string;
   attemptId: string;
+  returnTo: string;
 }) {
   const router = useRouter();
   useEffect(() => {
@@ -648,14 +652,19 @@ function SubmittedScreen({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => router.push("/user/tests")}
+          onClick={() => router.push(returnTo)}
         >
           Back to tests
         </Button>
         <Button
           size="sm"
           onClick={() =>
-            router.push(`/user/tests/${testId}/results?attemptId=${attemptId}`)
+            router.push(
+              withReturnTo(
+                `/user/tests/${testId}/results?attemptId=${attemptId}`,
+                returnTo,
+              ),
+            )
           }
         >
           View result
@@ -670,6 +679,9 @@ function SubmittedScreen({
 export default function AttemptPage() {
   const params = useParams<{ test: string; attemptId: string }>();
   const router = useRouter();
+
+  // Where "Back to tests" goes — the filtered list the attempt was started from.
+  const returnTo = useReturnTo("/user/tests");
 
   const { data, isLoading, isError } = trpc.attempt.getResume.useQuery(
     { attemptId: params.attemptId },
@@ -928,7 +940,7 @@ export default function AttemptPage() {
         <p className="font-medium">Test not found</p>
         <Button
           variant="outline"
-          onClick={() => navigateSafe(() => router.push("/user/tests"))}
+          onClick={() => navigateSafe(() => router.push(returnTo))}
         >
           Back to tests
         </Button>
@@ -1018,7 +1030,11 @@ export default function AttemptPage() {
         )}
 
         {stage === "submitted" && (
-          <SubmittedScreen testId={data.test.id} attemptId={data.attempt.id} />
+          <SubmittedScreen
+            testId={data.test.id}
+            attemptId={data.attempt.id}
+            returnTo={returnTo}
+          />
         )}
       </div>
     </div>

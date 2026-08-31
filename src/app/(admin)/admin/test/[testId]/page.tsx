@@ -10,6 +10,8 @@ import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { SolutionAudioDialog } from "~/components/common/admin/add-explanation-audio-dialog";
 import { DeleteTestDialog } from "~/components/common/admin/delete-test-dialog";
+import { useReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 import {
   Trophy,
   Users,
@@ -21,6 +23,7 @@ import {
   Lock,
   List,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { env } from "~/env";
@@ -84,6 +87,8 @@ export default function TestPage({
 }) {
   const { testId } = use(params);
   const utils = trpc.useUtils();
+  // Back / delete return to the filtered list the admin drilled in from.
+  const returnTo = useReturnTo("/admin/tests");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -116,6 +121,18 @@ export default function TestPage({
 
   return (
     <div className="mx-auto flex min-w-3xl flex-col gap-6 px-4 py-10">
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground -ml-2 w-fit gap-1.5"
+      >
+        <Link href={returnTo}>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to tests
+        </Link>
+      </Button>
+
       {/* Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
@@ -221,13 +238,13 @@ export default function TestPage({
         {!isDraft && (
           <>
             <Button asChild variant="outline" size="sm">
-              <Link href={`/admin/test/${testId}/attempts`}>
+              <Link href={withReturnTo(`/admin/test/${testId}/attempts`, returnTo)}>
                 <Users className="h-3.5 w-3.5" />
                 All Attempts
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link href={`/admin/test/${testId}/leaderboard`}>
+              <Link href={withReturnTo(`/admin/test/${testId}/leaderboard`, returnTo)}>
                 <Trophy className="h-3.5 w-3.5" />
                 Leaderboard
               </Link>
@@ -236,7 +253,7 @@ export default function TestPage({
         )}
         {isDraft && (
           <Button asChild variant="outline" size="sm">
-            <Link href={`/admin/test/${testId}/edit`}>
+            <Link href={withReturnTo(`/admin/test/${testId}/edit`, returnTo)}>
               <Pencil className="h-3.5 w-3.5" />
               Edit
             </Link>
@@ -287,6 +304,7 @@ export default function TestPage({
         onClose={() => setDeleteOpen(false)}
         testId={testId}
         testTitle={test.title}
+        returnTo={returnTo}
       />
     </div>
   );

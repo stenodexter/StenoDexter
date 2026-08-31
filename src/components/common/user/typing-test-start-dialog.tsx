@@ -3,6 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { withReturnTo } from "~/lib/return-to";
 import { trpc } from "~/trpc/react";
 import {
   Dialog,
@@ -50,17 +51,25 @@ export function TypingTestStartDialog({
   open,
   onOpenChange,
   test,
+  returnTo,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   test: TypingTestCard;
+  /** Filtered list to return to from inside the attempt. */
+  returnTo?: string;
 }) {
   const router = useRouter();
 
   const createAttempt = trpc.typingTest.attempt.create.useMutation({
     onSuccess: (attempt) => {
       onOpenChange(false);
-      router.push(`/user/typing-test/${test.id}/attempt/${attempt.id}`);
+      router.push(
+        withReturnTo(
+          `/user/typing-test/${test.id}/attempt/${attempt.id}`,
+          returnTo ?? null,
+        ),
+      );
     },
     onError: (e) => toast.error(e.message ?? "Failed to start. Try again."),
   });

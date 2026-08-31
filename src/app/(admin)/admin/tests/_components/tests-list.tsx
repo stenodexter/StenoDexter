@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { SolutionAudioDialog } from "~/components/common/admin/add-explanation-audio-dialog";
+import { useCurrentReturnTo } from "~/hooks/use-return-to";
+import { withReturnTo } from "~/lib/return-to";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -48,10 +50,13 @@ function TestCard({ test }: { test: Test }) {
   const hasSolutionAudio = !!test.solutionAudioKey;
   const utils = trpc.useUtils();
   const router = useRouter(); // 👈 add
+  const returnTo = useCurrentReturnTo();
 
   return (
     <div
-      onClick={() => router.push(`/admin/test/${test.id}`)}
+      onClick={() =>
+        router.push(withReturnTo(`/admin/test/${test.id}`, returnTo))
+      }
       className="bg-card hover:bg-muted/30 flex h-full cursor-pointer flex-col gap-3 rounded-xl border px-4 py-4 transition-all hover:shadow-sm"
     >
       {/* TOP CONTENT */}
@@ -119,13 +124,23 @@ function TestCard({ test }: { test: Test }) {
         {!isDraft && (
           <>
             <Button asChild variant="outline" size="xs">
-              <Link href={`/admin/test/${test.id}/attempts`}>
+              <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/attempts`,
+                  returnTo,
+                )}
+              >
                 <Users className="h-3.5 w-3.5" />
                 Attempts
               </Link>
             </Button>
             <Button asChild variant="outline" size="xs">
-              <Link href={`/admin/test/${test.id}/leaderboard`}>
+              <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/leaderboard`,
+                  returnTo,
+                )}
+              >
                 <Trophy className="h-3.5 w-3.5" />
                 Leaderboard
               </Link>
@@ -141,7 +156,12 @@ function TestCard({ test }: { test: Test }) {
         )}
         {isDraft && (
           <Button asChild variant="outline" size="xs">
-            <Link href={`/admin/test/${test.id}/edit`}>
+            <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/edit`,
+                  returnTo,
+                )}
+              >
               <Pencil className="h-3.5 w-3.5" />
               Edit
             </Link>
@@ -157,10 +177,13 @@ function TestRow({ test }: { test: Test }) {
   const hasSolutionAudio = !!test.solutionAudioKey;
   const utils = trpc.useUtils();
   const router = useRouter(); // 👈 add
+  const returnTo = useCurrentReturnTo();
 
   return (
     <div
-      onClick={() => router.push(`/admin/test/${test.id}`)} // 👈 add
+      onClick={() =>
+        router.push(withReturnTo(`/admin/test/${test.id}`, returnTo))
+      } // 👈 add
       className="bg-card hover:bg-muted/30 flex cursor-pointer auto-rows-fr items-center gap-4 rounded-xl border px-5 py-3.5 transition-all"
     >
       {/* Title + badges */}
@@ -215,13 +238,23 @@ function TestRow({ test }: { test: Test }) {
         {!isDraft && (
           <>
             <Button asChild variant="ghost" size="sm">
-              <Link href={`/admin/test/${test.id}/attempts`}>
+              <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/attempts`,
+                  returnTo,
+                )}
+              >
                 <Users className="h-3.5 w-3.5" />
                 Attempts
               </Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href={`/admin/test/${test.id}/leaderboard`}>
+              <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/leaderboard`,
+                  returnTo,
+                )}
+              >
                 <Trophy className="h-3.5 w-3.5" />
                 Leaderboard
               </Link>
@@ -230,7 +263,12 @@ function TestRow({ test }: { test: Test }) {
         )}
         {isDraft && (
           <Button asChild variant="ghost" size="sm">
-            <Link href={`/admin/test/${test.id}/edit`}>
+            <Link
+                href={withReturnTo(
+                  `/admin/test/${test.id}/edit`,
+                  returnTo,
+                )}
+              >
               <Pencil className="h-3.5 w-3.5" />
               Edit
             </Link>
